@@ -1,0 +1,49 @@
+Shadow Fight 2 Recomp — third-party source and runtime notices
+
+This file describes components used by the compiler or native runtime. Their
+licenses apply separately from the root LICENSE. Game files and keys are supplied
+locally by the user; no license to those files is granted here.
+
+Runtime and generator
+- LAS Recomp, Peiikai, MIT: licenses/LASRecomp.txt (runtime and generator).
+  https://github.com/Peiikai/LASRecomp
+- Audio mixer model: Ryujinx Team and Contributors, MIT: licenses/Ryujinx.txt.
+  Notice retained by the upstream LAS Recomp source:
+  https://github.com/Peiikai/LASRecomp/blob/main/third_party/ryujinx/LICENSE.txt
+- SMAA: licenses/SMAA.txt (authors and permissive terms there).
+  Pinned source/lookup tables are fetched by tools/setup_smaa.py into ignored
+  third_party/smaa; the tables are SMAA library data, not SF2 game assets.
+  https://github.com/iryoku/smaa
+- SDL3: zlib license, licenses/SDL3.txt; headers and library are installed locally
+  by tools/setup_runtime.sh --build-sdl or supplied by a system development package.
+  https://github.com/libsdl-org/SDL
+- Vulkan Memory Allocator: AMD, MIT, licenses/VulkanMemoryAllocator.txt.
+  Included from the host development package, compiled by runtime/nvn/vulkan/vma.cpp.
+  https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
+- shaderc: Apache-2.0, https://github.com/google/shaderc/blob/main/LICENSE
+  Vulkan loader: Apache-2.0, https://github.com/KhronosGroup/Vulkan-Loader/blob/main/LICENSE.txt
+  These and C/C++ system libraries normally remain system-provided shared libraries.
+  Preserve package license notices when bundling any such libraries separately.
+
+Local extraction and analysis (not linked into the game)
+- hactool: licenses/hactool.txt (ISC); bundled mbedTLS:
+  licenses/hactool-mbedTLS.txt.
+- nstool: licenses/nstool.txt (MIT); shared dependency licenses:
+  licenses/nstool-libfmt.txt, nstool-liblz4.txt, nstool-libmbedtls.txt,
+  nstool-libpietendo.txt and nstool-libtoolchain.txt in the same folder.
+  Official source revisions and archive checksums: tools/extraction-dependencies.json.
+  tools/setup_extraction.py fetches these into ignored tools/third_party/.
+- LibHac 0.19.0: local NuGet dependency of tools/bktr/Sf2Bktr.csproj. Preserve
+  the license supplied by the restored package if redistributing the tool binary.
+- Il2CppDumper and Mono.Cecil: licenses/Il2CppDumper.txt and licenses/Mono.Cecil.txt;
+  source-build instructions in tools/il2cpp/. Assemblies are local build outputs.
+- Python analysis dependencies are declared in tools/requirements.txt; their
+  package licenses accompany their installed distributions.
+
+The public source package excludes game/, generated C, game-derived executables,
+assets, tickets and user keys. The conversion output is generated locally and
+contains original game-derived code/data; it is not the compiler source package.
+
+License layout: root LICENSE covers project contributions; licenses/ holds the
+tracked third-party license texts; this file indexes their scope and provenance.
+Ignored dependency installations retain their own original upstream notices.

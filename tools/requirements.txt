@@ -1,0 +1,7 @@
+# Versions used by the supported generation/extraction toolchain.
+capstone==5.0.9
+unicorn==2.1.4
+lz4==4.4.5
+cryptography==41.0.7
+# Official control icon JPEG -> local PNG during input preparation only.
+Pillow==10.2.0

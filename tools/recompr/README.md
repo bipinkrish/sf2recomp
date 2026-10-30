@@ -1,0 +1,38 @@
+# SF2 static recompiler
+
+Forked from [LAS Recomp](https://github.com/Peiikai/LASRecomp)'s generator
+(MIT; see ../../licenses/LASRecomp.txt). It translates AArch64 NSO instructions into C functions
+`void f_<guestaddr>(Cpu *c)` and emits address tables for the runtime dispatcher.
+
+| File | Purpose |
+|---|---|
+| `nso.py` | NSO decompression, segments, dynamic symbols and relocations |
+| `analyze.py` | Function discovery using `.eh_frame_hdr` and instruction analysis |
+| `lifter.py`, `simd_c.py` | Instruction and portable FP/SIMD lowering |
+| `gen.py` | C generation; `--symbols` seeds IL2CPP function boundaries and names |
+| `game_addresses.py` | Supported SF2 build IDs and guest address definitions |
+| `patches.py` | Six console-stream compatibility hook sites; no instruction patches or SDK hooks |
+
+From the repository root, with your extracted update and IL2CPP symbol map:
+
+```sh
+python3 tools/recompr/gen.py main game/extracted/update/exefs/main \
+  0x7000000000 game/gen/main --symbols game/il2cpp/sym_main.txt
+python3 tools/recompr/gen.py sdk game/extracted/update/exefs/sdk \
+  0x7004000000 game/gen/sdk
+make -j8
+```
+
+Regenerate after editing `patches.py`; generated C and game inputs are ignored by
+git. The runtime supplies `cpu.h`, dispatch, loading/relocation, system services
+and Vulkan rendering. Main and SDK are translated; the runtime loader replaces
+`rtld`, and movie imports from `subsdk0` currently use `runtime/hle/movie.c` stubs.
+This does not translate the entire movie module or provide video playback.
+
+Only update v131072 is accepted. Generated tables embed all 32 main/SDK NSO build-ID
+bytes; the runtime refuses mismatched files before starting a graphics device.
+Linux reaches the original menu and Story dialogue. `.eh_frame_hdr` currently
+helps discover function starts only: it does **not** provide guest C++ stack
+unwinding or connect throws to landing pads. Supporting those catch paths is
+still required for later game execution. See the root README for launch options
+and current platform limitations.

@@ -1,0 +1,50 @@
+# User's game dumps and everything extracted from them (never committed)
+game/
+*.nsp
+*.nsz
+*.nca
+*.nso
+*.xci
+*.tik
+*.cert
+title.keys
+*.keys
+
+# Build outputs
+build/
+generated/
+out/
+objs/
+__pycache__/
+tools/bktr/bin/
+tools/bktr/obj/
+*.o
+*.a
+*.so
+*.dylib
+*.exe
+
+# Reference/recomp caches
+cache/
+logs/
+*.log
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Locally built/downloaded tools (setup recipes and notices stay tracked)
+tools/bin/
+tools/il2cpp/*.dll
+tools/il2cpp/*.deps.json
+tools/il2cpp/*.runtimeconfig.json
+.venv/
+# Downloaded/built native dependencies (licenses and setup recipes stay tracked)
+/deps/include/SDL3/
+/third_party/
+/tools/third_party/
+deps/lib/
+deps/lib64/
+deps/share/
+deps/bin/
+*.so.*

@@ -1,0 +1,51 @@
+[
+  {
+    "name": "hactool",
+    "repository": "SciresM/hactool",
+    "revision": "1d64a83450e025622f3468c28fc4164dad2c5ef6",
+    "sha256": "f7148daad624ba909f5ae253210734b1a0ce19e89a7914b6cf71401f7134ebbc",
+    "destination": "hactool"
+  },
+  {
+    "name": "nstool",
+    "repository": "jakcron/nstool",
+    "revision": "cfb826ca6c165fbcd816fd7949df88ef3d72a948",
+    "sha256": "3fa23a0ebe4199ae22d22af0581ee62c4ab8e54f679ffaab753d621dcb19a8f6",
+    "destination": "nstool"
+  },
+  {
+    "name": "libfmt",
+    "repository": "jakcron/libfmt",
+    "revision": "b03b081e026ceb1226b45de926babe629d6c0688",
+    "sha256": "462ead0a73a03363ffa7b05f7ea432f17cd387cf2c72709242512557fd26501e",
+    "destination": "nstool/deps/libfmt"
+  },
+  {
+    "name": "liblz4",
+    "repository": "jakcron/liblz4",
+    "revision": "561775a11e00cbd21a45031c64068cb5e1242608",
+    "sha256": "45da125e7cdf96dfe991e991cf9e03ffc29c96788ec0b30e3f3463c58cc36d5d",
+    "destination": "nstool/deps/liblz4"
+  },
+  {
+    "name": "libmbedtls",
+    "repository": "jakcron/libmbedtls",
+    "revision": "74346376dd035e9fbc161cdb80afc646b72fde86",
+    "sha256": "8a10749000cf53a80069fbe2a333f8403f245d412fb86ca9326d5087d0bcb87d",
+    "destination": "nstool/deps/libmbedtls"
+  },
+  {
+    "name": "libpietendo",
+    "repository": "jakcron/libpietendo",
+    "revision": "5d50d02f8f3b8918bdfbbb599b8c4c1628660d89",
+    "sha256": "0474677aebab93c6ceb2ff15f4e0b65131cd04ecbf07c949e36b4c717a0ebf1a",
+    "destination": "nstool/deps/libpietendo"
+  },
+  {
+    "name": "libtoolchain",
+    "repository": "jakcron/libtoolchain",
+    "revision": "578d170f5b294e4a9feb3cc2d504896e846f204e",
+    "sha256": "1ae9e1528612beadb54ca79711b035913ec14b806ae0f0a96062c63252c5889e",
+    "destination": "nstool/deps/libtoolchain"
+  }
+]
