@@ -982,8 +982,8 @@ void kernel_stop_threads(void (*idle)(void)) {
 // threads ever reached spy_done, i.e. the frozen process was holding the global malloc/dl lock
 // the unwinder needs). The dump thread then symbolizes: dladdr our own base for module offsets,
 // and walks the rbp frame chain (when frame pointers exist) via rt_probe_u64.
-#include <dlfcn.h>
 #ifndef _WIN32
+#include <dlfcn.h>
 #include <signal.h>
 
 static volatile sig_atomic_t spy_armed;
@@ -1018,12 +1018,17 @@ static void spy_install(void) {
                 di.dli_fname ? di.dli_fname : "?");
     }
 }
+#else
+static void spy_install(void) {}
 #endif
 
 // One sample: ask, wait up to ~60 ms, print rip/rsp/rbp and walk the rbp frame chain (reading
 // another thread's live stack is racy but the stack pages are mapped; rt_probe_u64 stops faults).
 static void spy_sample(KThread *t, const char *prefix) {
-#ifndef _WIN32
+#ifdef _WIN32
+    if (t->started && !t->finished)
+        plat_bt_other_thread_tid((int)GetThreadId((HANDLE)t->host), prefix);
+#else
     if (!t->started || t->finished) return;
     t->spy_done = 0;
     if (pthread_kill(t->host, SIGUSR2) != 0) {

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-"""Build a native Linux SF2 folder locally from the user's supported game files."""
+"""Build a native Linux or experimental Windows SF2 folder from local game files."""
 import argparse
-import hashlib
 import importlib.util
 import json
 import os
@@ -15,10 +14,13 @@ sys.path.insert(0, str(ROOT / "tools"))
 from game_metadata import APP_ID, parse_nacp
 from setup_ffmpeg import ARCHIVE_NAME as FFMPEG_ARCHIVE_NAME, VERSION as FFMPEG_VERSION
 from setup_fonts import FONT_DIRECTORY, prepare as prepare_fonts
+from windows_dlls import dependency_closure
+from analyze_il2cpp import prepare_symbols
+from host_tools import require_host
 
 
 def run(*command):
-    subprocess.run([str(part) for part in command], cwd=ROOT, check=True)
+    subprocess.run([part.as_posix() if isinstance(part, Path) else str(part) for part in command], cwd=ROOT, check=True)
 
 
 def source_ids(game):
@@ -36,42 +38,6 @@ def source_ids(game):
         raise ValueError("The extracted updated RomFS/IL2CPP metadata is missing.")
     return ids
 
-
-def digest(path):
-    h = hashlib.sha256()
-    with path.open("rb") as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b""):
-            h.update(block)
-    return h.hexdigest()
-
-
-def prepare_symbols(game):
-    symbols = ROOT / "game/il2cpp"
-    symbols.mkdir(parents=True, exist_ok=True)
-    stamp = symbols / "source.json"
-    inputs = {
-        "main": digest(game / "exefs/main"),
-        "metadata": digest(game / "romfs/Data/Managed/Metadata/global-metadata.dat"),
-    }
-    if stamp.is_file() and (symbols / "sym_main.txt").is_file():
-        try:
-            previous = json.loads(stamp.read_text())
-            if previous == {**inputs, "symbols": digest(symbols / "sym_main.txt")}:
-                return symbols / "sym_main.txt"
-        except (ValueError, OSError):
-            pass
-    uncompressed = game / "exefs/main.uncompressed"
-    # Recreate this intermediate from the validated input, never reuse a stale one.
-    if not (ROOT / "tools/bin/hactool").is_file():
-        run("sh", ROOT / "tools/build_extraction_tools.sh")
-    run(ROOT / "tools/bin/hactool", "-t", "nso0", "--disablekeywarns",
-        f"--uncompressed={uncompressed}", game / "exefs/main")
-    if not (ROOT / "tools/il2cpp/Il2CppDumper.dll").is_file():
-        run(sys.executable, ROOT / "tools/build_il2cpp.py")
-    run("sh", ROOT / "tools/il2cpp_run.sh", game, symbols)
-    inputs["symbols"] = digest(symbols / "sym_main.txt")
-    stamp.write_text(json.dumps(inputs, indent=2) + "\n")
-    return symbols / "sym_main.txt"
 
 
 
@@ -114,8 +80,13 @@ def install_desktop(output):
     return target
 
 
-def package_game(game, output, executable, sdl_dir, ffmpeg_dir):
+def package_game(game, output, executable, sdl_dir, ffmpeg_dir, target="linux"):
     """Copy only runtime inputs; keys, tickets, compiler outputs and tools stay out."""
+    if target not in {"linux", "windows"}:
+        raise ValueError(f"Unsupported package target: {target}")
+    windows = target == "windows"
+    exe_name = "sf2.exe" if windows else "sf2"
+    decoder_name = "ffmpeg.exe" if windows else "ffmpeg"
     source_ids(game)
     output = output.resolve()
     if output == ROOT or ROOT.is_relative_to(output) or game.is_relative_to(output) or output.is_relative_to(game):
@@ -123,18 +94,28 @@ def package_game(game, output, executable, sdl_dir, ffmpeg_dir):
     if not (game / "control.nacp").is_file() or not (game / "icon.png").is_file():
         raise ValueError("Official control.nacp/icon.png are missing; rerun tools/extract.sh with your NSP and keys.")
     info = parse_nacp((game / "control.nacp").read_bytes())
-    desktop_exec(output / "sf2")  # Validate launcher compatibility before copying files.
+    if not windows:
+        desktop_exec(output / "sf2")  # Validate launcher compatibility before copying files.
     # This checks the actual linked build IDs without opening a graphical window.
     run(executable, "--check-game", game)
-    ffmpeg_executable = ffmpeg_dir / "bin/ffmpeg"
+    ffmpeg_executable = ffmpeg_dir / "bin" / decoder_name
     ffmpeg_build = ffmpeg_dir / "share/ffmpeg/BUILD.txt"
     ffmpeg_source = ffmpeg_dir / "share/ffmpeg" / FFMPEG_ARCHIVE_NAME
     ffmpeg_license = ffmpeg_dir / "share/licenses/FFmpeg"
-    ffmpeg_libraries = sorted({*ffmpeg_dir.glob("lib/libav*.so*"), *ffmpeg_dir.glob("lib/libsw*.so*")})
+    ffmpeg_libraries = (sorted(ffmpeg_dir.glob("bin/*.dll")) if windows else
+                        sorted({*ffmpeg_dir.glob("lib/libav*.so*"), *ffmpeg_dir.glob("lib/libsw*.so*")}))
     if (not ffmpeg_executable.is_file() or not ffmpeg_build.is_file() or not ffmpeg_source.is_file()
             or not ffmpeg_license.is_dir() or not ffmpeg_libraries):
         raise ValueError("The bundled FFmpeg build is incomplete; run tools/setup_ffmpeg.py --build.")
     prepare_fonts(FONT_DIRECTORY, check=True)
+    # Resolve the complete PE import graph before touching an existing output.
+    # Each executable has its own DLL search directory; decoder DLLs stay beside
+    # ffmpeg.exe, and application DLLs stay beside sf2.exe.
+    game_dlls, decoder_dlls = {}, {}
+    if windows:
+        search = [executable.parent, sdl_dir / "bin"]
+        game_dlls = dependency_closure([executable], search)
+        decoder_dlls = dependency_closure([ffmpeg_executable], [ffmpeg_dir / "bin", *search])
     output.mkdir(parents=True, exist_ok=True)
     exefs = output / "extracted/exefs"
     exefs.mkdir(parents=True, exist_ok=True)
@@ -142,7 +123,7 @@ def package_game(game, output, executable, sdl_dir, ffmpeg_dir):
         shutil.copy2(game / "exefs" / name, exefs / name)
     shutil.copytree(game / "romfs", output / "extracted/romfs", dirs_exist_ok=True)
     # Install the executable after its data. Existing user settings and saves stay.
-    shutil.copy2(executable, output / "sf2")
+    shutil.copy2(executable, output / exe_name)
     # Earlier conversions used the compiler project's name for the game binary.
     # Remove that generated file when refreshing an existing converted folder.
     legacy = output / "sf2recomp"
@@ -150,8 +131,9 @@ def package_game(game, output, executable, sdl_dir, ffmpeg_dir):
         legacy.unlink()
     for name in ("control.nacp", "icon.png"):
         shutil.copy2(game / name, output / name)
-    (output / "game-info.json").write_text(json.dumps(info, ensure_ascii=False, indent=2) + "\n")
-    write_desktop(output, info)
+    (output / "game-info.json").write_text(json.dumps(info, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    if not windows:
+        write_desktop(output, info)
     config = output / "sf2recomp.ini"
     if not config.exists():
         shutil.copy2(ROOT / "sf2recomp.ini", config)
@@ -169,22 +151,22 @@ def package_game(game, output, executable, sdl_dir, ffmpeg_dir):
         (notices / old_name).unlink(missing_ok=True)
     # Local shared SDL is needed alongside the executable; OS/driver libraries
     # remain supplied by the user's Linux installation. Static SDL needs no copy.
-    libraries = list((sdl_dir / "lib").glob("libSDL3.so*"))
+    libraries = [] if windows else list((sdl_dir / "lib").glob("libSDL3.so*"))
     if libraries:
         lib = output / "lib"
         lib.mkdir(exist_ok=True)
         for path in libraries:
-            target = lib / path.name
-            if target.is_symlink():
-                target.unlink()
+            destination = lib / path.name
+            if destination.is_symlink():
+                destination.unlink()
             if path.is_symlink():
                 # Keep aliases relative inside the output, avoiding duplicate data
                 # or symlinks back to the build machine's dependency prefix.
-                if target.exists():
-                    target.unlink()
-                target.symlink_to(path.resolve().name)
+                if destination.exists():
+                    destination.unlink()
+                destination.symlink_to(path.resolve().name)
             else:
-                shutil.copy2(path, target)
+                shutil.copy2(path, destination)
     # Converted outputs carry the small LGPL-only decoder and its matching shared libraries. The game never asks the
     # player to install FFmpeg or find it on PATH.
     ffmpeg_bundle = output / "lib/ffmpeg"
@@ -194,13 +176,18 @@ def package_game(game, output, executable, sdl_dir, ffmpeg_dir):
     ffmpeg_lib = ffmpeg_bundle / "lib"
     ffmpeg_bin.mkdir(parents=True)
     ffmpeg_lib.mkdir(parents=True)
-    shutil.copy2(ffmpeg_executable, ffmpeg_bin / "ffmpeg")
-    for path in ffmpeg_libraries:
-        target = ffmpeg_lib / path.name
+    shutil.copy2(ffmpeg_executable, ffmpeg_bin / decoder_name)
+    if windows:
+        for path in game_dlls.values():
+            shutil.copy2(path, output / path.name)
+        for path in decoder_dlls.values():
+            shutil.copy2(path, ffmpeg_bin / path.name)
+    for path in ([] if windows else ffmpeg_libraries):
+        destination = ffmpeg_lib / path.name
         if path.is_symlink():
-            target.symlink_to(path.resolve().name)
+            destination.symlink_to(path.resolve().name)
         else:
-            shutil.copy2(path, target)
+            shutil.copy2(path, destination)
     ffmpeg_notices = notices / "FFmpeg"
     if ffmpeg_notices.exists():
         shutil.rmtree(ffmpeg_notices)
@@ -213,23 +200,43 @@ def package_game(game, output, executable, sdl_dir, ffmpeg_dir):
     for name in ("NotoSans-LICENSE.txt", "NotoSansCJK-LICENSE.txt", "SOURCE.txt"):
         shutil.copy2(FONT_DIRECTORY / name, font_notices / name)
     (output / "build.json").write_text(json.dumps({
-        "target": "linux", "executable": "sf2", "source_build_ids": source_ids(game),
+        "target": "windows" if windows else "linux", "executable": exe_name, "source_build_ids": source_ids(game),
+        "windows_validation": "experimental; hardware playtesting required" if windows else None,
         "official_title": info["title"], "official_display_version": info["display_version"],
         "configuration": "sf2recomp.ini (read at runtime)",
         "cutscene_decoder": f"FFmpeg {FFMPEG_VERSION} (bundled, LGPL-only build)",
     }, indent=2) + "\n")
-    (output / "RUN.txt").write_text(
-        "Run ./sf2 from this folder or any working directory.\n"
-        f"Official game: {info['title']} {info['display_version']}.\n"
-        f"Desktop launcher: {APP_ID}.desktop (local paths; regenerate if moved).\n"
-        "Edit sf2recomp.ini for language/audio/video/keyboard/gamepad mappings; restart to apply.\n"
-        "Keep extracted/ beside the executable. This output contains your local game-derived files.\n"
-        "Cutscene playback uses the FFmpeg decoder and source bundled in lib/ffmpeg and licenses/FFmpeg; no FFmpeg install is needed.\n"
-        "Keep lib/fonts/ alongside the executable for shared-font fallback (Noto, SIL OFL 1.1).\n"
-        "System requirements: Linux x86-64, Vulkan loader/driver, shaderc and C/C++ runtime libraries.\n"
-        "Software fallback: SDL_VIDEODRIVER=x11 LARECOMP_VK_NO_GMEM=1 "
-        "VK_DRIVER_FILES=/usr/share/vulkan/icd.d/lvp_icd.json ./sf2\n"
-        "Combat and hardware-driver compatibility remain incomplete.\n")
+    if windows:
+        # Keep dependency notices from the exact installed build prefix.
+        native_notices = sdl_dir / "share/licenses"
+        if native_notices.is_dir():
+            shutil.copytree(native_notices, notices / "windows-dependencies", dirs_exist_ok=True)
+        (output / "windows-dlls.json").write_text(json.dumps({
+            "application": sorted(game_dlls), "decoder": sorted(decoder_dlls),
+            "system_vulkan_loader": "provided by the installed GPU driver",
+        }, indent=2) + "\n")
+        (output / "RUN.txt").write_text(
+            "Run sf2.exe. Keep extracted/, lib/, and the packaged DLLs beside it.\n"
+            "Edit sf2recomp.ini, then restart to apply settings. Saves/config are preserved on rebuild.\n"
+            "Requirements: Windows 10 1903+ x64 or Windows 11; x64 CPU with CMPXCHG16B; Vulkan 1.3 GPU driver.\n"
+            "Integrated and dedicated GPUs use the same Vulkan renderer; Windows GPU compatibility needs testing.\n"
+            "MSYS2, Python and build tools are only needed for conversion, not to run this folder.\n"
+            "Cutscene decoder, matching source/licenses and fallback fonts are bundled.\n"
+            "This Windows port is experimental and has not yet been validated on Windows hardware.\n"
+        )
+    else:
+        (output / "RUN.txt").write_text(
+            "Run ./sf2 from this folder or any working directory.\n"
+            f"Official game: {info['title']} {info['display_version']}.\n"
+            f"Desktop launcher: {APP_ID}.desktop (local paths; regenerate if moved).\n"
+            "Edit sf2recomp.ini for language/audio/video/keyboard/gamepad mappings; restart to apply.\n"
+            "Keep extracted/ beside the executable. This output contains your local game-derived files.\n"
+            "Cutscene playback uses the FFmpeg decoder and source bundled in lib/ffmpeg and licenses/FFmpeg; no FFmpeg install is needed.\n"
+            "Keep lib/fonts/ alongside the executable for shared-font fallback (Noto, SIL OFL 1.1).\n"
+            "System requirements: Linux x86-64, Vulkan loader/driver, shaderc and C/C++ runtime libraries.\n"
+            "Software fallback: SDL_VIDEODRIVER=x11 LARECOMP_VK_NO_GMEM=1 "
+            "VK_DRIVER_FILES=/usr/share/vulkan/icd.d/lvp_icd.json ./sf2\n"
+            "Combat and hardware-driver compatibility remain incomplete.\n")
     print(f"Native game folder: {output}")
 
 
@@ -239,13 +246,24 @@ def main(argv=None):
     source.add_argument("--nsp", type=Path, help="supported combined base + update v131072 NSP")
     source.add_argument("--game", type=Path, help="already extracted updated game directory")
     ap.add_argument("--keys", type=Path, help="your local prod.keys, required with --nsp")
-    ap.add_argument("--output", type=Path, default=ROOT / "out/shadow-fight-2-linux")
+    ap.add_argument("--target", choices=("linux", "windows"), default="windows" if os.name == "nt" else "linux")
+    ap.add_argument("--output", type=Path)
+    ap.add_argument("--symbols", type=Path, help="reuse an existing sym_main.txt instead of running local analysis")
+    ap.add_argument("--skip-generation", action="store_true", help="compile existing game/gen files; build identity is still checked")
     ap.add_argument("--jobs", type=int, default=min(os.cpu_count() or 1, 8))
     ap.add_argument("--package-only", action="store_true", help="package an existing matching local build")
     ap.add_argument("--install-desktop", action="store_true",
                     help="explicitly register the output launcher in your user application menu")
     args = ap.parse_args(argv)
     try:
+        windows = args.target == "windows"
+        require_host(args.target)
+        if windows and args.install_desktop:
+            raise ValueError("--install-desktop is a Linux option; run sf2.exe on Windows.")
+        if args.package_only and args.skip_generation:
+            raise ValueError("--skip-generation is unnecessary with --package-only")
+        if args.output is None:
+            args.output = ROOT / f"out/shadow-fight-2-{args.target}"
         if args.jobs < 1:
             raise ValueError("--jobs must be positive")
         if args.nsp:
@@ -253,31 +271,39 @@ def main(argv=None):
                 raise ValueError("--nsp requires --keys pointing to your locally obtained prod.keys")
             if args.package_only:
                 raise ValueError("--package-only requires --game")
-            run("sh", ROOT / "tools/extract.sh", args.nsp.resolve(), args.keys.resolve(), "--validate-only")
-            if not all((ROOT / "tools/bin" / name).is_file() for name in ("hactool", "nstool")):
-                run("sh", ROOT / "tools/build_extraction_tools.sh")
-            run("sh", ROOT / "tools/extract.sh", args.nsp.resolve(), args.keys.resolve())
+            run(sys.executable, ROOT / "tools/extract.py", args.nsp.resolve(), args.keys.resolve(), "--validate-only")
+            run(sys.executable, ROOT / "tools/extract.py", args.nsp.resolve(), args.keys.resolve())
             game = ROOT / "game/extracted/update"
         else:
             game = args.game.resolve(strict=True)
         source_ids(game)
-        sdl_dir = Path(os.environ.get("SDL_DIR", ROOT / "deps")).resolve()
-        ffmpeg_dir = Path(os.environ.get("FFMPEG_DIR", ROOT / "deps/ffmpeg")).resolve()
-        if not args.package_only:
+        prefix = os.environ.get("SDL_DIR")
+        if windows and not prefix:
+            prefix = subprocess.check_output(["cygpath", "-m", os.environ.get("MINGW_PREFIX", "/ucrt64")], text=True).strip()
+        sdl_dir = Path(prefix or ROOT / "deps").resolve()
+        ffmpeg_dir = Path(os.environ.get("FFMPEG_DIR", ROOT / ("deps/ffmpeg-windows" if windows else "deps/ffmpeg"))).resolve()
+        if not args.package_only and not args.skip_generation:
             missing = [name for name in ("capstone", "unicorn", "lz4", "cryptography", "PIL")
                        if importlib.util.find_spec(name) is None]
             if missing:
                 raise ValueError("Install build dependencies: python3 -m pip install -r tools/requirements.txt")
-            run(ROOT / "tools/setup_runtime.sh", "--ensure")
-        run(sys.executable, ROOT / "tools/setup_ffmpeg.py", "--ensure")
         if not args.package_only:
-            symbols = prepare_symbols(game)
+            run("bash", ROOT / ("tools/setup_windows.sh" if windows else "tools/setup_runtime.sh"), "--ensure")
+        run(sys.executable, ROOT / "tools/setup_ffmpeg.py", "--ensure", "--target", args.target)
+        if not args.package_only and not args.skip_generation:
+            if args.symbols:
+                symbols = args.symbols.resolve(strict=True)
+            else:
+                symbols = prepare_symbols(game)
             run(sys.executable, ROOT / "tools/recompr/gen.py", "main", game / "exefs/main",
-                "0x7000000000", ROOT / "game/gen/main", "--symbols", symbols)
+                "0x7000000000", ROOT / "game/gen/main", "--symbols", symbols, "--simd", "c")
             run(sys.executable, ROOT / "tools/recompr/gen.py", "sdk", game / "exefs/sdk",
-                "0x7004000000", ROOT / "game/gen/sdk")
-            run("make", f"-j{args.jobs}", f"SDL_DIR={sdl_dir}")
-        package_game(game, args.output, ROOT / "build/sf2", sdl_dir, ffmpeg_dir)
+                "0x7004000000", ROOT / "game/gen/sdk", "--simd", "c")
+        if not args.package_only:
+            run("make", f"-j{args.jobs}", f"TARGET={args.target}", f"SDL_DIR={sdl_dir.as_posix()}",
+                f"PYTHON={Path(sys.executable).as_posix()}")
+        executable = ROOT / ("build/windows/sf2.exe" if windows else "build/sf2")
+        package_game(game, args.output, executable, sdl_dir, ffmpeg_dir, args.target)
         if args.install_desktop:
             install_desktop(args.output)
         return 0

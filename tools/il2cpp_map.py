@@ -48,7 +48,7 @@ def write_sorted_syms(path, syms):
             seen[addr] = name
         else:
             seen[addr] += f' ; alias:{name}'
-    with open(path, 'w') as f:
+    with open(path, 'w', encoding='utf-8', newline='\n') as f:
         for addr in sorted(seen):
             f.write(f'0x{addr:08X} {seen[addr]}\n')
     return len(seen)
@@ -63,7 +63,8 @@ def main():
     args = ap.parse_args()
 
     script = os.path.join(args.indir, 'script.json')
-    raw = json.load(open(script))
+    with open(script, encoding='utf-8-sig') as stream:
+        raw = json.load(stream)
     methods = raw['ScriptMethod']
 
     layout = load_nso_layout(args.nso) if os.path.exists(args.nso) else None
@@ -77,7 +78,7 @@ def main():
     # Anchors are only printed by the dumper console, so they are passed in
     # explicitly; the defaults below are the values Il2CppDumper 6.7.46 found
     # for this build (update main, metadata v24).
-    with open(anchors_path, 'w') as f:
+    with open(anchors_path, 'w', encoding='utf-8', newline='\n') as f:
         if layout:
             f.write('# NSO0 layout of main (mem_off / size)\n')
             for name in ('text', 'ro', 'data'):

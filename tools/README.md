@@ -6,15 +6,17 @@ Downloaded and built tools stay in ignored directories.
 
 ## Requirements
 
-The currently supported host is Linux x86_64 with Python 3.12+, a .NET 8 SDK,
-C/C++ build tools, CMake and make. Native game compilation additionally needs the
+Input preparation has native Linux x86_64 and experimental Windows UCRT64 entry
+points, using Python 3.12+, a .NET 8+ SDK, Clang/Clang++, CMake and Ninja.
+See the [complete Windows setup](../docs/windows.md) for native CPython and MSYS2
+dependencies; Windows no longer requires Linux-prepared inputs. Native game compilation additionally needs the
 Clang/LLD, SDL3, Vulkan and shaderc dependencies described in the root README.
 
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
 python3 -m pip install -r tools/requirements.txt
-tools/build_extraction_tools.sh
+python3 tools/build_extraction_tools.py
 python3 tools/build_il2cpp.py
 ```
 
@@ -27,12 +29,15 @@ see [its provenance and notices](il2cpp/README.md). The BKTR merger restores pin
 `LibHac 0.19.0` from NuGet. First builds need network access for source/NuGet
 packages; source caches and package caches can be reused offline afterward.
 
-`build_extraction_tools.sh` automatically fetches hactool, NSTool and NSTool's
+`build_extraction_tools.py` automatically fetches hactool, NSTool and NSTool's
 five shared dependencies from official source archives before building them.
 Their immutable revisions and SHA256 hashes are recorded in
 `extraction-dependencies.json`. The pinned archives reproduce all 1,862 formerly
 vendored source/license files byte for byte; no local source patches are required.
 Sources under `tools/third_party/` and executables under `tools/bin/` are ignored.
+The CMake driver compiles in `build/tools/extraction/<host>`; Windows executables
+are installed in `tools/bin/windows` with `.exe` suffixes, separate from Linux
+tools and objects. The legacy `.sh` entry points delegate to the Python drivers.
 Git submodule initialization is not needed. Original upstream notices remain in
 the downloaded source trees; tracked license copies live centrally in `licenses/`.
 
@@ -49,8 +54,8 @@ executes translated C. LZ4 reads NSOs; cryptography validates user-supplied keys
 ## Prepare a supported package
 
 ```sh
-tools/extract.sh '/path/to/your/base-and-update.nsp' '/path/to/your/prod.keys'
-tools/il2cpp_run.sh
+python3 tools/extract.py '/path/to/your/base-and-update.nsp' '/path/to/your/prod.keys'
+python3 tools/analyze_il2cpp.py
 ```
 
 Supported input currently means the **combined SF2 base + v131072 update** NSP
@@ -64,14 +69,23 @@ make every package/version compatible with this implementation.
 selects a local output root (default: ignored `game/`). New extraction is staged in
 that root; failures preserve the previous `nsp/` and `extracted/` directories.
 Successful output includes `extracted/update/{exefs,romfs}` for compilation/runtime
-and the original base extraction for development. Tickets/titlekeys remain local
-with private directory/file permissions, and the normal tools do not log key values.
+and the original base extraction for development. Tickets/titlekeys remain local;
+POSIX permissions restrict access on Linux, while Windows uses inherited folder
+ACLs. Keep the checkout and keys in your own user folders. Normal tools do not
+log key values. The extraction driver prepares missing native tools automatically
+and builds the managed BKTR merger with the selected .NET SDK.
 
 For an alternate extracted directory and symbol output:
 
 ```sh
-tools/il2cpp_run.sh /path/to/extracted/update /path/to/local/symbols
+python3 tools/analyze_il2cpp.py /path/to/extracted/update /path/to/local/symbols
 ```
+
+Symbol analysis builds the pinned dumper when needed, recreates the NSO
+intermediate in a temporary directory, and publishes symbols only after fresh
+output validation. Cached symbols are tied to the NSO/metadata/config/map hashes.
+Il2CppDumper's managed assemblies are host-independent; its build record verifies
+their hashes before reuse. A failing run cannot silently reuse a stale dump.
 
 Generate/build from those local inputs using `tools/recompr/README.md` or the root
 conversion workflow. Generated C, symbols, metadata, native game binaries and game

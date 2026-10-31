@@ -567,12 +567,12 @@ HOOKS, PATCHES = {}, {}
 def write_if_changed(path, text):
     """Leaves unchanged chunks untouched so make only recompiles what a patch affected."""
     try:
-        with open(path) as f:
+        with open(path, encoding='utf-8') as f:
             if f.read() == text:
                 return
     except FileNotFoundError:
         pass
-    with open(path, 'w') as f:
+    with open(path, 'w', encoding='utf-8', newline='\n') as f:
         f.write(text)
 
 

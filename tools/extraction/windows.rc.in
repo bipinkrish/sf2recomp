@@ -1,0 +1,2 @@
+// UTF-8 arguments for hactool; no game resources are embedded in these tools.
+1 24 "@SF2_ROOT@/runtime/platform/windows.manifest"

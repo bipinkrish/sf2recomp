@@ -1,7 +1,9 @@
 # Native runtime dependencies
 
-The current build targets **Linux x86_64**. Windows remains a porting target;
-these steps do not produce a Windows executable. Game extraction and CPU-code
+This dependency recipe targets **Linux x86_64**. The separate
+[experimental Windows guide](../docs/windows.md) covers the complete native
+Windows conversion/build workflow. The Linux commands here do not produce a
+Windows executable. Game extraction and CPU-code
 generation are separate steps: no proprietary game files or generated game code
 are supplied by this setup script.
 
@@ -35,7 +37,7 @@ their development packages before configuring SDL; see the
 Ubuntu 24.04+ example (`universe` provides the graphics development packages):
 
 ```sh
-sudo apt install build-essential clang lld make cmake pkg-config curl ca-certificates \
+sudo apt install build-essential clang lld make cmake ninja-build pkg-config curl ca-certificates \
   libvulkan-dev libshaderc-dev libvulkan-memory-allocator-dev \
   libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev \
   libxss-dev libxtst-dev libasound2-dev libpulse-dev libudev-dev
@@ -48,7 +50,7 @@ and [shaderc package](https://packages.ubuntu.com/libshaderc-dev).
 Fedora example:
 
 ```sh
-sudo dnf install gcc-c++ clang lld make cmake pkgconf-pkg-config curl ca-certificates \
+sudo dnf install gcc-c++ clang lld make cmake ninja-build pkgconf-pkg-config curl ca-certificates \
   vulkan-loader-devel vulkan-headers libshaderc-devel VulkanMemoryAllocator-devel \
   libX11-devel libXext-devel libXrandr-devel libXcursor-devel libXfixes-devel \
   libXi-devel libXScrnSaver-devel libXtst-devel alsa-lib-devel \

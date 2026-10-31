@@ -2,6 +2,7 @@
 // that folder unless a session explicitly selects another data root.
 #include "paths.h"
 #include "platform.h"
+#include "platform/path_util.h"
 
 #include <errno.h>
 #include <limits.h>
@@ -17,21 +18,38 @@ static bool executable_dir(char *out, size_t size) {
     if (!plat_exe_path(out, size)) return false;
     char *slash = strrchr(out, '/');
     if (!slash) return false;
-    if (slash == out) slash[1] = 0;
+    if (slash == out || (slash == out + 2 && out[1] == ':')) slash[1] = 0;
     else *slash = 0;
     return true;
 }
 
 static bool absolute_path(const char *path, char *out, size_t size) {
+#ifdef _WIN32
+    // _fullpath also resolves drive-relative C:foo and root-relative \foo.
+    if (!_fullpath(out, path, size)) return false;
+    for (char *p = out; *p; p++) if (*p == '\\') *p = '/';
+    return true;
+#else
     if (*path == '/') return snprintf(out, size, "%s", path) < (int)size;
     char cwd[PATH_MAX];
     return getcwd(cwd, sizeof cwd) && snprintf(out, size, "%s/%s", cwd, path) < (int)size;
+#endif
 }
 
 static bool mkdirs(const char *path) {
     char copy[PATH_MAX];
     if (snprintf(copy, sizeof copy, "%s", path) >= sizeof copy) return false;
-    for (char *p = copy + 1; ; ++p) {
+#ifdef _WIN32
+    size_t root = plat_path_root(copy, 1);
+#else
+    size_t root = plat_path_root(copy, 0);
+#endif
+    if (!root) { errno = EINVAL; return false; }
+    if (root == strlen(copy)) {
+        struct stat st;
+        return stat(copy, &st) == 0 && S_ISDIR(st.st_mode);
+    }
+    for (char *p = copy + root; ; ++p) {
         if (*p && *p != '/') continue;
         char end = *p;
         *p = 0;
@@ -66,6 +84,9 @@ void rt_paths_init(void) {
         perror("SF2 Recomp data directory");
         exit(1);
     }
+#ifdef _WIN32
+    for (char *p = g_root; *p; p++) if (*p == '\\') *p = '/';
+#endif
     fprintf(stderr, "[paths] data: %s\n", g_root);
 }
 

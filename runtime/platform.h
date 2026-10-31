@@ -1,4 +1,4 @@
-// Host OS layer. The current native implementation is runtime/platform/linux.c.
+// Host OS layer: Linux and Windows x86-64.
 #pragma once
 #include <stdbool.h>
 #include <stddef.h>
@@ -70,6 +70,11 @@ typedef struct {
 } PlatSysInfo;
 void plat_system_info(PlatSysInfo *si);
 bool plat_exe_path(char *buf, size_t size);
+// Safe reads for exception decoding and crash diagnostics. Never dereference an
+// untrusted address in the reporting thread.
+bool plat_probe_read(uint64_t addr, void *out, size_t size);
+int plat_host_thread_id(void);
+bool plat_host_thread_alive(int tid);
 void plat_exec(char *const argv[]);  // replace the process (NULL = same command line); returns only on failure
 #if defined(_WIN32) || defined(__linux__)
 void plat_terminate(void);  // end the process now, skipping DLL teardown (exit status 0)

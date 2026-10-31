@@ -38,6 +38,7 @@ tools/bin/
 tools/il2cpp/*.dll
 tools/il2cpp/*.deps.json
 tools/il2cpp/*.runtimeconfig.json
+tools/il2cpp/.sf2-build.json
 .venv/
 # Downloaded/built native dependencies (licenses and setup recipes stay tracked)
 /deps/*

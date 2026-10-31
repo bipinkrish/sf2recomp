@@ -22,7 +22,6 @@
 
 #include <pthread.h>
 #include <stdatomic.h>
-#include <sys/syscall.h>
 #include <time.h>
 #include <stdlib.h>
 #include <string.h>
@@ -246,7 +245,7 @@ static void *run(void *arg) {
     plat_thread_guest(44);  // (the game's GPU thread's class: performance cores on a Mac)
     plat_thread_perf_core(PLAT_PERF_RENDER);
     is_render = true;
-    atomic_store(&render_tid, (int)syscall(SYS_gettid));
+    atomic_store(&render_tid, plat_host_thread_id());
     rq_watch(NULL, 0);  // (registers this thread for the hang dump)
     for (;;) {
         pthread_mutex_lock(&lock);
@@ -269,7 +268,7 @@ static void *run(void *arg) {
         uint64_t c0 = stats ? plat_thread_cpu_ns() : 0, w0 = stats ? plat_now_ns() : 0;
         void *pool = backend_pool_push();
         static _Atomic(int) rq_tid;  // (diagnostics: the running thread's kernel TID, for cross-thread backtraces)
-        atomic_store(&rq_tid, (int)syscall(SYS_gettid));
+        atomic_store(&rq_tid, plat_host_thread_id());
         static int trace = -1;
         if (trace < 0) trace = getenv("SF2_TRACE_RENDER") != NULL;
         if (trace) LOG("[rq] item %llu kind=%d (%s) starting (handle=%llx)\n",

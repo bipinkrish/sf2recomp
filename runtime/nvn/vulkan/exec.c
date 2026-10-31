@@ -3339,6 +3339,8 @@ static void pretouch_host(void *host, uint64_t size) {
     uintptr_t page = PLAT_PAGE;
 #ifdef __linux__
     page = (uintptr_t)sysconf(_SC_PAGESIZE);
+#elif defined(_WIN32)
+    page = 4096; // Windows x64 host pages; every imported page must be materialized.
 #endif
     for (; at < end; at = (at | (page - 1)) + 1) {
         // This is LIVE game memory, including MethodInfo pointers and heap metadata.
@@ -6973,11 +6975,11 @@ static void *exec_wd_run(void *arg) {
         if (wd_done) return NULL;
         if (reported < 5) {
             int tid = wd_target_tid;
-            long alive = syscall(SYS_tgkill, getpid(), tid, 0);  // (probe with signal 0: does the kernel know it?)
+            bool alive = plat_host_thread_alive(tid);
             fprintf(stderr, "[exec_watchdog] exec is %d ms in, host tid %d (probe: %s)\n",
                     reported * wd_interval_ms + wd_interval_ms, tid,
-                    alive == 0 ? "exists" : (errno == ESRCH ? "GONE" : "other"));
-            if (alive == 0)
+                    alive ? "exists" : "GONE or inaccessible");
+            if (alive)
                 plat_bt_other_thread_tid(tid, reported ? "[exec_watchdog] still stuck" : "[exec_watchdog]");
         }
         reported++;
@@ -6992,7 +6994,7 @@ void backend_execute(uint64_t handle) {
     }
     pthread_t wd;
     if (wd_interval_ms > 0) {
-        wd_target_tid = (int)syscall(SYS_gettid);  // (this thread: the render thread, until this exec ends)
+        wd_target_tid = plat_host_thread_id();
         wd_done = 0;
         if (pthread_create(&wd, NULL, exec_wd_run, NULL) == 0) pthread_detach(wd);
         else wd_done = 1;

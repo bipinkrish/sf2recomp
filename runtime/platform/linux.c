@@ -295,6 +295,17 @@ bool plat_exe_path(char *buf, size_t size) {
     return true;
 }
 
+static int probe_fd = -1;
+static pthread_once_t probe_once = PTHREAD_ONCE_INIT;
+static void probe_open(void) { probe_fd = open("/proc/self/mem", O_RDONLY | O_CLOEXEC); }
+bool plat_probe_read(uint64_t addr, void *out, size_t size) {
+    pthread_once(&probe_once, probe_open);
+    return probe_fd >= 0 && pread(probe_fd, out, size, (off_t)addr) == (ssize_t)size;
+}
+
+int plat_host_thread_id(void) { return (int)syscall(SYS_gettid); }
+bool plat_host_thread_alive(int tid) { return syscall(SYS_tgkill, getpid(), tid, 0) == 0; }
+
 // Our own command line, from /proc/self/cmdline (NUL-separated).
 static char **self_argv(void) {
     static char buf[32768];

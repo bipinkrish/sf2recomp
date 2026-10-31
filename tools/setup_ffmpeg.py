@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the small, LGPL-only FFmpeg runtime bundled with converted Linux games."""
+"""Build the small, LGPL-only FFmpeg decoder for the native host target."""
 import argparse
 import hashlib
 import os
@@ -25,17 +25,18 @@ CONFIGURE = [
 ]
 
 
-def paths():
-    prefix = Path(os.environ.get("FFMPEG_DIR", ROOT / "deps/ffmpeg")).resolve()
+def paths(target="linux"):
+    default = ROOT / ("deps/ffmpeg-windows" if target == "windows" else "deps/ffmpeg")
+    prefix = Path(os.environ.get("FFMPEG_DIR", default)).resolve()
     work = Path(os.environ.get("SF2_DEPS_WORK", ROOT / "build/dependencies")).resolve()
     return prefix, work
 
 
-def installed(prefix):
+def installed(prefix, target="linux"):
     marker = prefix / "share/ffmpeg/BUILD.txt"
     return (
-        (prefix / "bin/ffmpeg").is_file()
-        and any(p.is_file() for p in (prefix / "lib").glob("libavcodec.so.*"))
+        (prefix / ("bin/ffmpeg.exe" if target == "windows" else "bin/ffmpeg")).is_file()
+        and any(p.is_file() for p in prefix.glob("bin/avcodec-*.dll" if target == "windows" else "lib/libavcodec.so.*"))
         and marker.is_file()
         and f"FFmpeg {VERSION}" in marker.read_text()
         and (prefix / "share/ffmpeg" / ARCHIVE_NAME).is_file()
@@ -65,9 +66,9 @@ def source_archive(work):
     return archive
 
 
-def build(prefix, work, force=False):
+def build(prefix, work, force=False, target="linux"):
     marker = prefix / "share/ffmpeg/BUILD.txt"
-    if not force and installed(prefix):
+    if not force and installed(prefix, target):
         print(f"Bundled FFmpeg {VERSION} is ready: {prefix}")
         return
 
@@ -75,19 +76,23 @@ def build(prefix, work, force=False):
         if not shutil.which(command):
             raise RuntimeError(f"Missing build tool: {command}")
     archive = source_archive(work)
-    source = work / f"ffmpeg-{VERSION}-source"
+    source = work / f"ffmpeg-{VERSION}-{target}-source"
     if source.exists():
         shutil.rmtree(source)
     source.mkdir(parents=True)
     subprocess.run([
-        "tar", "-xJf", str(archive), "--strip-components=1", "-C", str(source),
+        "tar", "--force-local", "-xJf", archive.as_posix(), "--strip-components=1", "-C", source.as_posix(),
     ], check=True)
 
-    config = ["--cc=clang", f"--prefix={prefix}", f"--bindir={prefix / 'bin'}", f"--libdir={prefix / 'lib'}", *CONFIGURE]
+    config = ["--cc=clang", f"--prefix={prefix.as_posix()}", f"--bindir={(prefix / 'bin').as_posix()}",
+              f"--libdir={(prefix / 'lib').as_posix()}", *CONFIGURE]
+    if target == "windows":
+        config.remove("--enable-pthreads")
+        config += ["--target-os=mingw32", "--arch=x86_64", "--enable-w32threads"]
     if not shutil.which("nasm") and not shutil.which("yasm"):
         config.append("--disable-x86asm")
         print("nasm/yasm not found; building FFmpeg without x86 assembly optimizations.")
-    subprocess.run([str(source / "configure"), *config], cwd=source, check=True)
+    subprocess.run(["bash", (source / "configure").as_posix(), *config], cwd=source, check=True)
     jobs = int(os.environ.get("JOBS", str(min(os.cpu_count() or 1, 8))))
     if jobs < 1:
         raise ValueError("JOBS must be a positive integer")
@@ -109,13 +114,14 @@ def build(prefix, work, force=False):
             if not option.startswith(("--prefix=", "--bindir=", "--libdir="))
         ) + "\n"
     )
-    if not installed(prefix):
+    if not installed(prefix, target):
         raise RuntimeError(f"FFmpeg install is incomplete: {prefix}")
     print(f"Bundled FFmpeg {VERSION} built at {prefix}")
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--target", choices=("linux", "windows"), default="windows" if os.name == "nt" else "linux")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--check", action="store_true", help="check for the built decoder without downloading")
     mode.add_argument("--build", action="store_true", help="build FFmpeg from the pinned upstream source")
@@ -127,16 +133,18 @@ def main(argv=None):
               "FFMPEG_SOURCE_ARCHIVE supplies the pinned source archive for offline setup.\n"
               "SF2_DEPS_WORK changes the source/build cache. JOBS controls parallel compilation.")
         return 0
-    prefix, work = paths()
+    prefix, work = paths(args.target)
     try:
+        if args.target == "windows" and (os.name != "nt" or os.environ.get("MSYSTEM") != "UCRT64"):
+            raise ValueError("Build Windows FFmpeg in the MSYS2 UCRT64 shell on Windows x64.")
         if args.check:
-            if not installed(prefix):
+            if not installed(prefix, args.target):
                 raise RuntimeError(f"Bundled FFmpeg is missing; run {Path(__file__).name} --build")
             print(f"Bundled FFmpeg found: {prefix}")
         elif args.ensure:
-            build(prefix, work)
+            build(prefix, work, target=args.target)
         else:
-            build(prefix, work, force=args.build)
+            build(prefix, work, force=args.build, target=args.target)
         return 0
     except (OSError, RuntimeError, ValueError, subprocess.CalledProcessError) as error:
         print(f"FFmpeg setup failed: {error}", file=sys.stderr)

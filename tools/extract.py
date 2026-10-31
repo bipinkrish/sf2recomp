@@ -3,7 +3,7 @@
 import argparse
 import importlib.util
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import os
 import re
 import shutil
@@ -14,6 +14,8 @@ import tempfile
 import xml.etree.ElementTree as ET
 
 from game_metadata import write_game_metadata
+from build_extraction_tools import ensure_tools
+from host_tools import ROOT, dotnet_environment, dotnet_sdk, host_target, run
 
 TOOLS = Path(__file__).resolve().parent
 TITLE_IDS = {"Application": 0x0100AB000ABFE000, "Patch": 0x0100AB000ABFE800}
@@ -39,13 +41,17 @@ def pfs0_entries(path):
             raise ValueError("invalid NSP file table")
         table, strings = source.read(count * 24), source.read(strings_size)
         entries = {}
+        portable_names = set()
         for index in range(count):
             offset, length, name_offset, _ = struct.unpack_from("<QQII", table, index * 24)
             if name_offset >= len(strings) or b"\0" not in strings[name_offset:]:
                 raise ValueError("invalid NSP filename")
             name = strings[name_offset:strings.index(0, name_offset)].decode("utf-8")
-            if not name or name in (".", "..") or any(c in name for c in "/\\:\r\n") or name in entries:
+            if (not name or name in (".", "..") or any(c in name for c in '/\\:<>"|?*')
+                    or any(ord(c) < 32 for c in name) or name.endswith((".", " "))
+                    or PureWindowsPath(name).is_reserved() or name.casefold() in portable_names):
                 raise ValueError("NSP contains an unsafe or duplicate filename")
+            portable_names.add(name.casefold())
             if data_start + offset + length > size:
                 raise ValueError("NSP contains an out-of-range file")
             entries[name] = Entry(data_start + offset, length)
@@ -149,6 +155,7 @@ def main(argv=None):
     parser.add_argument("--game-dir", type=Path, default=TOOLS.parent / "game")
     parser.add_argument("--validate-only", action="store_true", help="check the packaged layout without extraction")
     args = parser.parse_args(argv)
+    previous_mask = None
     try:
         nsp, keys, game = args.nsp.resolve(strict=True), args.keys.resolve(strict=True), args.game_dir.resolve()
         if not keys.is_file():
@@ -161,19 +168,14 @@ def main(argv=None):
             return 0
         if importlib.util.find_spec("PIL") is None:
             raise ValueError("install icon conversion dependencies: python3 -m pip install -r tools/requirements.txt")
-        gc, nt = TOOLS / "bin/hactool", TOOLS / "bin/nstool"
-        if not all(os.access(tool, os.X_OK) for tool in (gc, nt)):
-            raise ValueError("build extraction tools first: tools/build_extraction_tools.sh")
-        dotnet = os.environ.get("DOTNET", "dotnet")
-        if not shutil.which(dotnet):
-            raise ValueError("install the .NET 8 SDK to build/run the BKTR merger")
+        dotnet = dotnet_sdk()
+        gc, nt = ensure_tools()
         # Private staging keeps tickets/keys local, and failures preserve previous results.
-        os.umask(0o077)
+        previous_mask = os.umask(0o077)
         game.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(prefix=".extract-", dir=game) as temporary:
             stage = Path(temporary)
             (stage / "nsp").mkdir()
-            run = lambda *command: subprocess.run([str(arg) for arg in command], check=True)
             run(gc, "-t", "pfs0", "--pfs0dir=" + str(stage / "nsp"), nsp)
             run(sys.executable, TOOLS / "extract_titlekeys.py", "--keys", keys, "--nsp-dir", stage / "nsp")
             base, update = stage / "extracted/base", stage / "extracted/update"
@@ -193,12 +195,12 @@ def main(argv=None):
             base_nca, base_ticket = programs["Application"]
             for partition, name in (("--part1", "romfs"), ("--part2", "logo")):
                 run(nt, "-k", keys, "--tik", stage / "nsp" / base_ticket, partition, base / name, stage / "nsp" / base_nca)
-            merger = TOOLS / "bktr/bin/Release/net8.0/Sf2Bktr.dll"
-            run(dotnet, "build", TOOLS / "bktr/Sf2Bktr.csproj", "-c", "Release", "--nologo")
-            environment = dict(os.environ, SF2BKTR_DUMP_OUT=str(update / "romfs.img"))
-            subprocess.run([dotnet, str(merger), str(stage / "nsp" / programs["Patch"][0]),
-                            str(stage / "nsp" / base_nca), str(keys), str(stage / "nsp/title.keys")],
-                           env=environment, check=True)
+            merger = ROOT / "build/tools/bktr" / host_target() / "Sf2Bktr.dll"
+            run(dotnet, "build", TOOLS / "bktr/Sf2Bktr.csproj", "-c", "Release", "--nologo",
+                "-p:UseAppHost=false", "-o", merger.parent, env=dotnet_environment())
+            environment = dict(dotnet_environment(), SF2BKTR_DUMP_OUT=str(update / "romfs.img"))
+            run(dotnet, merger, stage / "nsp" / programs["Patch"][0], stage / "nsp" / base_nca,
+                keys, stage / "nsp/title.keys", env=environment)
             run(nt, "-t", "romfs", "-x", update / "romfs", update / "romfs.img")
             if not (update / "romfs/Data/Managed/Metadata/global-metadata.dat").is_file():
                 raise ValueError("merged RomFS lacks the required IL2CPP metadata")
@@ -213,6 +215,9 @@ def main(argv=None):
     except (OSError, ValueError, ET.ParseError, subprocess.CalledProcessError) as error:
         print("Extraction failed:", error, file=sys.stderr)
         return 1
+    finally:
+        if previous_mask is not None:
+            os.umask(previous_mask)
 
 
 if __name__ == "__main__":

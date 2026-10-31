@@ -2,6 +2,9 @@
 # Check native dependencies, or prepare pinned SDL/SMAA/font sources locally.
 set -euo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+if [[ ${TARGET:-} == windows || ${OS:-} == Windows_NT ]]; then
+    exec bash "$root/tools/setup_windows.sh" "$@"
+fi
 mode=${1:---check}
 if (( $# > 1 )) || [[ $mode != --check && $mode != --ensure && $mode != --build-sdl && $mode != --fetch-smaa && $mode != --help ]]; then
     echo "Usage: $0 [--check|--ensure|--build-sdl|--fetch-smaa|--help]" >&2

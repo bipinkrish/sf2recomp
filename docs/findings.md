@@ -472,3 +472,26 @@ sections at 1280x720, despite the 120 FPS target. This is not a matched performa
 comparison with the AMD mailbox run; shader/loading dips also occurred. Full-game
 stability remains unverified. Evidence: `build/validation/gpu-nvidia-post-reboot`
 (heap log, settings/environment, game log, result JSON and screenshots).
+
+## 2026-10-31 — RTX 120 FPS and monitor refresh
+
+The earlier RTX 60 FPS observation was a presentation limit: the external
+DisplayPort-2 monitor was at 1920x1080/60 Hz. NVIDIA's X11 surface exposed FIFO,
+immediate and FIFO-latest-ready, but no mailbox, so the existing renderer fell
+back to FIFO. AMD's mailbox path could render ahead of that 60 Hz display;
+120 rendered frames did not imply 120 displayed refreshes in that configuration.
+
+Changing the monitor to its advertised 1920x1080/120 Hz mode allowed the existing
+NVIDIA FIFO path to hold about 119 FPS in warm sections. Strict-validation runs
+at 1280x720 and 1920x1080 reached frame 3,000, including Kenji sparring, and
+exited with status 0 without reported Vulkan errors. Loading/shader compilation
+still caused dips. The 1080p combat capture was visually checked. No renderer
+code change was required for this frame-rate increase.
+
+The installed desktop launcher uses `out/shadow-fight-2-linux/sf2`, whose binary
+matches the tested development executable. Its separate INI and `build`'s INI
+still requested 60 FPS despite the repository INI requesting 120. Both launch
+INIs were updated to 120, preserving the other settings and saving copies under
+`build/validation/gpu-nvidia-120hz`. The user explicitly chose to keep the monitor
+change for this session only; no persistent 120 Hz display preference is claimed.
+Evidence and settings snapshots: `build/validation/gpu-nvidia-120hz`.

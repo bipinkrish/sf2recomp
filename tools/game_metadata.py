@@ -53,7 +53,7 @@ def write_game_metadata(control, destination, source):
         image.convert("RGB").save(destination / "icon.png", format="PNG")
     shutil.copy2(nacp, destination / "control.nacp")
     info.update(control_source=source, icon_source=icon.name)
-    (destination / "game-info.json").write_text(json.dumps(info, ensure_ascii=False, indent=2) + "\n")
+    (destination / "game-info.json").write_text(json.dumps(info, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return info
 
 

@@ -219,10 +219,7 @@ static const char *host_sym(uint64_t pc, uint64_t *offset) {
 // Safe diagnostic reads: unmapped guest addresses fail instead of causing
 // another fault inside the crash handler. __cxa_throw decodes the known wrapper.
 static bool probe_read(uint64_t a, void *buf, size_t n) {
-    static int fd = -2;  // (-2: not opened yet)
-    if (fd == -2) fd = open("/proc/self/mem", O_RDONLY);
-    if (fd < 0) return false;
-    return pread(fd, buf, n, (off_t)a) == (ssize_t)n;
+    return plat_probe_read(a, buf, n);
 }
 static bool probe_u32(uint64_t a, uint32_t *v) { return probe_read(a, v, 4); }
 static bool probe_u64(uint64_t a, uint64_t *v) { return probe_read(a, v, 8); }

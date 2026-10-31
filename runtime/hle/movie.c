@@ -7,13 +7,15 @@
 #include <limits.h>
 #include <pthread.h>
 #include <signal.h>
+#if !defined(_WIN32) && !defined(SF2_MOVIE_SDL_PROCESS)
 #include <spawn.h>
+#include <sys/wait.h>
+#endif
 #include <stdatomic.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -23,7 +25,17 @@
 #include "../settings.h"
 #include "movie.h"
 
+#if defined(_WIN32) || defined(SF2_MOVIE_SDL_PROCESS)
+#define MOVIE_SDL_PROCESS 1
+typedef SDL_Process *MovieChild;
+typedef SDL_IOStream *MoviePipe;
+#define MOVIE_PIPE_NONE NULL
+#else
 extern char **environ;
+typedef pid_t MovieChild;
+typedef int MoviePipe;
+#define MOVIE_PIPE_NONE (-1)
+#endif
 extern void audio_movie_set_active(bool active);
 
 #define MOVIE_FPS 25
@@ -40,8 +52,8 @@ typedef struct {
 } MovieFrame;
 
 typedef struct {
-    pid_t child;
-    int video_fd, audio_fd;
+    MovieChild child;
+    MoviePipe video_fd, audio_fd;
     pthread_t video_thread, audio_thread, monitor_thread;
     bool video_started, audio_started, monitor_started;
     SDL_AudioStream *audio_stream;
@@ -52,7 +64,7 @@ typedef struct {
     atomic_uint_fast64_t audio_bytes_submitted;
 } MoviePlayer;
 
-static MoviePlayer g_movie = {.video_fd = -1, .audio_fd = -1};
+static MoviePlayer g_movie = {.video_fd = MOVIE_PIPE_NONE, .audio_fd = MOVIE_PIPE_NONE};
 static pthread_mutex_t g_movie_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t g_movie_frames_lock = PTHREAD_MUTEX_INITIALIZER;
 static MovieFrame g_movie_frames[MOVIE_FRAME_COUNT];
@@ -101,11 +113,16 @@ static bool movie_resolve_path(const char *guest_path, char *out, size_t out_siz
     if (snprintf(candidate, sizeof candidate, "%s/%s", g_romfs_dir, rel) >= (int)sizeof candidate) return false;
     if (!realpath(g_romfs_dir, root) || !realpath(candidate, resolved)) return false;
     size_t root_len = strlen(root);
+#ifdef _WIN32
+    if (_strnicmp(root, resolved, root_len) || resolved[root_len] != '/') return false;
+#else
     if (strncmp(root, resolved, root_len) || resolved[root_len] != '/') return false;
+#endif
     if (snprintf(out, out_size, "%s", resolved) >= (int)out_size) return false;
     return true;
 }
 
+#ifndef MOVIE_SDL_PROCESS
 static int movie_move_fd(int fd) {
     int n;
 #ifdef F_DUPFD_CLOEXEC
@@ -125,6 +142,8 @@ static void movie_close_pair(int p[2]) {
     p[0] = p[1] = -1;
 }
 
+#endif
+
 typedef struct {
     char executable[PATH_MAX];
     char library_dir[PATH_MAX];
@@ -143,7 +162,7 @@ static bool movie_select_decoder(MovieDecoder *decoder) {
         if (slash) {
             *slash = 0;
             if (snprintf(decoder->executable, sizeof decoder->executable,
-                         "%s/lib/ffmpeg/bin/ffmpeg", executable) < (int)sizeof decoder->executable &&
+                         "%s/lib/ffmpeg/bin/ffmpeg" PLAT_EXE_SUFFIX, executable) < (int)sizeof decoder->executable &&
                 snprintf(decoder->library_dir, sizeof decoder->library_dir,
                          "%s/lib/ffmpeg/lib", executable) < (int)sizeof decoder->library_dir &&
                 access(decoder->executable, X_OK) == 0)
@@ -152,11 +171,12 @@ static bool movie_select_decoder(MovieDecoder *decoder) {
     }
 
     // A raw build/smoke run can use the developer's PATH. Converted game folders always bundle FFmpeg here.
-    strcpy(decoder->executable, "ffmpeg");
+    strcpy(decoder->executable, "ffmpeg" PLAT_EXE_SUFFIX);
     LOG("[movie] bundled decoder not found beside the executable; trying PATH (developer fallback)\n");
     return true;
 }
 
+#ifndef MOVIE_SDL_PROCESS
 static char **movie_spawn_environment(const char *library_dir, char *ld_library_path, size_t path_size,
                                       char ***owned_env) {
     *owned_env = NULL;
@@ -247,6 +267,100 @@ fail:
     return false;
 }
 
+#else
+// Windows cannot inherit an arbitrary POSIX fd 3. Use its two standard output
+// pipes instead: video on stdout, PCM on stderr. Quiet mode is essential: text
+// diagnostics must never enter the PCM stream. Exit status is logged by the host.
+// SF2_MOVIE_SDL_PROCESS exercises this same branch on Linux without a Windows SDK.
+static bool movie_spawn_decoder(const char *path, const MovieDecoder *decoder,
+                                MovieChild *child, MoviePipe *video_fd, MoviePipe *audio_fd) {
+    char filter[128];
+    snprintf(filter, sizeof filter, "scale=%d:%d:flags=fast_bilinear,fps=%d",
+             RENDERER_MOVIE_WIDTH, RENDERER_MOVIE_HEIGHT, MOVIE_FPS);
+    const char *argv[] = {
+        decoder->executable, "-nostdin", "-hide_banner", "-loglevel", "quiet", "-re", "-i", path,
+        "-map", "0:v:0", "-vf", filter, "-pix_fmt", "nv12", "-f", "rawvideo", "pipe:1",
+        "-map", "0:a:0?", "-vn", "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "2", "-f", "s16le", "pipe:2", NULL
+    };
+    SDL_PropertiesID props = SDL_CreateProperties();
+    if (!props) return false;
+    bool ok = SDL_SetPointerProperty(props, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, (void *)argv) &&
+        SDL_SetNumberProperty(props, SDL_PROP_PROCESS_CREATE_STDIN_NUMBER, SDL_PROCESS_STDIO_NULL) &&
+        SDL_SetNumberProperty(props, SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER, SDL_PROCESS_STDIO_APP) &&
+        SDL_SetNumberProperty(props, SDL_PROP_PROCESS_CREATE_STDERR_NUMBER, SDL_PROCESS_STDIO_APP);
+    SDL_Process *process = ok ? SDL_CreateProcessWithProperties(props) : NULL;
+    SDL_DestroyProperties(props);
+    if (!process) { LOG("[movie] cannot start decoder: %s\n", SDL_GetError()); return false; }
+    SDL_PropertiesID output = SDL_GetProcessProperties(process);
+    MoviePipe video = SDL_GetProcessOutput(process);
+    MoviePipe audio = SDL_GetPointerProperty(output, SDL_PROP_PROCESS_STDERR_POINTER, NULL);
+    if (!video || !audio) {
+        SDL_KillProcess(process, true);
+        SDL_WaitProcess(process, true, NULL);
+        SDL_DestroyProcess(process);
+        return false;
+    }
+    *child = process;
+    *video_fd = video;
+    *audio_fd = audio;
+    return true;
+}
+#endif
+
+static ssize_t movie_pipe_read(MoviePipe pipe, void *out, size_t size, MoviePlayer *player) {
+#ifdef MOVIE_SDL_PROCESS
+    while (!atomic_load(&player->stop)) {
+        size_t n = SDL_ReadIO(pipe, out, size);
+        if (n) return (ssize_t)n;
+        SDL_IOStatus status = SDL_GetIOStatus(pipe);
+        if (status == SDL_IO_STATUS_NOT_READY) { SDL_Delay(1); continue; }
+        if (status == SDL_IO_STATUS_EOF) return 0;
+        errno = EIO;
+        return -1;
+    }
+    return 0;
+#else
+    (void)player;
+    return read(pipe, out, size);
+#endif
+}
+
+static void movie_pipe_close(MoviePipe pipe) {
+#ifndef MOVIE_SDL_PROCESS
+    if (pipe != MOVIE_PIPE_NONE) close(pipe);
+#else
+    (void)pipe; // SDL_DestroyProcess owns its I/O streams, after readers join.
+#endif
+}
+
+static void movie_child_kill(MovieChild child) {
+#ifdef MOVIE_SDL_PROCESS
+    if (child) SDL_KillProcess(child, true);
+#else
+    if (child > 0) kill(child, SIGTERM);
+#endif
+}
+
+static int movie_child_wait(MovieChild child) {
+#ifdef MOVIE_SDL_PROCESS
+    int status = 255;
+    return SDL_WaitProcess(child, true, &status) ? status : 255;
+#else
+    int status = 0;
+    pid_t waited;
+    do { waited = waitpid(child, &status, 0); } while (waited < 0 && errno == EINTR);
+    return waited < 0 ? 255 : WIFEXITED(status) ? WEXITSTATUS(status) : 255;
+#endif
+}
+
+static void movie_child_destroy(MovieChild child) {
+#ifdef MOVIE_SDL_PROCESS
+    if (child) SDL_DestroyProcess(child);
+#else
+    (void)child;
+#endif
+}
+
 static void movie_frames_clear(void) {
     pthread_mutex_lock(&g_movie_frames_lock);
     for (int i = 0; i < MOVIE_FRAME_COUNT; i++) {
@@ -273,10 +387,10 @@ static bool movie_frames_init(void) {
     return true;
 }
 
-static size_t movie_read_frame(int fd, void *buffer, size_t size, MoviePlayer *p) {
+static size_t movie_read_frame(MoviePipe fd, void *buffer, size_t size, MoviePlayer *p) {
     size_t got = 0;
     while (got < size && !atomic_load(&p->stop)) {
-        ssize_t n = read(fd, (uint8_t *)buffer + got, size - got);
+        ssize_t n = movie_pipe_read(fd, (uint8_t *)buffer + got, size - got, p);
         if (n > 0) got += (size_t)n;
         else if (n == 0) break;
         else if (errno != EINTR) break;
@@ -314,9 +428,11 @@ static void *movie_video_reader(void *arg) {
         free(scratch);
     } else {
         LOG("[movie] cannot allocate video frame buffer\n");
+        atomic_store(&p->stop, true);
+        movie_child_kill(p->child);
     }
-    close(p->video_fd);
-    p->video_fd = -1;
+    movie_pipe_close(p->video_fd);
+    p->video_fd = MOVIE_PIPE_NONE;
     atomic_store(&p->video_done, true);
     return NULL;
 }
@@ -337,7 +453,7 @@ static void *movie_audio_reader(void *arg) {
             while (!atomic_load(&p->stop) && SDL_GetAudioStreamQueued(p->audio_stream) > MOVIE_AUDIO_QUEUE_LIMIT)
                 movie_sleep_ns(5000000ull);
         }
-        ssize_t n = read(p->audio_fd, buffer, sizeof buffer);
+        ssize_t n = movie_pipe_read(p->audio_fd, buffer, sizeof buffer, p);
         if (n > 0) {
             if (p->audio_stream) {
                 if (SDL_PutAudioStreamData(p->audio_stream, buffer, (int)n)) {
@@ -350,8 +466,8 @@ static void *movie_audio_reader(void *arg) {
         } else if (n < 0 && errno == EINTR) continue;
         else break;
     }
-    close(p->audio_fd);
-    p->audio_fd = -1;
+    movie_pipe_close(p->audio_fd);
+    p->audio_fd = MOVIE_PIPE_NONE;
     atomic_store(&p->audio_eof, true);
     // A short clip can reach audio EOF before frame zero is presented. Its queued
     // samples still need to start once the presenter releases playback.
@@ -375,10 +491,8 @@ static void *movie_monitor(void *arg) {
     MoviePlayer *p = arg;
     pthread_join(p->video_thread, NULL);
     pthread_join(p->audio_thread, NULL);
-    int status = 0;
-    pid_t waited;
-    do { waited = waitpid(p->child, &status, 0); } while (waited < 0 && errno == EINTR);
-    if (!atomic_load(&p->stop) && (!WIFEXITED(status) || WEXITSTATUS(status) != 0))
+    int status = movie_child_wait(p->child);
+    if (!atomic_load(&p->stop) && status != 0)
         LOG("[movie] decoder exited with status %#x\n", status);
     audio_movie_set_active(false);
     atomic_store(&g_movie_visible, false);
@@ -392,25 +506,23 @@ static void movie_stop_locked(void) {
     atomic_store(&g_movie_skip_requested, false);
     // The monitor reaps a completed child while leaving its PID in the player. Only signal a live overlay, avoiding
     // the chance that a reused PID is signalled when a later movie/reset cleans up an already-finished clip.
-    if (was_visible && g_movie.child > 0) kill(g_movie.child, SIGTERM);
+    if (was_visible && g_movie.child) movie_child_kill(g_movie.child);
     if (g_movie.monitor_started) {
         pthread_join(g_movie.monitor_thread, NULL);
         g_movie.monitor_started = false;
     } else {
         if (g_movie.video_started) pthread_join(g_movie.video_thread, NULL);
-        else if (g_movie.video_fd >= 0) close(g_movie.video_fd);
+        else movie_pipe_close(g_movie.video_fd);
         if (g_movie.audio_started) pthread_join(g_movie.audio_thread, NULL);
-        else if (g_movie.audio_fd >= 0) close(g_movie.audio_fd);
-        if (g_movie.child > 0) {
-            int status;
-            while (waitpid(g_movie.child, &status, 0) < 0 && errno == EINTR) {}
-        }
+        else movie_pipe_close(g_movie.audio_fd);
+        if (g_movie.child) movie_child_wait(g_movie.child);
     }
+    movie_child_destroy(g_movie.child);
     if (g_movie.audio_stream) SDL_DestroyAudioStream(g_movie.audio_stream);
     if (g_movie.audio_subsystem) SDL_QuitSubSystem(SDL_INIT_AUDIO);
     audio_movie_set_active(false);
     g_movie.child = 0;
-    g_movie.video_fd = g_movie.audio_fd = -1;
+    g_movie.video_fd = g_movie.audio_fd = MOVIE_PIPE_NONE;
     g_movie.video_started = g_movie.audio_started = g_movie.monitor_started = false;
     g_movie.audio_stream = NULL;
     g_movie.audio_subsystem = false;
