@@ -12,7 +12,10 @@ enum { RES_MATCH = 0, RES_DYNAMIC = 9, RES_Q75 = 10, RES_Q25 = 11, RES_Q50 = 12 
 enum { UPSCALE_BILINEAR = 0, UPSCALE_METALFX = 1, UPSCALE_FSR1 = 2 };
 #define UPSCALE_SHARP UPSCALE_FSR1
 enum { AA_OFF = 0, AA_SMAA = 1 };
-enum { PROMPTS_AUTO = 0, PROMPTS_NINTENDO = 1, PROMPTS_XBOX = 2, PROMPTS_PLAYSTATION = 3 };
+enum {
+    PROMPTS_AUTO = 0, PROMPTS_NINTENDO = 1, PROMPTS_XBOX = 2, PROMPTS_PLAYSTATION = 3,
+    PROMPTS_KEYBOARD = 4
+};
 
 extern bool g_gpu_integrated;
 
@@ -29,6 +32,7 @@ typedef struct Settings {
     int language;
     int aspect;
     bool fullscreen;
+    int target_fps;
     int res_mode;
     bool res_auto;
     int upscaler;
@@ -39,6 +43,7 @@ typedef struct Settings {
     int rumble_strength;
     bool bg_input;
     int prompts;
+    bool experimental_keyboard_prompts;
     int screen_filter;
     char save_directory[SETTINGS_SAVE_DIRECTORY_CAP];
 } Settings;

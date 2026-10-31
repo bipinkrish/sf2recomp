@@ -196,7 +196,9 @@ static void *thread_main(void *arg) {
     if (t->is_main) plat_thread_perf_core(PLAT_PERF_GAME);  // (the game's frame runs here)
     crash_handler_install();
     rt_set_fpcr(0);
+    rt_guest_eh_reset();
     if (!setjmp(t->unwind)) guest_call(&t->cpu, t->entry);
+    rt_guest_eh_reset();  // a reboot/ExitThread longjmp can discard translated EH frames
     // Finish diagnostic: how a guest thread exits (return value + last guest frames). The boot's
     // silent nnMain return (~29 s: scene built, Vulkan up, zero presents, render queue saw one
     // texture-destroy) has no other trace; this names the last code main ran and what it gave back.

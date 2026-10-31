@@ -40,11 +40,7 @@ tools/il2cpp/*.deps.json
 tools/il2cpp/*.runtimeconfig.json
 .venv/
 # Downloaded/built native dependencies (licenses and setup recipes stay tracked)
-/deps/include/SDL3/
+/deps/*
 /third_party/
 /tools/third_party/
-deps/lib/
-deps/lib64/
-deps/share/
-deps/bin/
 *.so.*

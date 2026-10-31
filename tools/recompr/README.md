@@ -11,7 +11,7 @@ Forked from [LAS Recomp](https://github.com/Peiikai/LASRecomp)'s generator
 | `lifter.py`, `simd_c.py` | Instruction and portable FP/SIMD lowering |
 | `gen.py` | C generation; `--symbols` seeds IL2CPP function boundaries and names |
 | `game_addresses.py` | Supported SF2 build IDs and guest address definitions |
-| `patches.py` | Six console-stream compatibility hook sites; no instruction patches or SDK hooks |
+| `patches.py` | Console-stream, Unity frame-rate, and runtime keyboard-hint hooks; no instruction patches or SDK hooks |
 
 From the repository root, with your extracted update and IL2CPP symbol map:
 
@@ -26,13 +26,14 @@ make -j8
 Regenerate after editing `patches.py`; generated C and game inputs are ignored by
 git. The runtime supplies `cpu.h`, dispatch, loading/relocation, system services
 and Vulkan rendering. Main and SDK are translated; the runtime loader replaces
-`rtld`, and movie imports from `subsdk0` currently use `runtime/hle/movie.c` stubs.
-This does not translate the entire movie module or provide video playback.
+`rtld`, and movie imports from `subsdk0` use the host decoder in
+`runtime/hle/movie.c`. This does not translate the entire movie module; track
+operations and broader cinematic behavior remain limited.
 
 Only update v131072 is accepted. Generated tables embed all 32 main/SDK NSO build-ID
 bytes; the runtime refuses mismatched files before starting a graphics device.
-Linux reaches the original menu and Story dialogue. `.eh_frame_hdr` currently
-helps discover function starts only: it does **not** provide guest C++ stack
-unwinding or connect throws to landing pads. Supporting those catch paths is
-still required for later game execution. See the root README for launch options
-and current platform limitations.
+Linux reaches the original menu and Story dialogue. The generator reads LSDA
+call-site catch metadata and emits protected-call tables; the runtime can resume
+matching typed or catch-all landing pads. Cleanup and rethrow paths remain
+unsupported and broader exception coverage is still needed. See the root README
+for launch options and current platform limitations.

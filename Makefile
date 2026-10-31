@@ -7,13 +7,15 @@ GEN     ?= game/gen
 GAME    ?= game/extracted/update
 PYTHON  ?= python3
 SDL_DIR ?= $(CURDIR)/deps
-# A complete local prefix (headers and library) or the distro's SDL3 package.
-ifneq ($(and $(wildcard $(SDL_DIR)/include/SDL3/SDL.h),$(wildcard $(SDL_DIR)/lib/libSDL3.*)),)
+# Default to the local prefix that runtime-deps can prepare. Prefer a suitable
+# system SDL only when there is no complete local installation.
 SDL_CFLAGS := -I$(SDL_DIR)/include
 SDL_LIBS := -L$(SDL_DIR)/lib -lSDL3 -Wl,-rpath,$(SDL_DIR)/lib
-else
-SDL_CFLAGS := $(shell pkg-config --cflags sdl3 2>/dev/null)
-SDL_LIBS := $(shell pkg-config --libs sdl3 2>/dev/null || echo -lSDL3)
+ifeq ($(and $(wildcard $(SDL_DIR)/include/SDL3/SDL.h),$(wildcard $(SDL_DIR)/lib/libSDL3.*)),)
+ifeq ($(shell pkg-config --atleast-version=3.4.0 sdl3 2>/dev/null && echo yes),yes)
+SDL_CFLAGS := $(shell pkg-config --cflags sdl3)
+SDL_LIBS := $(shell pkg-config --libs sdl3)
+endif
 endif
 
 # The generated game code (tools/recompr/gen.py), compiled like the generator expects:
@@ -30,7 +32,7 @@ EXE := $(B)/sf2
 
 # Download pinned SMAA sources only when absent; generated files stay out of Git.
 SMAA_INPUTS := third_party/smaa/smaa_hlsl.inc third_party/smaa/Textures/AreaTex.h third_party/smaa/Textures/SearchTex.h
-$(SMAA_INPUTS) &: tools/setup_smaa.py
+$(SMAA_INPUTS) &: tools/setup_smaa.py | runtime-deps
 	$(PYTHON) tools/setup_smaa.py
 	@touch $(SMAA_INPUTS)
 
@@ -67,9 +69,10 @@ $(EXE): $(RT_OBJ) $(GEN_OBJ) Makefile | check-generated
 	@mkdir -p $(B)
 	$(CXX) -o $@ $(filter %.o,$^) $(LDFLAGS)
 
-# Fast compile for the 6 monolithic functions that cause Clang -O1 optimizer stalls:
+# Fast compile for the monolithic functions that cause Clang -O1 optimizer stalls:
 SLOW_CHUNKS := $(B)/obj/main/main_047.o $(B)/obj/main/main_183.o $(B)/obj/main/main_662.o \
-               $(B)/obj/main/main_704.o $(B)/obj/main/main_735.o $(B)/obj/main/main_759.o
+               $(B)/obj/main/main_704.o $(B)/obj/main/main_735.o $(B)/obj/main/main_746.o \
+               $(B)/obj/main/main_759.o
 
 $(SLOW_CHUNKS): $(B)/obj/%.o: $(GEN)/%.c
 	@mkdir -p $(dir $@)
@@ -93,3 +96,10 @@ runtime-objs: $(RT_OBJ)
 
 clean:
 	rm -rf $(B)
+
+# Prepare native dependencies before any runtime compile, including partial-prefix recovery.
+.PHONY: runtime-deps
+runtime-deps:
+	SDL_DIR="$(SDL_DIR)" tools/setup_runtime.sh --ensure
+
+$(RT_OBJ): | runtime-deps

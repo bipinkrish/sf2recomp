@@ -13,6 +13,7 @@ import sys
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 from game_metadata import APP_ID, parse_nacp
+from setup_ffmpeg import ARCHIVE_NAME as FFMPEG_ARCHIVE_NAME, VERSION as FFMPEG_VERSION
 
 
 def run(*command):
@@ -112,7 +113,7 @@ def install_desktop(output):
     return target
 
 
-def package_game(game, output, executable, sdl_dir):
+def package_game(game, output, executable, sdl_dir, ffmpeg_dir):
     """Copy only runtime inputs; keys, tickets, compiler outputs and tools stay out."""
     source_ids(game)
     output = output.resolve()
@@ -124,6 +125,14 @@ def package_game(game, output, executable, sdl_dir):
     desktop_exec(output / "sf2")  # Validate launcher compatibility before copying files.
     # This checks the actual linked build IDs without opening a graphical window.
     run(executable, "--check-game", game)
+    ffmpeg_executable = ffmpeg_dir / "bin/ffmpeg"
+    ffmpeg_build = ffmpeg_dir / "share/ffmpeg/BUILD.txt"
+    ffmpeg_source = ffmpeg_dir / "share/ffmpeg" / FFMPEG_ARCHIVE_NAME
+    ffmpeg_license = ffmpeg_dir / "share/licenses/FFmpeg"
+    ffmpeg_libraries = sorted({*ffmpeg_dir.glob("lib/libav*.so*"), *ffmpeg_dir.glob("lib/libsw*.so*")})
+    if (not ffmpeg_executable.is_file() or not ffmpeg_build.is_file() or not ffmpeg_source.is_file()
+            or not ffmpeg_license.is_dir() or not ffmpeg_libraries):
+        raise ValueError("The bundled FFmpeg build is incomplete; run tools/setup_ffmpeg.py --build.")
     output.mkdir(parents=True, exist_ok=True)
     exefs = output / "extracted/exefs"
     exefs.mkdir(parents=True, exist_ok=True)
@@ -174,10 +183,33 @@ def package_game(game, output, executable, sdl_dir):
                 target.symlink_to(path.resolve().name)
             else:
                 shutil.copy2(path, target)
+    # Converted outputs carry the small LGPL-only decoder and its matching shared libraries. The game never asks the
+    # player to install FFmpeg or find it on PATH.
+    ffmpeg_bundle = output / "lib/ffmpeg"
+    if ffmpeg_bundle.exists():
+        shutil.rmtree(ffmpeg_bundle)
+    ffmpeg_bin = ffmpeg_bundle / "bin"
+    ffmpeg_lib = ffmpeg_bundle / "lib"
+    ffmpeg_bin.mkdir(parents=True)
+    ffmpeg_lib.mkdir(parents=True)
+    shutil.copy2(ffmpeg_executable, ffmpeg_bin / "ffmpeg")
+    for path in ffmpeg_libraries:
+        target = ffmpeg_lib / path.name
+        if path.is_symlink():
+            target.symlink_to(path.resolve().name)
+        else:
+            shutil.copy2(path, target)
+    ffmpeg_notices = notices / "FFmpeg"
+    if ffmpeg_notices.exists():
+        shutil.rmtree(ffmpeg_notices)
+    shutil.copytree(ffmpeg_license, ffmpeg_notices)
+    shutil.copy2(ffmpeg_source, ffmpeg_notices / f"ffmpeg-{FFMPEG_VERSION}-source.tar.xz")
+    shutil.copy2(ffmpeg_build, ffmpeg_notices / "BUILD.txt")
     (output / "build.json").write_text(json.dumps({
         "target": "linux", "executable": "sf2", "source_build_ids": source_ids(game),
         "official_title": info["title"], "official_display_version": info["display_version"],
         "configuration": "sf2recomp.ini (read at runtime)",
+        "cutscene_decoder": f"FFmpeg {FFMPEG_VERSION} (bundled, LGPL-only build)",
     }, indent=2) + "\n")
     (output / "RUN.txt").write_text(
         "Run ./sf2 from this folder or any working directory.\n"
@@ -185,10 +217,11 @@ def package_game(game, output, executable, sdl_dir):
         f"Desktop launcher: {APP_ID}.desktop (local paths; regenerate if moved).\n"
         "Edit sf2recomp.ini for language/audio/video/keyboard/gamepad mappings; restart to apply.\n"
         "Keep extracted/ beside the executable. This output contains your local game-derived files.\n"
+        "Cutscene playback uses the FFmpeg decoder and source bundled in lib/ffmpeg and licenses/FFmpeg; no FFmpeg install is needed.\n"
         "System requirements: Linux x86-64, Vulkan loader/driver, shaderc and C/C++ runtime libraries.\n"
         "Software fallback: SDL_VIDEODRIVER=x11 LARECOMP_VK_NO_GMEM=1 "
         "VK_DRIVER_FILES=/usr/share/vulkan/icd.d/lvp_icd.json ./sf2\n"
-        "Combat, video playback and hardware-driver compatibility remain incomplete.\n")
+        "Combat and hardware-driver compatibility remain incomplete.\n")
     print(f"Native game folder: {output}")
 
 
@@ -221,19 +254,22 @@ def main(argv=None):
             game = args.game.resolve(strict=True)
         source_ids(game)
         sdl_dir = Path(os.environ.get("SDL_DIR", ROOT / "deps")).resolve()
+        ffmpeg_dir = Path(os.environ.get("FFMPEG_DIR", ROOT / "deps/ffmpeg")).resolve()
         if not args.package_only:
             missing = [name for name in ("capstone", "unicorn", "lz4", "cryptography", "PIL")
                        if importlib.util.find_spec(name) is None]
             if missing:
                 raise ValueError("Install build dependencies: python3 -m pip install -r tools/requirements.txt")
-            run(ROOT / "tools/setup_runtime.sh", "--check")
+            run(ROOT / "tools/setup_runtime.sh", "--ensure")
+        run(sys.executable, ROOT / "tools/setup_ffmpeg.py", "--ensure")
+        if not args.package_only:
             symbols = prepare_symbols(game)
             run(sys.executable, ROOT / "tools/recompr/gen.py", "main", game / "exefs/main",
                 "0x7000000000", ROOT / "game/gen/main", "--symbols", symbols)
             run(sys.executable, ROOT / "tools/recompr/gen.py", "sdk", game / "exefs/sdk",
                 "0x7004000000", ROOT / "game/gen/sdk")
             run("make", f"-j{args.jobs}", f"SDL_DIR={sdl_dir}")
-        package_game(game, args.output, ROOT / "build/sf2", sdl_dir)
+        package_game(game, args.output, ROOT / "build/sf2", sdl_dir, ffmpeg_dir)
         if args.install_desktop:
             install_desktop(args.output)
         return 0

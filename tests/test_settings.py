@@ -39,6 +39,29 @@ def compile_harness(source, output):
 
 
 class SettingsTests(unittest.TestCase):
+    def test_experimental_keyboard_prompts_require_opt_in(self):
+        harness = r'''
+#include <assert.h>
+#include "settings.h"
+int main(int argc, char **argv) {
+    assert(argc == 4 && !g_settings.experimental_keyboard_prompts);
+    assert(settings_load_file(argv[1]) && g_settings.experimental_keyboard_prompts);
+    assert(settings_load_file(argv[2]) && !g_settings.experimental_keyboard_prompts);
+    assert(settings_load_file(argv[3]) && !g_settings.experimental_keyboard_prompts);
+    return 0;
+}
+'''
+        with tempfile.TemporaryDirectory(prefix="sf2-experimental-config-") as directory:
+            root = pathlib.Path(directory)
+            (root / "test.c").write_text(harness)
+            files = []
+            for name, value in (("on", "true"), ("off", "false"), ("invalid", "maybe")):
+                path = root / f"{name}.ini"
+                path.write_text(f"[experimental]\nkeyboard_prompts = {value}\n")
+                files.append(str(path))
+            compile_harness(root / "test.c", root / "test")
+            subprocess.run([str(root / "test"), *files], check=True)
+
     def test_extensible_config_and_environment_precedence(self):
         harness = r'''
 #include <assert.h>
@@ -95,6 +118,11 @@ int main(int argc, char **argv) {
 // Exercise the actual event -> HID state consumer with the configuration parser.
 #include "hle/input.c"
 bool menu_input_captured(void) { return false; }
+static bool movie_visible, skip_requested;
+void movie_request_skip(void) { skip_requested = true; }
+bool movie_overlay_active(void) { return movie_visible; }
+uint64_t renderer_present_count(void) { return 1; }
+volatile int g_inject_plus;
 int main(int argc, char **argv) {
     assert(argc == 3);
     unsetenv("LARECOMP_LANG"); unsetenv("LARECOMP_VOLUME"); unsetenv("LARECOMP_REVERB");
@@ -133,14 +161,31 @@ int main(int argc, char **argv) {
 
     host_test = true;
     test_pad = 1u << SDL_GAMEPAD_BUTTON_EAST;
-    recompute_pad();
-    assert(!(pad_buttons & (1ull << BIND_A)));
+    recompute_pad(0);
+    assert(!(pads[0].buttons & (1ull << BIND_A)));
     test_pad = (1u << SDL_GAMEPAD_BUTTON_NORTH) | (1u << PADB_RTRIGGER);
-    recompute_pad();
-    assert(pad_buttons & (1ull << BIND_A));
-    assert(pad_buttons & (1ull << BIND_X));
-    assert(pad_buttons & (1ull << BIND_ZL));
-    assert(!(pad_buttons & (1ull << BIND_B)));
+    recompute_pad(0);
+    assert(pads[0].buttons & (1ull << BIND_A));
+    assert(pads[0].buttons & (1ull << BIND_X));
+    assert(pads[0].buttons & (1ull << BIND_ZL));
+    assert(!(pads[0].buttons & (1ull << BIND_B)));
+
+    uint64_t state[5] = {0};
+    uint32_t player = 0;
+    Cpu cpu = {0};
+    cpu.x[0] = (uintptr_t)state; cpu.x[1] = (uintptr_t)&player;
+    movie_visible = true;
+    fill_state(&cpu);
+    assert(state[1] == 0 && state[2] == 0 && state[3] == 0);
+    assert(((uint32_t *)state)[8] == 1);
+    note_press(0, 1ull << BIND_A, 0);
+    assert(skip_requested);
+    movie_visible = false;
+    fill_state(&cpu);
+    assert(!(state[1] & (1ull << BIND_A))); // skip press cannot select Story
+    note_press(0, 0, 1ull << BIND_A);
+    fill_state(&cpu);
+    assert(state[1] & (1ull << BIND_A));
 
     FILE *saved = tmpfile(); assert(saved);
     bind_config_save(saved);

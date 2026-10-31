@@ -3,12 +3,13 @@
 set -euo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 mode=${1:---check}
-if (( $# > 1 )) || [[ $mode != --check && $mode != --build-sdl && $mode != --fetch-smaa && $mode != --help ]]; then
-    echo "Usage: $0 [--check|--build-sdl|--fetch-smaa|--help]" >&2
+if (( $# > 1 )) || [[ $mode != --check && $mode != --ensure && $mode != --build-sdl && $mode != --fetch-smaa && $mode != --help ]]; then
+    echo "Usage: $0 [--check|--ensure|--build-sdl|--fetch-smaa|--help]" >&2
     exit 2
 fi
 if [[ $mode == --help ]]; then
     cat <<'HELP'
+--ensure     Prepare missing SDL/SMAA automatically, then check.
 --check      Compile/link native dependency probe; no downloads (default).
 --build-sdl  Prepare SMAA, build/install verified SDL 3.4.16 locally, then check.
 --fetch-smaa Download verified SMAA sources and generate its shader include only.
@@ -20,6 +21,16 @@ SMAA_SOURCE_DIR    Optional offline SMAA source folder; same checksums required.
 See tools/runtime-dependencies.md for system packages and licenses.
 HELP
     exit
+fi
+if [[ $mode == --ensure ]]; then
+    prefix=${SDL_DIR:-"$root/deps"}
+    if [[ -f $prefix/include/SDL3/SDL.h && ( -f $prefix/lib/libSDL3.so || -f $prefix/lib/libSDL3.a ) ]] ||
+       pkg-config --atleast-version=3.4.0 sdl3 2>/dev/null; then
+        python3 "$root/tools/setup_smaa.py"
+        mode=--check
+    else
+        mode=--build-sdl
+    fi
 fi
 if [[ $mode == --fetch-smaa ]]; then
     exec python3 "$root/tools/setup_smaa.py"

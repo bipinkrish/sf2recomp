@@ -6,7 +6,7 @@
 //                  7680 x 2160); capped to the GPU's 16384-pixel texture limit. 1x on an integrated GPU: 720 lines,
 //                  a lower base resolution suited to integrated GPUs
 //   .75x / .50x / .25x  of Match display (scaled up to the window - with MetalFX on macOS when chosen)
-//   Dynamic        Match display, lowered in steps while the GPU can't hold 60 fps and raised again when it can.
+//   Dynamic        Match display, lowered in steps while the GPU can't hold the configured target FPS and raised again.
 //                  The render targets stay allocated at the Match display size (ax, ay) and the frame is drawn into
 //                  their top-left part at (sx, sy): no reallocation at a step, so no hitch (each step reallocated
 //                  every screen-sized texture before: ~325 ms on an M3 Max, seconds at 4K on Vulkan, issue #100).
@@ -28,7 +28,7 @@
 // 0.375, 4K and up 1/3 (1280x720 at 4K, still 1440 lines at 8K); 540 lines or less: no scaling. It was 1/3 everywhere:
 // 640x360 of a 1080p window, blurry on integrated GPUs (issue #205).
 // It holds a resolution and changes only when it must: down when 3 of the last 4 half seconds were over budget or
-// they averaged over 95% of it (1 s in a row when frames miss 60 outright), straight to where the last second's frame is predicted to fit with room; up
+// they averaged over 95% of it (1 s in a row when frames miss the target outright), straight to where the last second's frame is predicted to fit with room; up
 // one step after 5 s in a row (no load spikes in it) with that step predicted to fit with room, at least 5 s after the
 // last change, and the wait before a raise doubles each time a raise is undone within 30 s (up to a minute; reset
 // after a calm minute). Before: down after one half second over, up after 3 s in 0.05 steps - it stepped all the time
@@ -37,69 +37,73 @@
 // in, a shader compiling: 100+ ms frames with the GPU nearly idle, which used to step it down on a fast GPU and, with
 // the slow raises, keep it low for a minute). With GPU times (Metal's command buffers, Vulkan's timestamps) it goes by
 // those alone. Without, by the frame times with the spikes left out: the mean of the half second's frames up to 3x their
-// median (a frame missing one vsync, 33 ms, still counts: that's how a slow GPU shows at 60 Hz). Either way a spike
+// median (a frame missing one vsync still counts). Either way a spike
 // neither steps it down nor, so, doubles the raise wait. LARECOMP_DYN_NO_GPU=1: ignore the GPU times (tests the
 // frame-time path); LARECOMP_SPIKE_MS (pace.c): CPU-side spikes.
 //
 // The GPU time has two parts: the game's (G, scales with the factor: about its area, factor^2) and the window step's
 // (W: the image drawn into the window - upscale, SMAA - and the menu: depends on the window's size only). The budget
-// is for G + W (87% of a 60 Hz frame); a raise must be predicted to fit with room to spare (G x (new / old)^2 with 25%
+// is for G + W (87% of the configured target frame interval); a raise must be predicted to fit with room to spare (G x (new / old)^2 with 25%
 // on top, + W: the room is for G, which moves with the scene - W is the window's and steady, and large at 4K / 8K
 // with an upscaler: 7-9 ms at 7680x4320 with MetalFX on an M3 Max; no fixed raise threshold, so it settles one step
 // under where it would go over instead of hunting), and a step down goes straight to where G + W is predicted to fit
 // with that same room (at most 0.3 at once), so the next raise isn't predicted to fit right away.
-// Held: when even the floor misses 60 fps and the frames wait for the display (vsync: a frame every 33 ms
-// for G + W = 17), going lower gains nothing, so the budget becomes 87% of that frame interval (whole 60 Hz refreshes:
-// 33.3 / 50 ms) and the factor goes back up as far as it fits there (a large W - 4K SMAA / FSR 1 on an integrated
+// Held: when even the floor misses the configured target and frames wait for the display, going lower gains nothing,
+// so the budget becomes 87% of the held frame interval (whole virtual refreshes) and the factor goes back up as far as
+// it fits there (a large W - 4K SMAA / FSR 1 on an integrated
 // GPU - or a slow GPU at a big window). A hold keeps measuring: G + W over the hold's budget for a second lowers the
-// factor; at the floor for 1.5 s, the hold steps down from 30 to 20 fps (G at the floor can grow after the hold began:
-// UHD 770 4K 19.4 -> 27.9 ms, frames every 49-65 ms while it said 30). It steps back up - 20 to 30, 30 to looking for
-// 60 - only when the floor is predicted to fit the faster rate with 20% to spare for 2 s (after 10 s, doubling each
+// factor; at the floor for 1.5 s, the hold adds one refresh to each frame (at the default 60 Hz, 30 to 20 fps; G at
+// the floor can grow after the hold began: UHD 770 4K 19.4 -> 27.9 ms, frames every 49-65 ms while it said 30). It
+// steps back up only when the floor is predicted to fit the faster rate with 20% to spare for 2 s (after 10 s, doubling each
 // time that fails or is undone within 30 s), and starts over when W changes (another upscaler / anti-aliasing / window
 // size). Frames that don't wait (mailbox: a frame every G + W) keep going down to the floor: there every step down is
 // a faster frame. tools/test_dynres.py: the controller against a simulated GPU (the UHD 770 cases).
-#define DYN_N 30            // frames per decision (~half a second)
+#define DYN_MAX_SAMPLES 180 // up to half a second at the maximum configured 360 fps
 #define DYN_FLOOR_LINES 540.0     // the floor: at least this many render lines...
 #define DYN_FLOOR_SHARE (1.0 / 3)  // ... and at least this share of the Match display's
 #define DYN_STEP 0.1        // the factor's grid (the floor below its first step)
-#define DYN_BUDGET 14.5     // ms of GPU work per frame at 60 fps (G + W)
 #define DYN_RAISE_FIT 0.9   // a hold's raise: predicted G + W under this share of the budget
 #define DYN_UP_FIT 0.8      // a raise / a step down's target (not held): predicted G / this + W within the budget
 #define DYN_DOWN_VOTES 3    // decisions over budget out of the last 4 (2 s) before a step down
-#define DYN_DOWN_FAST 2     // ... in a row when the frames miss 60 outright: G + W over a whole refresh (1 s)
+#define DYN_DOWN_FAST 2     // ... in a row when the frames miss the target outright (1 s)
 #define DYN_UP_VOTES 10     // decisions in a row with the next step predicted to fit before a raise (5 s)
 #define DYN_RAISE_WAIT 5.0  // s from the last change to a raise (doubles while raises are undone, up to 60)
 #define DYN_MAX_DOWN 0.3    // the most a step down lowers the factor at once
 #define DYN_HOLD_UP_FIT 0.8 // a hold steps up: the floor's predicted G + W under this share of the faster rate's budget
-#define DYN_HOLD_MAX 3      // vsyncs a hold waits at most (60 Hz: 20 fps)
+#define DYN_HOLD_MAX 3      // virtual refreshes a hold waits at most
 static double g_dyn = 1.0;
 static double g_dyn_floor = DYN_FLOOR_SHARE;  // (set from the window: dyn_set_floor)
 static unsigned g_down_hist;  // the last decisions over budget (bit 0: the latest)
 static double g_down_gw[4];   // and their G + W
-static int g_down_fast_votes;  // decisions in a row missing 60 outright
+static int g_down_fast_votes;  // decisions in a row missing the configured target outright
 static double g_prev_G = -1, g_prev_W;  // the decision before's G and W (a step down's target: the two averaged)
-static double g_dyn_gpu_sum, g_dyn_win_sum, g_last_t, g_dyn_dt[DYN_N];
+static double g_dyn_gpu_sum, g_dyn_win_sum, g_last_t, g_dyn_dt[DYN_MAX_SAMPLES];
 static int g_dyn_n, g_dyn_gpu_n, g_dyn_good;
 static double g_dyn_cool_until, g_dyn_raise_wait = DYN_RAISE_WAIT, g_dyn_raise_at;
 static double g_dyn_last_raise = -100, g_dyn_last_lower = -100;
 static double g_hold_dt, g_hold_w;               // held: the frame interval at the floor (> 0) and W then
-static double g_probe_at, g_probe_wait = 10.0;  // looking for 60 again (from a hold)
+static double g_probe_at, g_probe_wait = 10.0;  // looking for the configured target again (from a hold)
 static bool g_probing;
-static double g_probe_start = -100, g_probe_ok_at = -100;  // when the last probe for 60 began / was last met
-static int g_probe_good;                                     // probing: decisions in a row that met 60
+static double g_probe_start = -100, g_probe_ok_at = -100;  // when the last target-rate probe began / was last met
+static int g_probe_good;                                     // probing: decisions in a row that met the target
 static double g_probe_from;                                  // the factor the hold had when the probe began
 static double g_probe_fail_gw, g_probe_fail_at = -1000;      // the last failed probe: G + W at the floor then, when
-#define DYN_PROBE_MAX 60.0  // s: the longest wait between probes for 60 from a hold
+#define DYN_PROBE_MAX 60.0  // s: the longest wait between target-rate probes from a hold
 // held: G at the floor followed through the scene's load - measured there as the hold began, then scaled by how G
 // changed at each factor since (G right after a step is the reference at the new factor): the part of G that
 // doesn't scale with the resolution makes area estimates optimistic (UHD 770 1080p: ~6.5 of 9.1 ms at 0.50)
 static double g_floor_g, g_ref_g;
 static bool g_ref_pending;
 static int g_hold_miss, g_hold_up_votes;  // held: decisions in a row over the hold's budget / with room for the next rate
-static int g_hold_met_votes;              // held at 20: decisions in a row whose frames already met 30 (with G + W in its budget)
-static double g_hold_up_at = -100;        // when the hold last stepped up (20 -> 30)
+static int g_hold_met_votes;              // held at three refreshes: frames met the next faster two-refresh rate
+static double g_hold_up_at = -100;        // when the hold last stepped up
 
-static int hold_vsyncs(void) { return (int)lround(g_hold_dt * 60 / 1000); }
+static int target_fps(void) {
+    return g_settings.target_fps >= 30 && g_settings.target_fps <= 360 ? g_settings.target_fps : 60;
+}
+static double target_frame_ms(void) { return 1000.0 / target_fps(); }
+static int dyn_sample_count(void) { return target_fps() / 2; }
+static int hold_vsyncs(void) { return (int)lround(g_hold_dt / target_frame_ms()); }
 static bool at_floor(void) { return g_dyn <= g_dyn_floor + 1e-6; }
 // the grid, the floor below its first step (and no step closer than half a step above the floor)
 static double dyn_grid(double f) {
@@ -123,11 +127,11 @@ static void dyn_set_floor(double lines) {
 
 // The window's size changed (fullscreen <-> windowed, a resize): every scalable target is reallocated and what was
 // measured belongs to the old size. The factor keeps the render height (to the nearest step), so the game's part of
-// the GPU time stays about the same. Before, the factor stayed as it was: a window made larger missed 60 until the
-// slow frames stepped it down, one made smaller sat blurry until a raise, and a hold (30 fps on an integrated GPU)
+// the GPU time stays about the same. Before, the factor stayed as it was: a window made larger missed the target until
+// slow frames stepped it down, one made smaller sat blurry until a raise, and a hold on an integrated GPU
 // ended because the window step's time changed, so the factor went down to the floor and climbed back over the next
 // seconds - the image changed sharpness for a while after every switch (issue #205). A hold now keeps its frame rate
-// (its floor's G scaled to the new floor, the window step measured again, a probe for 60 fps a probe wait away); the
+// (its floor's G scaled to the new floor, the window step measured again, a probe for the target a probe wait away); the
 // votes start over, the raise wait is back at its first 5 s, and the next decision comes 1 s after the change, from
 // frames at the new size only (a window dragged to size: none until it stops).
 static void dyn_window_changed(double now, double from, double to) {
@@ -140,7 +144,7 @@ static void dyn_window_changed(double now, double from, double to) {
         g_ref_pending = true;  // (G's reference at the new size: the first decision there)
         g_hold_w = -1;         // (the window step's time at the new size: the first decision there)
         g_hold_miss = g_hold_up_votes = g_hold_met_votes = 0;
-        g_probe_at = fmax(g_probe_at, now + g_probe_wait);  // (a probe for 60: once the hold has measured the new size)
+        g_probe_at = fmax(g_probe_at, now + g_probe_wait);  // (a target-rate probe: once the hold has measured the new size)
     }
     g_down_hist = 0, g_down_fast_votes = 0, g_dyn_good = 0, g_prev_G = -1;
     memset(g_down_gw, 0, sizeof g_down_gw);
@@ -187,23 +191,25 @@ static void dyn_update(double now, double game_ms, double win_ms, double lines) 
         start = 0;
         if (getenv("LARECOMP_DYN_START")) g_dyn = dyn_grid(fmin(1.0, atof(getenv("LARECOMP_DYN_START"))));
     }
-    double dt = g_last_t > 0 ? (now - g_last_t) * 1000.0 : 16.7;
+    double frame_ms = target_frame_ms();
+    int samples = dyn_sample_count();
+    double dt = g_last_t > 0 ? (now - g_last_t) * 1000.0 : frame_ms;
     g_last_t = now;
     if (dt > 250) return;  // (loading, menus, a stall: not the GPU's steady state)
     g_dyn_dt[g_dyn_n++] = dt;
     if (game_ms >= 0) { g_dyn_gpu_sum += game_ms; g_dyn_win_sum += fmax(0, win_ms); g_dyn_gpu_n++; }
-    if (g_dyn_n < DYN_N) return;  // decide every ~half second
+    if (g_dyn_n < samples) return;  // decide every ~half second at the configured target
     // frame times: median, and the mean without the outliers (single CPU-side spikes)
-    double sorted[DYN_N], kept = 0;
-    memcpy(sorted, g_dyn_dt, sizeof sorted);
-    qsort(sorted, DYN_N, sizeof *sorted, cmp_double);
-    double med = (sorted[DYN_N / 2 - 1] + sorted[DYN_N / 2]) / 2;
+    double sorted[DYN_MAX_SAMPLES], kept = 0;
+    memcpy(sorted, g_dyn_dt, (size_t)samples * sizeof *sorted);
+    qsort(sorted, samples, sizeof *sorted, cmp_double);
+    double med = samples & 1 ? sorted[samples / 2] : (sorted[samples / 2 - 1] + sorted[samples / 2]) / 2;
     int nkept = 0;
-    for (int i = 0; i < DYN_N; i++) if (sorted[i] <= 3 * med) { kept += sorted[i]; nkept++; }
-    bool gpu = g_dyn_gpu_n >= DYN_N / 2;
+    for (int i = 0; i < samples; i++) if (sorted[i] <= 3 * med) { kept += sorted[i]; nkept++; }
+    bool gpu = g_dyn_gpu_n >= (samples + 1) / 2;
     double avg_dt = kept / nkept, G = gpu ? g_dyn_gpu_sum / g_dyn_gpu_n : -1, W = gpu ? g_dyn_win_sum / g_dyn_gpu_n : 0;
     double avg_gpu = gpu ? G + W : -1;
-    int spikes = DYN_N - nkept;
+    int spikes = samples - nkept;
     g_dyn_gpu_sum = g_dyn_win_sum = 0;
     g_dyn_n = g_dyn_gpu_n = 0;
     double sum_ms = g_sum_n ? g_sum_ms / g_sum_n : -1;
@@ -212,33 +218,33 @@ static void dyn_update(double now, double game_ms, double win_ms, double lines) 
     double prev = g_dyn;
     static int log = -1;  // LARECOMP_LOG_DYNRES=1: every decision, not only the steps
     if (log < 0) log = getenv("LARECOMP_LOG_DYNRES") != NULL;
-    double budget = DYN_BUDGET;
-    bool hold_up = false;  // (20 -> 30 fps this time: the factor was set to fit it already)
+    double budget = frame_ms * 0.87;
+    bool hold_up = false;  // (a held rate stepped up: the factor was set to fit it already)
     if (gpu) {
         if (g_hold_dt > 0 && g_hold_w < 0) g_hold_w = W;  // (the window's size changed: its step's time there)
         else if (g_hold_dt > 0 && fabs(W - g_hold_w) > fmax(1.0, 0.25 * g_hold_w)) {  // another upscaler / AA
             LOG("[dynres] window step %.1f -> %.1f ms: hold at %.0f fps ended\n", g_hold_w, W, 1000 / g_hold_dt);
             g_hold_dt = 0, g_probing = false, g_probe_wait = 10.0, g_hold_miss = g_hold_up_votes = g_hold_met_votes = 0;
         }
-        // held at 20 while the frames already come at 30 (every 33.3 ms) with G + W inside the 30 hold's budget (10%
-        // to spare), 1 s in a row: it holds 30 again right away (no probe wait - unless the last step up was undone)
+        // held at three refreshes while frames already come at two, with G + W inside that hold's budget (10% to spare)
+        // for 1 s: resume two-refresh frames right away (no probe wait - unless the last step up was undone)
         int hvs = g_hold_dt > 0 ? hold_vsyncs() : 0;
-        double faster = (hvs - 1) * 1000 / 60.0;
+        double faster = (hvs - 1) * frame_ms;
         bool met = hvs > 2 && avg_dt <= 1.05 * faster && avg_gpu <= faster * 0.87 * DYN_RAISE_FIT;
         g_hold_met_votes = met ? g_hold_met_votes + 1 : 0;
         if (g_hold_dt > 0 && g_ref_pending) g_ref_g = G, g_ref_pending = false;  // (the first measure at a new factor)
         if (g_hold_dt > 0 && g_ref_g > 0) {
-            // the next faster rate: 20 -> 30 fps, 30 -> looking for 60; the floor must fit it with room, 2 s in a row
+            // the next faster rate (one fewer refresh per frame); the floor must fit it with room for 2 s in a row
             double g_floor = g_floor_g * G / g_ref_g;
             int vs = hvs;
-            double up_budget = vs > 2 ? (vs - 1) * 1000 / 60.0 * 0.87 : DYN_BUDGET;
+            double up_budget = vs > 2 ? (vs - 1) * frame_ms * 0.87 : budget;
             bool room = g_floor + W <= up_budget * DYN_HOLD_UP_FIT;
             g_hold_up_votes = room ? g_hold_up_votes + 1 : 0;
             bool met_now = met && g_hold_met_votes >= 2 && (g_probe_wait <= 10.0 || now >= g_probe_at);
             if ((room && g_hold_up_votes >= 4 && now >= g_probe_at) || met_now) {
                 g_hold_up_votes = g_hold_miss = g_hold_met_votes = 0;
                 if (vs > 2) {
-                    g_hold_dt = (vs - 1) * 1000 / 60.0;
+                    g_hold_dt = (vs - 1) * frame_ms;
                     g_hold_up_at = now, g_probe_at = now + g_probe_wait;
                     double to = fmin(g_dyn, dyn_fit(G, W, g_hold_dt * 0.87 * DYN_RAISE_FIT));
                     if (met_now)
@@ -250,77 +256,75 @@ static void dyn_update(double now, double game_ms, double win_ms, double lines) 
                     if (to != g_dyn) g_floor_g *= G / g_ref_g, g_ref_pending = true, g_dyn = to;
                     hold_up = true;
                 } else {
-                    LOG("[dynres] the floor would fit 60 fps now (game %.1f ms at %.2f: ~%.1f at %.2f, window %.1f): looking for it\n",
-                        G, g_dyn, g_floor, g_dyn_floor, W);
+                    LOG("[dynres] the floor would fit %d fps now (game %.1f ms at %.2f: ~%.1f at %.2f, window %.1f): looking for it\n",
+                        target_fps(), G, g_dyn, g_floor, g_dyn_floor, W);
                     g_hold_dt = 0, g_probing = true, g_probe_start = now, g_probe_good = 0;
                 }
             }
         }
-        // Held at 30 with the GPU 30% idle or more: G may be inflated by a lowered clock (an integrated GPU clocks down
-        // while frames wait for the display: UHD 770, 1080p window, G 15.9 ms at 0.50 held at 30 against 9-11 at 60),
-        // so the hold's own measure may never show 60 fitting again (it stayed at 30 for the rest of a run). Every probe
-        // wait (10 s, doubling each time a probe fails, at most a minute) it tries 60 at the floor; a probe that fails is
-        // back in the hold within ~1.5 s at the factor it had, with frames that were at 30 anyway. After a failed probe
+        // Held at two refreshes with the GPU 30% idle or more: G may be inflated by a lowered clock (an integrated GPU
+        // clocks down while frames wait for the display), so the hold's own measure may not show the target fitting
+        // again. Every probe wait (10 s, doubling each time a probe fails, at most a minute) it tries the target at the
+        // floor; a probe that fails is back in the hold within ~1.5 s at the factor it had. After a failed probe
         // the next one waits until the floor's estimate is 10% under what that probe measured there (the scene got
         // lighter) or 2 minutes have passed: a hold that is real (SMAA + FSR 1 at 1080p on the UHD 770) probes rarely.
         double floor_gw = g_ref_g > 0 ? g_floor_g * G / g_ref_g + W : -1;
         bool probe_ok = now - g_probe_fail_at > 120.0 || (floor_gw > 0 && floor_gw < 0.9 * g_probe_fail_gw);
         if (g_hold_dt > 0 && !hold_up && hold_vsyncs() == 2 && avg_gpu < 0.7 * g_hold_dt && now >= g_probe_at && probe_ok) {
-            LOG("[dynres] held at 30 with the GPU %.0f%% busy (game %.1f + window %.1f ms at %.2f): its clock may be down, "
-                "trying 60 at %.2f\n", 100 * avg_gpu / g_hold_dt, G, W, g_dyn, g_dyn_floor);
+            LOG("[dynres] held at %.0f fps with the GPU %.0f%% busy (game %.1f + window %.1f ms at %.2f): its clock may be down, "
+                "trying %d at %.2f\n", 1000 / g_hold_dt, 100 * avg_gpu / g_hold_dt, G, W, target_fps(), g_dyn, g_dyn_floor);
             g_hold_dt = 0, g_probing = true, g_probe_start = now, g_probe_good = 0;
             g_hold_up_votes = g_hold_miss = g_hold_met_votes = 0;
             g_probe_from = g_dyn, g_dyn = g_dyn_floor;
         }
         if (g_hold_dt > 0) budget = g_hold_dt * 0.87;
-        // 60 out of reach at the floor and the frames wait for the display: lower gains nothing, hold that frame rate
-        // (whole refreshes of a 60 Hz display: a floor that alternates 1 and 2 of them - 40 fps - beats 30 at a higher
-        // factor; at most 3 refreshes, 20 fps)
-        double vsyncs = fmin(floor(avg_dt / (1000 / 60.0) + 0.1), DYN_HOLD_MAX);
+        // The target is out of reach at the floor and frames wait for the display: lower gains nothing, so hold a whole
+        // number of virtual refreshes (at most 3) to avoid spending GPU time on frames the display cannot show.
+        double vsyncs = fmin(floor(avg_dt / frame_ms + 0.1), DYN_HOLD_MAX);
         static int votes;  // (two half seconds in a row)
-        bool held_back = g_hold_dt == 0 && at_floor() && avg_gpu > DYN_BUDGET && vsyncs >= 2 && avg_dt >= 1.25 * avg_gpu &&
+        bool held_back = g_hold_dt == 0 && at_floor() && avg_gpu > budget && vsyncs >= 2 && avg_dt >= 1.25 * avg_gpu &&
                          now - g_probe_start >= 1.5;  // (a probe: the clock comes back up first)
         votes = held_back ? votes + 1 : 0;
         if (held_back && votes >= 2) {
-            g_hold_dt = vsyncs * 1000 / 60.0, g_hold_w = W;
+            g_hold_dt = vsyncs * frame_ms, g_hold_w = W;
             g_floor_g = g_ref_g = G, g_ref_pending = false;
             g_hold_miss = g_hold_up_votes = g_hold_met_votes = 0;
             // a probe that failed, or one met a moment ago that didn't last: wait longer for the next
             if (g_probing || now - g_probe_ok_at < 30.0) g_probe_wait = fmin(g_probe_wait * 2, DYN_PROBE_MAX);
             if (g_probing && now - g_probe_start < 5.0) g_probe_fail_gw = G + W, g_probe_fail_at = now;
             if (g_probing && now - g_probe_start < 5.0 && g_probe_from > g_dyn) {  // (a probe failed: the hold's factor again)
-                LOG("[dynres] 60 fps didn't fit: back to %.2f\n", g_probe_from);
+                LOG("[dynres] target %d fps didn't fit: back to %.2f\n", target_fps(), g_probe_from);
                 g_ref_pending = true;  // (the floor's G as just measured; G's reference at that factor next)
                 g_dyn = g_probe_from;
             }
             g_probing = false;
             g_probe_at = now + g_probe_wait;
             budget = g_hold_dt * 0.87;
-            if (W >= 0.4 * 1000 / 60.0 || W >= G)
-                LOG("[dynres] window step %.1f ms is the limit (game %.1f ms at %.2f, a frame every %.1f ms): 60 fps out of "
+            if (W >= 0.4 * frame_ms || W >= G)
+                LOG("[dynres] window step %.1f ms is the limit (game %.1f ms at %.2f, a frame every %.1f ms): %d fps out of "
                     "reach, holding %.0f fps; the factor goes up while G + W fits %.1f ms\n", W, G, g_dyn, avg_dt,
-                    1000 / g_hold_dt, budget);
+                    target_fps(), 1000 / g_hold_dt, budget);
             else
-                LOG("[dynres] game %.1f + window %.1f ms at %.2f (a frame every %.1f ms): 60 fps out of reach, holding %.0f "
-                    "fps; the factor goes up while G + W fits %.1f ms\n", G, W, g_dyn, avg_dt, 1000 / g_hold_dt, budget);
+                LOG("[dynres] game %.1f + window %.1f ms at %.2f (a frame every %.1f ms): %d fps out of reach, holding %.0f "
+                    "fps; the factor goes up while G + W fits %.1f ms\n", G, W, g_dyn, avg_dt, target_fps(), 1000 / g_hold_dt, budget);
         }
-        // a probe met 60: two decisions in a row (one could be the game's own frames before its 30 fps mode ends)
-        g_probe_good = g_probing && g_hold_dt == 0 && avg_gpu <= DYN_BUDGET && avg_dt < 20 ? g_probe_good + 1 : 0;
+        // a probe met the target: two decisions in a row (the game's own frames may still be coming from a lower-rate mode)
+        g_probe_good = g_probing && g_hold_dt == 0 && avg_gpu <= budget && avg_dt < 1.2 * frame_ms ? g_probe_good + 1 : 0;
         if (g_probe_good >= 2) g_probing = false, g_probe_good = 0, g_probe_ok_at = now, g_probe_wait = 10.0;
     }
-    bool slow = gpu ? avg_gpu > budget : avg_dt > 17.4;
+    bool slow = gpu ? avg_gpu > budget : avg_dt > 1.044 * frame_ms;
     // held, but the frames came slower than the hold's (the display waits one more refresh): over budget too
     if (gpu && g_hold_dt > 0 && avg_dt > 1.2 * g_hold_dt && avg_gpu > 0.8 * budget) slow = true;
     bool hold_wait = hold_up;  // held and over its budget, not yet long enough to act on it (or the hold just stepped up)
     if (gpu && g_hold_dt > 0) {
         g_hold_miss = slow && !hold_up ? g_hold_miss + 1 : 0;
-        if (slow && at_floor() && g_hold_miss >= 3) {  // nothing lower: the hold steps down (30 -> 20 fps)
+        if (slow && at_floor() && g_hold_miss >= 3) {  // nothing lower: add another virtual refresh to the held interval
             int vs = hold_vsyncs();
             if (vs < DYN_HOLD_MAX) {
                 LOG("[dynres] game %.1f + window %.1f ms at %.2f misses the %.0f fps hold's %.1f ms (a frame every %.1f ms): "
-                    "holding %.0f fps\n", G, W, g_dyn, 1000 / g_hold_dt, budget, avg_dt, 60.0 / (vs + 1));
+                    "holding %.0f fps\n", G, W, g_dyn, 1000 / g_hold_dt, budget, avg_dt, target_fps() / (double)(vs + 1));
                 if (now - g_hold_up_at < 30.0) g_probe_wait = fmin(g_probe_wait * 2, DYN_PROBE_MAX);  // (the step up didn't hold)
-                g_hold_dt = (vs + 1) * 1000 / 60.0;
+                g_hold_dt = (vs + 1) * frame_ms;
                 budget = g_hold_dt * 0.87;
                 g_floor_g = g_ref_g = G, g_ref_pending = false;
                 g_probe_at = now + g_probe_wait;
@@ -334,17 +338,17 @@ static void dyn_update(double now, double game_ms, double win_ms, double lines) 
     // over budget for a while (not held: a hold acts on its own misses above): 3 of the last 4 decisions, or their G + W
     // averaging over 95% of the budget (a load near the budget alternates over / under from one half second to the
     // next while frames already miss: M3 Max at 7680x4320, G + W 12 / 15.5 / 12.4 / 15.9 ms, frames every 17-19 ms).
-    // Frames missing vsync often (a frame every 20 ms on average) with the GPU near the budget count as over too. The
-    // frames missing 60 outright (G + W over a whole refresh) acts sooner.
+    // Frames missing vsync often with the GPU near the budget count as over too. The
+    // frames missing the target outright (G + W over a whole refresh) act sooner.
     bool must = false;
     if (g_hold_dt == 0 && !hold_wait) {
-        bool over = slow || (gpu && avg_dt > 20.0 && avg_gpu > 0.8 * budget);
+        bool over = slow || (gpu && avg_dt > 1.2 * frame_ms && avg_gpu > 0.8 * budget);
         if (over && !slow) slow = true;  // (the steps below go by `slow`)
         g_down_hist = (g_down_hist << 1 | over) & 15;
         memmove(g_down_gw + 1, g_down_gw, 3 * sizeof *g_down_gw);
         g_down_gw[0] = gpu ? avg_gpu : 0;
         double mean4 = (g_down_gw[0] + g_down_gw[1] + g_down_gw[2] + g_down_gw[3]) / 4;
-        bool missing = gpu ? avg_gpu > budget / 0.87 : avg_dt > 20.0;
+        bool missing = gpu ? avg_gpu > budget / 0.87 : avg_dt > 1.2 * frame_ms;
         g_down_fast_votes = missing ? g_down_fast_votes + 1 : 0;
         must = __builtin_popcount(g_down_hist) >= DYN_DOWN_VOTES || g_down_fast_votes >= DYN_DOWN_FAST ||
                (slow && g_down_gw[3] > 0 && mean4 > 0.95 * budget);
@@ -369,10 +373,10 @@ static void dyn_update(double now, double game_ms, double win_ms, double lines) 
         g_dyn_raise_at = now + g_dyn_raise_wait;
     } else if (g_dyn < 1.0) {
         // headroom for a while (every decision of it), and not too soon after the last change. With GPU timing: the
-        // next step is predicted to fit with room (G scales with the area); without: frames at 60
+        // next step is predicted to fit with room (G scales with the area); without: frames at the target rate
         double up = dyn_grid(g_dyn + DYN_STEP);
         double g_up = G * (up / g_dyn) * (up / g_dyn);
-        bool fits = !gpu ? avg_dt < 16.9 : g_hold_dt > 0 ? g_up + W <= budget * DYN_RAISE_FIT : g_up / DYN_UP_FIT + W <= budget;
+        bool fits = !gpu ? avg_dt < 1.014 * frame_ms : g_hold_dt > 0 ? g_up + W <= budget * DYN_RAISE_FIT : g_up / DYN_UP_FIT + W <= budget;
         // (a decision with spikes - a level loading, a fade, a cutscene starting - says little about the scene ahead:
         // it starts the count over, so a raise doesn't come from a light loading screen)
         g_dyn_good = fits && !spikes ? g_dyn_good + 1 : 0;

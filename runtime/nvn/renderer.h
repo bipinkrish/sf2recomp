@@ -1,5 +1,6 @@
 // Interface between the NVN executor (renderer.m) and the Metal plumbing (metal.m).
 #pragma once
+#include "nvn.h"
 #ifdef __OBJC__
 #import <Metal/Metal.h>
 void renderer_init(id<MTLDevice> dev);
@@ -11,6 +12,14 @@ extern id<MTLBuffer> g_guest_buffer;
 extern uint64_t g_guest_buffer_base;
 #endif
 #include <SDL3/SDL_events.h>
+
+enum { RENDERER_MOVIE_WIDTH = 720, RENDERER_MOVIE_HEIGHT = 400 };
+
+// Host-decoded cinematics use a reusable RGBA target with NV12 frame uploads.
+// Decoder workers may submit frames; the Vulkan presenter consumes the newest one.
+NvnTexture *renderer_movie_texture(void);
+bool renderer_movie_submit_nv12(const void *data, uint32_t w, uint32_t h, uint32_t stride, uint32_t uv_off);
+void renderer_movie_clear(void);
 
 bool renderer_is_gpu_owned(NvnTexture *t);
 void renderer_flush(void);  // finish all recorded GPU work

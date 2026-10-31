@@ -12,6 +12,7 @@ this fork's self-contained game_addresses.py; empty --symbols yields upstream be
 """
 import argparse
 import bisect
+import io
 import os
 import platform
 import re
@@ -23,7 +24,7 @@ from collections import Counter
 import unicorn as uc
 from unicorn import arm64_const as A
 
-from analyze import eh_frame_functions
+from analyze import eh_frame_functions, eh_frame_handlers
 from lifter import Insn, Lifter, Unsupported, bits, emit_asm_batch, hx, sext
 from nso import Nso, R_AARCH64_RELATIVE
 
@@ -55,6 +56,14 @@ class Module:
         self.lifter = Lifter(base, simd)
         self.cache = {}
         self.stats = Counter()
+        self.eh_sites = eh_frame_handlers(n, base)
+        self.eh_calls = {}
+        for lo, hi, pad, handlers in self.eh_sites:
+            lo, hi = max(lo, self.lo), min(hi, self.hi)
+            for a in range((lo + 3) & ~3, hi, 4):
+                w = self.words[(a - self.lo) // 4]
+                if (w & 0xFC000000) == 0x94000000 or (w & 0xFFFFFC1F) == 0xD63F0000:
+                    self.eh_calls[a] = pad
         self.mu = None
         self.sym_starts, self.sym_names = set(), {}
         self.symfile = symfile
@@ -371,11 +380,20 @@ class Module:
             return [f'if ({ins.cond}) {{ {jump(ins.target)} }}']
         if k == 'bl':
             t = ins.target
+            if a in self.eh_calls:
+                if self.in_text(t):
+                    refs.add(t)
+                    target_fn = fname(t)
+                else:
+                    target_fn = 'NULL'
+                return [f'if (rt_guest_try_call(c, {hx(a)}, {hx(t)}, {target_fn})) goto L_exception_dispatch;']
             if self.in_text(t):
                 refs.add(t)
                 return [f'c->x[30] = {hx(a + 4)}; {fname(t)}(c);']
             return [f'c->x[30] = {hx(a + 4)}; c->pc = {hx(t)}; rt_dispatch(c);']
         if k == 'blr':
+            if a in self.eh_calls:
+                return [f'if (rt_guest_try_call(c, {hx(a)}, {ins.target}, NULL)) goto L_exception_dispatch;']
             return [f'c->pc = {ins.target}; c->x[30] = {hx(a + 4)}; rt_dispatch(c);']
         if k == 'br':
             return [f'c->pc = {ins.target}; __attribute__((musttail)) return rt_dispatch(c);']
@@ -430,6 +448,12 @@ class Module:
         all_labels = bool(tables)
         if all_labels:
             labels = set(range(entry, end, 4))
+        else:
+            labels = set(labels)
+        eh_calls = {a: self.eh_calls[a] for a in range(entry, end, 4)
+                    if a in self.eh_calls}
+        eh_pads = sorted(set(eh_calls.values()))
+        labels.update(pad for pad in eh_pads if entry <= pad < end)
         hooks_here = [a for a in range(entry, end, 4) if a in HOOKS]
         if hooks_here:  # (a hook's jump targets need their labels)
             labels = set(labels)
@@ -483,13 +507,23 @@ class Module:
                 out.append(f'    if ({ins.cond}) {{ {jump(ins.target)} }}')
             elif k == 'bl':
                 t = ins.target
-                if self.in_text(t):
+                if a in eh_calls:
+                    if self.in_text(t):
+                        refs.add(t)
+                        target_fn = fname(t)
+                    else:
+                        target_fn = 'NULL'
+                    out.append(f'    if (rt_guest_try_call(c, {hx(a)}, {hx(t)}, {target_fn})) goto L_exception_dispatch;')
+                elif self.in_text(t):
                     refs.add(t)
                     out.append(f'    c->x[30] = {hx(a + 4)}; {fname(t)}(c);')
                 else:
                     out.append(f'    c->x[30] = {hx(a + 4)}; c->pc = {hx(t)}; rt_dispatch(c);')
             elif k == 'blr':
-                out.append(f'    c->pc = {ins.target}; c->x[30] = {hx(a + 4)}; rt_dispatch(c);')
+                if a in eh_calls:
+                    out.append(f'    if (rt_guest_try_call(c, {hx(a)}, {ins.target}, NULL)) goto L_exception_dispatch;')
+                else:
+                    out.append(f'    c->pc = {ins.target}; c->x[30] = {hx(a + 4)}; rt_dispatch(c);')
             elif k == 'br':
                 jt = tables.get(a)
                 if jt == 'all':
@@ -512,6 +546,11 @@ class Module:
             cases = ' '.join(f'case {hx(t)}: goto L_{t:x};' for t in range(entry, end, 4))
             out.append(f'    switch (c->pc) {{ {cases} default: break; }}')
             out.append('    __attribute__((musttail)) return rt_dispatch(c);')
+        if eh_pads:
+            out.append('L_exception_dispatch:')
+            cases = ' '.join(f'case {hx(pad)}: goto L_{pad:x};' for pad in eh_pads
+                             if entry <= pad < end)
+            out.append(f'    switch (c->pc) {{ {cases} default: rt_udf(c, c->pc); }}')
         out.append('}')
         self._refs = refs
         return out
@@ -532,6 +571,47 @@ def write_if_changed(path, text):
         pass
     with open(path, 'w') as f:
         f.write(text)
+
+
+def emit_eh_table(name, eh_sites):
+    """Emit ordered exact-type/catch-all lookup; cleanup is excluded by the parser."""
+    with io.StringIO() as f:
+        f.write('#include "cpu.h"\n')
+        f.write('typedef struct { uint64_t lo, hi, pad; uint32_t first, count; } EhSite;\n')
+        f.write('typedef struct { uint64_t type; uint32_t selector; } EhHandler;\n')
+        handlers = []
+        sites = []
+        for lo, hi, pad, clauses in eh_sites:
+            if not clauses:
+                continue
+            first = len(handlers)
+            handlers.extend(clauses)
+            sites.append((lo, hi, pad, first, len(clauses)))
+        f.write(f'static const EhSite {name}_eh_sites[] = {{\n')
+        for lo, hi, pad, first, count in sites:
+            f.write(f'    {{{hx(lo)}, {hx(hi)}, {hx(pad)}, {first}, {count}}},\n')
+        if not sites:
+            f.write('    {0, 0, 0, 0, 0},\n')
+        f.write('};\n')
+        f.write(f'static const EhHandler {name}_eh_handlers[] = {{\n')
+        for typ, selector in handlers:
+            f.write(f'    {{{hx(typ)}, {selector}}},\n')
+        if not handlers:
+            f.write('    {0, 0},\n')
+        f.write('};\n')
+        f.write(f'bool {name}_eh_lookup(uint64_t site, uint64_t type, uint64_t *pad, uint64_t *selector) {{\n')
+        f.write(f'    size_t lo = 0, hi = {len(sites)};\n')
+        f.write('    while (lo < hi) { size_t mid = (lo + hi) / 2; if (')
+        f.write(f'{name}_eh_sites[mid].lo <= site) lo = mid + 1; else hi = mid; }}\n')
+        f.write('    if (!lo) return false;\n')
+        f.write(f'    const EhSite *s = &{name}_eh_sites[lo - 1];\n')
+        f.write('    if (site >= s->hi) return false;\n')
+        f.write('    for (uint32_t i = 0; i < s->count; i++) {\n')
+        f.write(f'        const EhHandler *h = &{name}_eh_handlers[s->first + i];\n')
+        f.write('        if (!h->type || h->type == type) { *pad = s->pad; *selector = h->selector; return true; }\n')
+        f.write('    }\n')
+        f.write('    return false;\n}\n')
+        return f.getvalue()
 
 
 def main():
@@ -670,9 +750,8 @@ def main():
         mm = re.fullmatch(re.escape(args.name) + r'_(\d{3})\.c', fn)
         if mm and int(mm.group(1)) >= nchunks:
             os.remove(os.path.join(args.outdir, fn))
-    import io
     with io.StringIO() as f:
-        f.write('#include "cpu.h"\n')
+        f.write('#include "cpu.h"\n#include <stdbool.h>\n')
         for a in order:
             f.write(f'void {fname(a)}(Cpu *c);\n')
         f.write(f'const uint64_t {args.name}_fn_addrs[] = {{\n')
@@ -688,6 +767,8 @@ def main():
         f.write(f'const uint8_t {args.name}_nso_build_id[32] = {{' +
                 ','.join(f'0x{b:02x}' for b in build_id) + '};\n')
         write_if_changed(os.path.join(args.outdir, f'{args.name}_table.c'), f.getvalue())
+    write_if_changed(os.path.join(args.outdir, f'{args.name}_eh.c'),
+                     emit_eh_table(args.name, m.eh_sites))
     if args.name == 'main':  # (what this code was generated from: the Makefile's game code library id, GAMELIB_BUILD_ID)
         write_if_changed(os.path.join(args.outdir, 'main_build_id.txt'), game_addresses.VERSIONS[version][1] + '\n')
     print(f'{args.name}: wrote {nchunks} chunks, {time.time() - t0:.0f}s total', file=sys.stderr)

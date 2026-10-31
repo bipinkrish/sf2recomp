@@ -4,6 +4,7 @@
 #include <float.h>
 #include <math.h>
 #include <pthread.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -546,6 +547,13 @@ static uint64_t fnv_sample(const uint8_t *p, uint64_t n) {
 }
 
 static pthread_mutex_t pending_lock = PTHREAD_MUTEX_INITIALIZER;
+static NvnTexture movie_texture;
+static bool movie_texture_initialized;
+static pthread_mutex_t movie_frame_lock = PTHREAD_MUTEX_INITIALIZER;
+static uint8_t *movie_frame_pending;
+static bool movie_frame_clear_pending;
+static uint8_t movie_black_nv12[RENDERER_MOVIE_WIDTH * RENDERER_MOVIE_HEIGHT * 3 / 2];
+static bool movie_black_initialized;
 
 static void upload_pending(TexBackend *b) {
     pthread_mutex_lock(&pending_lock);
@@ -770,6 +778,73 @@ static bool upload_nv12_now(NvnTexture *t, const void *nv12, uint32_t w, uint32_
     b->gpu_owned = true;
     pthread_mutex_unlock(&pending_lock);
     return true;
+}
+
+bool renderer_movie_submit_nv12(const void *data, uint32_t w, uint32_t h, uint32_t stride, uint32_t uv_off) {
+    if (!data || w != RENDERER_MOVIE_WIDTH || h != RENDERER_MOVIE_HEIGHT || stride != w || uv_off != w * h) return false;
+    size_t size = (size_t)uv_off + (size_t)stride * (h / 2);
+    void *copy = malloc(size);
+    if (!copy) return false;
+    memcpy(copy, data, size);
+    pthread_mutex_lock(&movie_frame_lock);
+    free(movie_frame_pending);
+    movie_frame_pending = copy;
+    movie_frame_clear_pending = false;
+    pthread_mutex_unlock(&movie_frame_lock);
+    return true;
+}
+
+NvnTexture *renderer_movie_texture(void) {
+    if (!movie_texture_initialized) {
+        memset(&movie_texture, 0, sizeof movie_texture);
+        movie_texture.target = 1;
+        movie_texture.format = 0x25;
+        movie_texture.width = RENDERER_MOVIE_WIDTH;
+        movie_texture.height = RENDERER_MOVIE_HEIGHT;
+        movie_texture.depth = 1;
+        movie_texture.levels = 1;
+        movie_texture.samples = 1;
+        movie_texture.layout.width = movie_texture.width;
+        movie_texture.layout.height = movie_texture.height;
+        movie_texture.layout.depth = 1;
+        movie_texture.layout.layers = 1;
+        movie_texture.layout.levels = 1;
+        movie_texture.layout.fmt = nvn_format_info(movie_texture.format);
+        tegra_layout_init(&movie_texture.layout);
+        snprintf(movie_texture.label, sizeof movie_texture.label, "host movie frame");
+        movie_texture_initialized = true;
+    }
+    tex_backend(&movie_texture);
+    void *frame = NULL;
+    bool clear = false;
+    pthread_mutex_lock(&movie_frame_lock);
+    frame = movie_frame_pending;
+    movie_frame_pending = NULL;
+    clear = movie_frame_clear_pending;
+    movie_frame_clear_pending = false;
+    pthread_mutex_unlock(&movie_frame_lock);
+    if (frame) {
+        upload_nv12_now(&movie_texture, frame, RENDERER_MOVIE_WIDTH, RENDERER_MOVIE_HEIGHT,
+                        RENDERER_MOVIE_WIDTH, RENDERER_MOVIE_WIDTH * RENDERER_MOVIE_HEIGHT);
+        free(frame);
+    } else if (clear) {
+        if (!movie_black_initialized) {
+            memset(movie_black_nv12, 128, sizeof movie_black_nv12);
+            memset(movie_black_nv12, 16, RENDERER_MOVIE_WIDTH * RENDERER_MOVIE_HEIGHT);
+            movie_black_initialized = true;
+        }
+        upload_nv12_now(&movie_texture, movie_black_nv12, RENDERER_MOVIE_WIDTH, RENDERER_MOVIE_HEIGHT,
+                        RENDERER_MOVIE_WIDTH, RENDERER_MOVIE_WIDTH * RENDERER_MOVIE_HEIGHT);
+    }
+    return &movie_texture;
+}
+
+void renderer_movie_clear(void) {
+    pthread_mutex_lock(&movie_frame_lock);
+    free(movie_frame_pending);
+    movie_frame_pending = NULL;
+    movie_frame_clear_pending = true;
+    pthread_mutex_unlock(&movie_frame_lock);
 }
 
 // ================================================================== views

@@ -22,6 +22,11 @@
 #define MIXBUF_MAX 24
 #define HIST 4
 
+static atomic_bool movie_audio_active;
+
+// Keep menu/game streams from competing with the decoded cutscene soundtrack. The movie's own SDL stream is separate.
+void audio_movie_set_active(bool active) { atomic_store(&movie_audio_active, active); }
+
 typedef struct {
     uint64_t addr, size, ctx;
     uint32_t start, end, loop_start, loop_end;
@@ -613,6 +618,7 @@ static void apply_gain(SDL_AudioStream *st) {
     static double env = -1;
     if (env < 0) env = getenv("LARECOMP_AUDIO_GAIN") ? atof(getenv("LARECOMP_AUDIO_GAIN")) : 1.0;
     float g = (float)(env * g_settings.volume);
+    if (atomic_load(&movie_audio_active)) g = 0.0f;
     if (st && SDL_GetAudioStreamGain(st) != g) SDL_SetAudioStreamGain(st, g);
 }
 
@@ -1082,6 +1088,7 @@ static void audout_close(Service *s) {
 }
 
 RT_ON_RESET(audio_reset) {
+    atomic_store(&movie_audio_active, false);
     int n = 0;
     for (int i = 0; i < 8; i++) {
         Renderer *r = g_rens[i];

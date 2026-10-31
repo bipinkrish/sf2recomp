@@ -14,9 +14,9 @@ typedef struct {
 // unknown / not counted)
 void output_scale(double dw, double dh, bool reshape_allowed, double now, double game_ms, double win_ms, OutScale *o);
 double output_scale_dynamic_factor(void);
-double output_scale_dynamic_hold_fps(void);
+double output_scale_dynamic_hold_fps(void);  // held frame rate when the target is out of reach, else 0
 // (diagnostics) "[scale] frame f drawable WxH -> render scale sx x sy" whenever the render scale or the window changes
-void output_scale_log(unsigned long long frame, double dw, double dh, const OutScale *o);  // the frame rate Dynamic holds (60 out of reach), else 0
+void output_scale_log(unsigned long long frame, double dw, double dh, const OutScale *o);
 
 // (Vulkan) where a frame's time went, noted once per frame before output_scale(); LARECOMP_LOG_DYNRES's [dynres] line
 // shows the per-frame averages. ms over the frame: game = the game's submissions' GPU time, win = the window image's

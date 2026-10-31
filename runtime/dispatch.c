@@ -302,9 +302,10 @@ void rt_fatal_trace(void) {
     abort();
 }
 
-// Guest C++ landing pads are not yet connected to the translated host frames.
-// Report the real exception and stop; never fabricate a return or abandon a thread.
+// Throws with a matching generated LSDA catch resume at that guest landing pad. If no
+// typed/catch-all handler is active, keep the detailed fatal diagnostic below.
 HLE_FUNC("__cxa_throw", hle_cxa_throw) {
+    if (rt_guest_raise(c->x[0], c->x[1])) return;
     LOG("[throw] guest C++ exception: obj %llx, type_info %llx, destructor %llx\n",
         (unsigned long long)c->x[0], (unsigned long long)c->x[1], (unsigned long long)c->x[2]);
     uint64_t name_ptr = 0;

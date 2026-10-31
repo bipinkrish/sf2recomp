@@ -13,8 +13,10 @@ This project is not affiliated with Nekki or Nintendo.
 
 Linux x86-64 renders the animated menu and reaches the English Story/Sensei
 introduction. These screens were inspected after removing unrelated Zelda hooks.
-Combat remains unverified. Original guest C++ catch/landing-pad support and video
-playback are unfinished. Windows remains a porting target, not a working build.
+The initial Story-dialogue exception now resumes through its guest LSDA landing
+pad, and the intro cinematic is decoded and displayed by the host movie path.
+Cleanup-only unwinding and rethrow are unsupported. Full combat stability, later
+cinematics, and Windows remain unverified.
 
 The verified rendering configuration is X11/Xwayland with Mesa lavapipe software
 Vulkan. This machine's AMD hardware path has encountered kernel-driver faults;
@@ -50,10 +52,8 @@ local SDK; no SDK or decryption keys ship in this repository.
 python3 -m venv .venv
 . .venv/bin/activate
 python3 -m pip install -r tools/requirements.txt
-# Install the documented native development packages, then build SDL locally
-# if your system does not provide SDL 3.4.0 or newer:
-tools/setup_runtime.sh --build-sdl
-tools/setup_runtime.sh --check
+# Install the documented native development packages. Conversion and make
+# automatically build pinned SDL locally when SDL 3.4+ is unavailable.
 
 python3 tools/convert.py \
   --nsp "/path/to/Shadow Fight 2.nsp" \
@@ -62,9 +62,10 @@ python3 tools/convert.py \
 ```
 
 SDL headers/libraries and SMAA sources are local dependencies, excluded from Git.
-`--build-sdl` prepares both. If SDL 3.4+ is already installed, run
-`tools/setup_runtime.sh --fetch-smaa` followed by `--check` instead. `make` also
-fetches missing SMAA files automatically; setup pins their revision and checksums.
+`make` and conversion run `tools/setup_runtime.sh --ensure`, which prepares
+missing SDL/SMAA automatically. Existing local or system SDL 3.4+ is reused.
+`--check` verifies dependencies without downloads; `--build-sdl` explicitly
+rebuilds the pinned SDL source. Setup verifies source checksums.
 
 The supported NSP input is a **combined base + update v131072 bundle containing
 its CNMT XML sidecars and tickets**. The supplied development NSP has this layout.
@@ -134,6 +135,16 @@ reverb = true
 
 [video]
 fullscreen = false
+target_fps = 60
+internal_resolution = auto
+upscaler = auto
+antialiasing = off
+
+[input]
+prompts = auto
+
+[experimental]
+keyboard_prompts = false
 
 [storage]
 save_directory = save
@@ -177,6 +188,35 @@ Precedence is built-in defaults, then INI, then existing `LARECOMP_*` session
 overrides. Saves/caches/logs live beside the executable by default;
 `LARECOMP_DATA_ROOT` or `LARECOMP_DATA_HOME` selects another writable state folder.
 These overrides do not move the default executable-side INI.
+
+`[input] prompts` accepts `auto`, `keyboard`, `nintendo`, `xbox`, or `playstation`.
+Replacing in-game icons/text with keyboard labels is experimental and **off by
+default**. Opt in with `[experimental] keyboard_prompts = true`; `prompts = keyboard`
+alone does not enable it. With this experiment enabled, labels use current INI
+bindings and `prompts = keyboard` forces them even with a controller connected.
+Direction groups use compact names (`WASD`, `Arrows`); inline dialogue keeps the
+game's directional shorthand. Long key names shrink to a bounded width.
+Keys inside visible action buttons have matching outline badges: circles for single characters and rounded
+rectangles for longer names. Standalone hints stay plain. During the intro, either
+mapped A or B skips playback (**K** or **J** with the shipped bindings). The skip
+press is consumed so it cannot also activate the menu behind the movie.
+With the experiment enabled, auto displays mapped keyboard labels when no gamepad
+is connected and controller glyphs when one is connected. Input mappings and intro
+skip work regardless of this display experiment.
+
+`[video] internal_resolution` accepts `auto`/`match`, `dynamic`, or a fixed
+scale from `0.25x` through `4x`. `auto` follows the window's fitted resolution;
+`dynamic` lowers render scale when GPU work cannot hold `target_fps`. `upscaler` accepts
+`auto`, `bilinear`, or `fsr1`; auto selects bilinear on integrated GPUs and FSR 1
+on discrete GPUs. FSR 1 is used only when upscaling. `antialiasing` accepts
+`off` or `smaa`. These renderer options take effect on launch. The maximum internal
+scale can be limited by the GPU's texture-size cap.
+
+`[video] target_fps` accepts an integer from 30 to 360. It sets Unity's target
+frame rate and the emulated display refresh used to pace the game loop. The game
+requests 60 FPS in several startup paths, so this setting overrides those requests.
+Set the host display to a matching refresh rate separately. Higher targets need
+enough CPU and GPU headroom to finish each frame in time.
 
 The developer launcher `tools/run_linux.sh --software` uses the repository INI
 and keeps run data under `build/run`.

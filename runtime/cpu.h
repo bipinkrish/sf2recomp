@@ -2,6 +2,7 @@
 #pragma once
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <setjmp.h>
 #include <string.h>
 
@@ -33,6 +34,7 @@ typedef void (*GuestFn)(Cpu *);
 
 // ---- runtime services (runtime/*.c)
 void rt_dispatch(Cpu *c);                 // call function at c->pc
+bool rt_guest_try_call(Cpu *c, uint64_t site, uint64_t target, GuestFn function); // translated EH call
 // hook site (tools/patches.py HOOKS, runtime/hle/hooks.c): 0 = run the instruction, 1 = the hook did it all,
 // 2.. = jump to the site's first.. target
 int rt_hook(Cpu *c, uint64_t site);

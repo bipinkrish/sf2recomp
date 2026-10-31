@@ -41,13 +41,22 @@ class PackageTests(unittest.TestCase):
         self.exe.write_text('#!/bin/sh\n[ "$1" = --check-game ]\n')
         self.exe.chmod(0o755)
         self.output = self.base / "native game"
+        self.ffmpeg = self.base / "ffmpeg"
+        for name in ("bin/ffmpeg", "share/ffmpeg/BUILD.txt",
+                     "share/ffmpeg/" + convert.FFMPEG_ARCHIVE_NAME,
+                     "share/licenses/FFmpeg/COPYING.LGPLv2.1", "lib/libavcodec.so.1"):
+            path = self.ffmpeg / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"fixture")
 
     def tearDown(self):
         self.temp.cleanup()
 
     def test_runtime_only_and_settings_preserved_on_reconversion(self):
-        convert.package_game(self.game, self.output, self.exe, self.base / "sdl")
+        convert.package_game(self.game, self.output, self.exe, self.base / "sdl", self.ffmpeg)
         self.assertTrue((self.output / "sf2").is_file())
+        self.assertEqual((self.output / "lib/ffmpeg/bin/ffmpeg").read_bytes(), b"fixture")
+        self.assertEqual((self.output / "lib/ffmpeg/lib/libavcodec.so.1").read_bytes(), b"fixture")
         self.assertFalse((self.output / "sf2recomp").exists())
         self.assertEqual(json.loads((self.output / "build.json").read_text())["executable"], "sf2")
         config = self.output / "sf2recomp.ini"
@@ -75,7 +84,7 @@ class PackageTests(unittest.TestCase):
         shutil.copy2(self.exe, self.output / "sf2recomp")  # Existing conversion before rename.
         (self.output / "licenses/LAS-RUNTIME-LICENSE.txt").write_text("old duplicate")
         (self.output / "licenses/SMAA-LICENSE.txt").write_text("old duplicate")
-        convert.package_game(self.game, self.output, self.exe, self.base / "sdl")
+        convert.package_game(self.game, self.output, self.exe, self.base / "sdl", self.ffmpeg)
         self.assertEqual(config.read_text(), "[controls.keyboard]\na = Space\n")
         self.assertEqual(save.read_text(), "saved progress")
         self.assertFalse((self.output / "sf2recomp").exists())
@@ -85,16 +94,26 @@ class PackageTests(unittest.TestCase):
 
     def test_user_desktop_registration_is_explicit(self):
         with patch.dict(os.environ, {"XDG_DATA_HOME": str(self.base / "user applications")}):
-            convert.package_game(self.game, self.output, self.exe, self.base / "sdl")
+            convert.package_game(self.game, self.output, self.exe, self.base / "sdl", self.ffmpeg)
             self.assertFalse((self.base / "user applications").exists())
             installed = convert.install_desktop(self.output)
             self.assertEqual(installed, self.base / "user applications/applications" / (convert.APP_ID + ".desktop"))
             self.assertEqual(installed.read_bytes(), (self.output / (convert.APP_ID + ".desktop")).read_bytes())
 
+    def test_missing_decoder_preserves_existing_output(self):
+        self.output.mkdir()
+        old_executable = self.output / "sf2"
+        old_executable.write_bytes(b"existing game")
+        (self.ffmpeg / "bin/ffmpeg").unlink()
+        with self.assertRaisesRegex(ValueError, "FFmpeg build is incomplete"):
+            convert.package_game(self.game, self.output, self.exe, self.base / "sdl", self.ffmpeg)
+        self.assertEqual(old_executable.read_bytes(), b"existing game")
+        self.assertEqual(list(self.output.iterdir()), [old_executable])
+
     def test_missing_official_metadata_rejected_before_output_creation(self):
         (self.game / "control.nacp").unlink()
         with self.assertRaisesRegex(ValueError, "Official control.nacp"):
-            convert.package_game(self.game, self.output, self.exe, self.base / "sdl")
+            convert.package_game(self.game, self.output, self.exe, self.base / "sdl", self.ffmpeg)
         self.assertFalse(self.output.exists())
 
     def test_desktop_special_characters_are_quoted_without_shell_execution(self):
@@ -110,14 +129,14 @@ class PackageTests(unittest.TestCase):
     def test_reject_source_overlap_without_mutation(self):
         before = (self.game / "exefs/main").read_bytes()
         with self.assertRaises(ValueError):
-            convert.package_game(self.game, self.game / "nested", self.exe, self.base)
+            convert.package_game(self.game, self.game / "nested", self.exe, self.base, self.ffmpeg)
         self.assertEqual((self.game / "exefs/main").read_bytes(), before)
         self.assertFalse((self.game / "nested").exists())
 
     def test_reject_unknown_build_before_output_creation(self):
         (self.game / "exefs/main").write_bytes(b"NSO0" + bytes(0x5c))
         with self.assertRaises(ValueError):
-            convert.package_game(self.game, self.output, self.exe, self.base)
+            convert.package_game(self.game, self.output, self.exe, self.base, self.ffmpeg)
         self.assertFalse(self.output.exists())
 
 

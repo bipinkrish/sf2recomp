@@ -68,6 +68,10 @@ void watch_arm(void);  // optional LARECOMP_WATCH_ADDR diagnostic
 bool rt_probe_u64(uint64_t a, uint64_t *v);                     // safe guest-memory read for probes
 bool rt_probe_u32(uint64_t a, uint32_t *v);
 void rt_fatal_trace(void) __attribute__((noreturn));
+bool rt_guest_raise(uint64_t exception_object, uint64_t type_info);
+void rt_guest_eh_reset(void);
+bool main_eh_lookup(uint64_t site, uint64_t type, uint64_t *pad, uint64_t *selector);
+bool sdk_eh_lookup(uint64_t site, uint64_t type, uint64_t *pad, uint64_t *selector);
 // runtime/crash_explain.c: the fatal line / crash spot, and the player's explanation of it (the crash dialog)
 void rt_fatal_msg(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 void rt_crash_fault(const char *what, uint64_t fa, uint64_t pc);

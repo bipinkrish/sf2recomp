@@ -25,14 +25,18 @@ Settings g_settings = {
     .reverb = true,
     .language = LANG_AUTO,
     .aspect = ASPECT_ORIGINAL,
+    .target_fps = 60,
     .res_mode = RES_MATCH,
+    .res_auto = true,
     .upscaler = UPSCALE_BILINEAR,
+    .upscaler_auto = true,
     .antialias = AA_OFF,
     .dpad_move = true,
     .rumble = true,
     .rumble_strength = 100,
     .bg_input = true,
     .prompts = PROMPTS_AUTO,
+    .experimental_keyboard_prompts = false,
     .save_directory = "save",
 };
 
@@ -129,13 +133,22 @@ int settings_language_index(const char *code) {
 
 // Named sections and a single option table allow new settings without changing
 // the INI parser. Unknown sections/keys are reserved for future versions.
-typedef enum { CONFIG_LANGUAGE, CONFIG_BOOL, CONFIG_VOLUME, CONFIG_PATH } ConfigType;
+typedef enum {
+    CONFIG_LANGUAGE, CONFIG_BOOL, CONFIG_VOLUME, CONFIG_PATH,
+    CONFIG_FRAME_RATE, CONFIG_RESOLUTION, CONFIG_UPSCALER, CONFIG_ANTIALIAS, CONFIG_PROMPTS
+} ConfigType;
 typedef struct { const char *section, *key; ConfigType type; void *value; size_t capacity; } ConfigOption;
 static const ConfigOption config_options[] = {
     {"general", "language", CONFIG_LANGUAGE, &g_settings.language},
     {"audio", "volume", CONFIG_VOLUME, &g_settings.volume},
     {"audio", "reverb", CONFIG_BOOL, &g_settings.reverb},
     {"video", "fullscreen", CONFIG_BOOL, &g_settings.fullscreen},
+    {"video", "target_fps", CONFIG_FRAME_RATE, &g_settings.target_fps},
+    {"video", "internal_resolution", CONFIG_RESOLUTION, &g_settings.res_mode},
+    {"video", "upscaler", CONFIG_UPSCALER, &g_settings.upscaler},
+    {"video", "antialiasing", CONFIG_ANTIALIAS, &g_settings.antialias},
+    {"input", "prompts", CONFIG_PROMPTS, &g_settings.prompts},
+    {"experimental", "keyboard_prompts", CONFIG_BOOL, &g_settings.experimental_keyboard_prompts},
     {"storage", "save_directory", CONFIG_PATH, g_settings.save_directory, sizeof g_settings.save_directory},
 };
 
@@ -166,6 +179,48 @@ static bool config_assign(const ConfigOption *option, const char *value) {
         return parse_bool(value, option->value);
     } else if (option->type == CONFIG_PATH) {
         return assign_path(option->value, option->capacity, value);
+    } else if (option->type == CONFIG_FRAME_RATE) {
+        char *end;
+        errno = 0;
+        long fps = strtol(value, &end, 10);
+        if (errno || end == value || *end || fps < 30 || fps > 360) return false;
+        *(int *)option->value = (int)fps;
+    } else if (option->type == CONFIG_RESOLUTION) {
+        if (!strcasecmp(value, "auto") || !strcasecmp(value, "match")) {
+            g_settings.res_mode = RES_MATCH;
+            g_settings.res_auto = !strcasecmp(value, "auto");
+            return true;
+        }
+        if (!strcasecmp(value, "dynamic")) g_settings.res_mode = RES_DYNAMIC;
+        else if (!strcasecmp(value, "0.25x")) g_settings.res_mode = RES_Q25;
+        else if (!strcasecmp(value, "0.50x") || !strcasecmp(value, "0.5x")) g_settings.res_mode = RES_Q50;
+        else if (!strcasecmp(value, "0.75x")) g_settings.res_mode = RES_Q75;
+        else if (!strcasecmp(value, "1x")) g_settings.res_mode = 1;
+        else if (!strcasecmp(value, "2x")) g_settings.res_mode = 2;
+        else if (!strcasecmp(value, "3x")) g_settings.res_mode = 3;
+        else if (!strcasecmp(value, "4x")) g_settings.res_mode = 4;
+        else return false;
+        g_settings.res_auto = false;
+    } else if (option->type == CONFIG_UPSCALER) {
+        if (!strcasecmp(value, "auto")) {
+            g_settings.upscaler_auto = true;
+            return true;
+        }
+        if (!strcasecmp(value, "bilinear")) g_settings.upscaler = UPSCALE_BILINEAR;
+        else if (!strcasecmp(value, "fsr1")) g_settings.upscaler = UPSCALE_FSR1;
+        else return false;  // MetalFX is not available in this Vulkan build.
+        g_settings.upscaler_auto = false;
+    } else if (option->type == CONFIG_ANTIALIAS) {
+        if (!strcasecmp(value, "off")) *(int *)option->value = AA_OFF;
+        else if (!strcasecmp(value, "smaa")) *(int *)option->value = AA_SMAA;
+        else return false;
+    } else if (option->type == CONFIG_PROMPTS) {
+        if (!strcasecmp(value, "auto")) *(int *)option->value = PROMPTS_AUTO;
+        else if (!strcasecmp(value, "keyboard")) *(int *)option->value = PROMPTS_KEYBOARD;
+        else if (!strcasecmp(value, "nintendo")) *(int *)option->value = PROMPTS_NINTENDO;
+        else if (!strcasecmp(value, "xbox")) *(int *)option->value = PROMPTS_XBOX;
+        else if (!strcasecmp(value, "playstation")) *(int *)option->value = PROMPTS_PLAYSTATION;
+        else return false;
     } else {
         char *end;
         errno = 0;
@@ -248,6 +303,6 @@ void settings_load(void) {
 
 void settings_resolve_defaults(bool integrated) {
     g_gpu_integrated = integrated;
-    g_settings.upscaler = integrated ? UPSCALE_BILINEAR : UPSCALE_SHARP;
-    g_settings.res_mode = RES_MATCH;
+    if (g_settings.upscaler_auto) g_settings.upscaler = integrated ? UPSCALE_BILINEAR : UPSCALE_SHARP;
+    if (g_settings.res_auto) g_settings.res_mode = RES_MATCH;
 }

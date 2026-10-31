@@ -17,30 +17,42 @@
 #include "../input_bind.h"
 #include "../rumble.h"
 #include "../ui/menu.h"
+#include "movie.h"
 
 enum {
     BTN_A = 0, BTN_B, BTN_X, BTN_Y, BTN_LSTICK, BTN_RSTICK, BTN_L, BTN_R, BTN_ZL, BTN_ZR, BTN_PLUS, BTN_MINUS,
     BTN_LEFT, BTN_UP, BTN_RIGHT, BTN_DOWN
 };
+enum { LOCAL_PLAYER_COUNT = 2 };
 
 _Static_assert(BTN_DOWN == BIND_DOWN && BTN_ZL == BIND_ZL, "bindings follow the button bits");
+_Static_assert(LOCAL_PLAYER_COUNT == RUMBLE_PLAYER_COUNT, "input and rumble player slots must agree");
 
-static _Atomic uint64_t key_buttons, pad_buttons;
-static _Atomic int32_t key_lx, key_ly, key_rx, key_ry, pad_lx, pad_ly, pad_rx, pad_ry;
+typedef struct {
+    SDL_Gamepad *handle;       // UI thread only
+    SDL_JoystickID id;         // stable while connected; UI thread only
+    _Atomic bool connected;    // published to guest input threads
+    _Atomic uint64_t buttons;
+    _Atomic int32_t lx, ly, rx, ry;
+    bool trigger_down[2];      // UI thread only
+} LocalPad;
+
+static _Atomic uint64_t key_buttons;
+static _Atomic int32_t key_lx, key_ly, key_rx, key_ry;
 static uint8_t keys_down[SDL_SCANCODE_COUNT];
-static SDL_Gamepad *pad;
+static LocalPad pads[LOCAL_PLAYER_COUNT];
 static _Atomic int64_t sampling;
 static bool host_test;  // scripted runs must not vibrate the user's controller
 
 // Guest IPC threads publish values; only the UI thread touches SDL's pad.
 // The lock also makes paired value snapshots consistent with permission/reset.
 static SDL_SpinLock rumble_lock;
-static RumbleValue rumble_values[2];
+static RumbleValue rumble_values[RUMBLE_VALUE_COUNT];
 static bool rumble_allowed = true;
 static _Atomic uint64_t rumble_frame_ms;
-static uint16_t rumble_last_lo, rumble_last_hi;
-static uint64_t rumble_last_ms;
-static bool rumble_warned;
+static uint16_t rumble_last_lo[LOCAL_PLAYER_COUNT], rumble_last_hi[LOCAL_PLAYER_COUNT];
+static uint64_t rumble_last_ms[LOCAL_PLAYER_COUNT];
+static bool rumble_warned[LOCAL_PLAYER_COUNT];
 
 static void rumble_clear(void) {
     SDL_LockSpinlock(&rumble_lock);
@@ -48,17 +60,17 @@ static void rumble_clear(void) {
     SDL_UnlockSpinlock(&rumble_lock);
 }
 void input_rumble_send(uint32_t h, const RumbleValue *v) {
-    int side = rumble_side(h);
+    int index = rumble_index(h);
     SDL_LockSpinlock(&rumble_lock);
-    if (side < 0) { SDL_UnlockSpinlock(&rumble_lock); return; }
-    if (rumble_allowed) rumble_values[side] = *v;
+    if (index < 0) { SDL_UnlockSpinlock(&rumble_lock); return; }
+    if (rumble_allowed) rumble_values[index] = *v;
     SDL_UnlockSpinlock(&rumble_lock);
 }
 RumbleValue input_rumble_get(uint32_t h) {
     RumbleValue v = {0, 160, 0, 320};
-    int side = rumble_side(h);
+    int index = rumble_index(h);
     SDL_LockSpinlock(&rumble_lock);
-    if (side >= 0 && rumble_allowed) v = rumble_values[side];
+    if (index >= 0 && rumble_allowed) v = rumble_values[index];
     SDL_UnlockSpinlock(&rumble_lock);
     return v;  // requested value, not physical motor feedback
 }
@@ -77,36 +89,43 @@ bool input_rumble_permitted(void) {
 void input_rumble_poll(void) {
     uint64_t now = SDL_GetTicks();
     uint64_t last_frame = atomic_load(&rumble_frame_ms);
-    uint16_t lo = 0, hi = 0;
     // Switch values are latched until changed: they contain no duration.
     // Renew SDL's 250 ms effect every 100 ms while frames are progressing.
     // A stalled render/UI thread therefore cannot leave an infinite effect.
     // This watchdog is a host policy, not a duration supplied by the game.
-    bool suppress = (now > last_frame && now - last_frame > 250) || !pad || host_test || !g_settings.rumble || menu_is_open() ||
-                    !SDL_GetKeyboardFocus();
-    SDL_LockSpinlock(&rumble_lock);
-    if (suppress) memset(rumble_values, 0, sizeof rumble_values);
-    else if (rumble_allowed) {
-        rumble_mix(rumble_values, &lo, &hi);
-        int pct = g_settings.rumble_strength;  // (Controls tab: Intensity)
-        if (pct > 0 && pct < 100) lo = (uint16_t)(lo * pct / 100), hi = (uint16_t)(hi * pct / 100);
-    }
-    SDL_UnlockSpinlock(&rumble_lock);
-    if (pad && (lo != rumble_last_lo || hi != rumble_last_hi ||
-                ((lo || hi) && now - rumble_last_ms >= 100))) {
-        if (!SDL_RumbleGamepad(pad, lo, hi, (lo || hi) ? 250 : 0) && !rumble_warned) {
-            LOG("[rumble] unavailable: %s\n", SDL_GetError());
-            rumble_warned = true;  // keyboard/non-rumble pads are still usable
+    bool stalled = now > last_frame && now - last_frame > 250;
+    for (int player = 0; player < LOCAL_PLAYER_COUNT; player++) {
+        SDL_Gamepad *pad = pads[player].handle;
+        uint16_t lo = 0, hi = 0;
+        bool suppress = stalled || !pad || host_test || !g_settings.rumble || menu_is_open() || !SDL_GetKeyboardFocus();
+        SDL_LockSpinlock(&rumble_lock);
+        if (suppress) memset(&rumble_values[player * RUMBLE_SIDES_PER_PLAYER], 0,
+                             RUMBLE_SIDES_PER_PLAYER * sizeof rumble_values[0]);
+        else if (rumble_allowed) {
+            rumble_mix(rumble_values, player, &lo, &hi);
+            int pct = g_settings.rumble_strength;  // (Controls tab: Intensity)
+            if (pct > 0 && pct < 100) lo = (uint16_t)(lo * pct / 100), hi = (uint16_t)(hi * pct / 100);
         }
-        rumble_last_ms = now;
+        SDL_UnlockSpinlock(&rumble_lock);
+        if (pad && (lo != rumble_last_lo[player] || hi != rumble_last_hi[player] ||
+                    ((lo || hi) && now - rumble_last_ms[player] >= 100))) {
+            if (!SDL_RumbleGamepad(pad, lo, hi, (lo || hi) ? 250 : 0) && !rumble_warned[player]) {
+                LOG("[rumble] player %d unavailable: %s\n", player + 1, SDL_GetError());
+                rumble_warned[player] = true;  // keyboard/non-rumble pads are still usable
+            }
+            rumble_last_ms[player] = now;
+        }
+        rumble_last_lo[player] = lo;
+        rumble_last_hi[player] = hi;
     }
-    rumble_last_lo = lo; rumble_last_hi = hi;
 }
 void input_rumble_stop(void) {  // UI thread: also called before normal app exit
     rumble_clear();
     atomic_store(&rumble_frame_ms, 0);
-    if (pad) SDL_RumbleGamepad(pad, 0, 0, 0);
-    rumble_last_lo = rumble_last_hi = 0;
+    for (int player = 0; player < LOCAL_PLAYER_COUNT; player++) {
+        if (pads[player].handle) SDL_RumbleGamepad(pads[player].handle, 0, 0, 0);
+        rumble_last_lo[player] = rumble_last_hi[player] = 0;
+    }
 }
 RT_ON_RESET(input_rumble_reset) {
     input_rumble_stop();
@@ -133,48 +152,72 @@ static void recompute_keyboard(void) {
 }
 
 // Controller buttons (and the triggers as buttons) -> Switch buttons through g_bind_pad; the sticks stay the sticks.
-static void recompute_pad(void) {
-    uint32_t host = test_pad;
-    if (pad && !host_test) {
+static void recompute_pad(int player) {
+    if (player < 0 || player >= LOCAL_PLAYER_COUNT) return;
+    LocalPad *p = &pads[player];
+    uint32_t host = player == 0 ? test_pad : 0;
+    if (p->handle && !host_test) {
         for (int i = 0; i < SDL_GAMEPAD_BUTTON_COUNT; i++)
-            if (SDL_GetGamepadButton(pad, (SDL_GamepadButton)i)) host |= 1u << i;
-        if (SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFT_TRIGGER) > 16000) host |= 1u << PADB_LTRIGGER;
-        if (SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) > 16000) host |= 1u << PADB_RTRIGGER;
+            if (SDL_GetGamepadButton(p->handle, (SDL_GamepadButton)i)) host |= 1u << i;
+        if (SDL_GetGamepadAxis(p->handle, SDL_GAMEPAD_AXIS_LEFT_TRIGGER) > 16000) host |= 1u << PADB_LTRIGGER;
+        if (SDL_GetGamepadAxis(p->handle, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) > 16000) host |= 1u << PADB_RTRIGGER;
     }
     uint64_t b = 0;
     for (int i = 0; i < BIND_PAD_COUNT; i++)
         if (g_bind_pad[i] >= 0 && g_bind_pad[i] < PADB_HOST_COUNT && (host >> g_bind_pad[i] & 1)) b |= 1ull << i;
-    pad_buttons = b;
-    if (!pad || host_test) { pad_lx = test_lx, pad_ly = test_ly, pad_rx = pad_ry = 0; return; }
-    pad_lx = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTX);
-    pad_ly = -SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTY);
-    pad_rx = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_RIGHTX);
-    pad_ry = -SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_RIGHTY);
+    atomic_store(&p->buttons, b);
+    if (!p->handle || host_test) {
+        atomic_store(&p->lx, player == 0 ? test_lx : 0);
+        atomic_store(&p->ly, player == 0 ? test_ly : 0);
+        atomic_store(&p->rx, 0);
+        atomic_store(&p->ry, 0);
+        return;
+    }
+    atomic_store(&p->lx, SDL_GetGamepadAxis(p->handle, SDL_GAMEPAD_AXIS_LEFTX));
+    atomic_store(&p->ly, -SDL_GetGamepadAxis(p->handle, SDL_GAMEPAD_AXIS_LEFTY));
+    atomic_store(&p->rx, SDL_GetGamepadAxis(p->handle, SDL_GAMEPAD_AXIS_RIGHTX));
+    atomic_store(&p->ry, -SDL_GetGamepadAxis(p->handle, SDL_GAMEPAD_AXIS_RIGHTY));
 }
 
 // Every press reaches the game, however short. recompute_pad reads the pad as it is now, so a quick tap whose press
 // and release SDL hands over together (a Bluetooth pad's reports often come batched), or that fell between two of the
 // game's polls, never showed: the game's menus took a second press now and then. A press the game hasn't polled yet
 // that is released is still given to the game's next polls (fill_state). UI thread: note_press; game thread: the rest.
-static _Atomic uint64_t press_unseen;  // pressed (events), not yet in a state the game polled
-static _Atomic uint64_t tap_buttons;   // released while unseen: the game's next poll gets them
+static _Atomic uint64_t movie_consumed[LOCAL_PLAYER_COUNT];
+static _Atomic uint64_t press_unseen[LOCAL_PLAYER_COUNT];  // pressed (events), not yet in a state the game polled
+static _Atomic uint64_t tap_buttons[LOCAL_PLAYER_COUNT];   // released while unseen: that player's next poll gets them
+static _Atomic uint32_t input_generation[LOCAL_PLAYER_COUNT];
 static uint64_t pad_bits(int host) {   // the game buttons bound to host button `host` (SDL button / PADB_*TRIGGER)
     uint64_t b = 0;
     for (int i = 0; i < BIND_PAD_COUNT; i++)
         if (g_bind_pad[i] == host) b |= 1ull << i;
     return b;
 }
-static void note_press(uint64_t down, uint64_t up) {
-    if (down) press_unseen |= down;
-    if (up) {
-        uint64_t u = atomic_fetch_and(&press_unseen, ~up) & up;
-        if (u) tap_buttons |= u;
+static void note_press(int player, uint64_t down, uint64_t up) {
+    if (player < 0 || player >= LOCAL_PLAYER_COUNT) return;
+    // The original VideoPlayerController accepts HintID A or B to skip.
+    if (movie_overlay_active() && (down & 3)) {
+        movie_request_skip();
+        atomic_fetch_or(&movie_consumed[player], down & 3);
+        down &= ~3ull;
     }
+    if (up) atomic_fetch_and(&movie_consumed[player], ~up);
+    if (down) atomic_fetch_or(&press_unseen[player], down);
+    if (up) {
+        uint64_t u = atomic_fetch_and(&press_unseen[player], ~up) & up;
+        if (u) atomic_fetch_or(&tap_buttons[player], u);
+    }
+}
+static void reset_player_edges(int player) {
+    if (player < 0 || player >= LOCAL_PLAYER_COUNT) return;
+    atomic_store(&press_unseen[player], 0);
+    atomic_store(&tap_buttons[player], 0);
+    atomic_fetch_add(&input_generation[player], 1);
 }
 
 // Forget held keys (the menu took focus); the gamepad is re-read on its next event.
 void input_reset(void) {
-    press_unseen = 0, tap_buttons = 0;
+    for (int player = 0; player < LOCAL_PLAYER_COUNT; player++) reset_player_edges(player);
     rumble_clear();
     memset(keys_down, 0, sizeof keys_down);
     recompute_keyboard();
@@ -261,7 +304,10 @@ void input_cursor_event(const SDL_Event *e) {
 // SDL drops controller events without keyboard focus unless this hint is set; it reads the hint live. (On macOS the
 // hint makes the system ask for Input Monitoring - reading HID input for a background app - so it was taken out as a
 // default there; the player opts in here.)
-SDL_JoystickID input_active_pad(void) { return pad ? SDL_GetGamepadID(pad) : 0; }
+SDL_JoystickID input_active_pad(void) { return pads[0].handle ? pads[0].id : 0; }
+bool input_any_gamepad_connected(void) {
+    return atomic_load(&pads[0].connected) || atomic_load(&pads[1].connected);
+}
 void input_apply_background(void) {
     SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, g_settings.bg_input ? "1" : "0");
 }
@@ -291,6 +337,7 @@ int input_family_of_type(int type) {
 }
 static _Atomic int pad_family;
 static void note_family(void) {
+    SDL_Gamepad *pad = pads[0].handle ? pads[0].handle : pads[1].handle;
     int f = pad ? input_family_of_type(SDL_GetGamepadType(pad)) : 0;
     if (f != pad_family) LOG("[input] button prompts: %s controller\n", f == 1 ? "Xbox" : f == 2 ? "PlayStation" : "Nintendo");
     pad_family = f;
@@ -321,15 +368,73 @@ int input_menu_family(SDL_JoystickID which) {
     return bind_label_family();
 }
 
-void input_handle_event(const SDL_Event *e) {
-    static bool scanned;  // pads present at startup: their ADDED event may have gone to the start screen's loop
-    if (!scanned) {
-        scanned = true;
-        int n = 0;
-        SDL_JoystickID *ids = SDL_GetGamepads(&n);
-        if (n > 0 && !pad) { pad = SDL_OpenGamepad(ids[0]); LOG("[input] gamepad: %s\n", SDL_GetGamepadName(pad)); note_family(); }
-        SDL_free(ids);
+static int pad_slot_for_id(SDL_JoystickID id) {
+    for (int player = 0; player < LOCAL_PLAYER_COUNT; player++)
+        if (pads[player].handle && pads[player].id == id) return player;
+    return -1;
+}
+
+static void attach_pad(SDL_JoystickID id) {
+    if (pad_slot_for_id(id) >= 0) return;
+    int player;
+    for (player = 0; player < LOCAL_PLAYER_COUNT && pads[player].handle; player++) {}
+    if (player == LOCAL_PLAYER_COUNT) {
+        LOG("[input] ignoring gamepad %d: local play supports two controllers\n", id);
+        return;
     }
+    SDL_Gamepad *pad = SDL_OpenGamepad(id);
+    if (!pad) {
+        LOG("[input] cannot open gamepad %d: %s\n", id, SDL_GetError());
+        return;
+    }
+    pads[player].handle = pad;
+    pads[player].id = id;
+    pads[player].trigger_down[0] = pads[player].trigger_down[1] = false;
+    reset_player_edges(player);
+    recompute_pad(player);
+    atomic_store(&pads[player].connected, true);
+    LOG("[input] player %d gamepad: %s\n", player + 1, SDL_GetGamepadName(pad));
+    note_family();
+}
+
+static void detach_pad(SDL_JoystickID id) {
+    int player = pad_slot_for_id(id);
+    if (player < 0) return;
+    SDL_Gamepad *pad = pads[player].handle;
+    if (pad) {
+        SDL_RumbleGamepad(pad, 0, 0, 0);
+        SDL_CloseGamepad(pad);
+    }
+    pads[player].handle = NULL;
+    pads[player].id = 0;
+    pads[player].trigger_down[0] = pads[player].trigger_down[1] = false;
+    atomic_store(&pads[player].connected, false);
+    reset_player_edges(player);
+    recompute_pad(player);
+    SDL_LockSpinlock(&rumble_lock);
+    memset(&rumble_values[player * RUMBLE_SIDES_PER_PLAYER], 0,
+           RUMBLE_SIDES_PER_PLAYER * sizeof rumble_values[0]);
+    SDL_UnlockSpinlock(&rumble_lock);
+    rumble_last_lo[player] = rumble_last_hi[player] = 0;
+    rumble_warned[player] = false;
+    note_family();
+    LOG("[input] player %d gamepad disconnected\n", player + 1);
+}
+
+static void scan_connected_pads(void) {
+    static bool scanned;
+    if (scanned) return;
+    scanned = true;  // a late-added device arrives as GAMEPAD_ADDED
+    int n = 0;
+    SDL_JoystickID *ids = SDL_GetGamepads(&n);
+    for (int i = 0; ids && i < n; i++) {
+        if (!pads[0].handle || !pads[1].handle) attach_pad(ids[i]);
+    }
+    SDL_free(ids);
+}
+
+void input_handle_event(const SDL_Event *e) {
+    scan_connected_pads();  // pads present at startup may have emitted ADDED before this event loop
     switch (e->type) {
     case SDL_EVENT_KEY_DOWN: case SDL_EVENT_KEY_UP: {
         if (e->type == SDL_EVENT_KEY_DOWN && e->key.scancode == SDL_SCANCODE_F9 && !e->key.repeat) g_debug_frame_request = 1;
@@ -337,41 +442,41 @@ void input_handle_event(const SDL_Event *e) {
         uint64_t before = key_buttons;
         recompute_keyboard();
         uint64_t now = key_buttons;
-        note_press(now & ~before, before & ~now);
+        note_press(0, now & ~before, before & ~now);
         break;
     }
     case SDL_EVENT_GAMEPAD_ADDED:
-        if (!pad) { pad = SDL_OpenGamepad(e->gdevice.which); LOG("[input] gamepad: %s\n", SDL_GetGamepadName(pad)); note_family(); }
+        attach_pad(e->gdevice.which);
         break;
     case SDL_EVENT_GAMEPAD_REMOVED:
-        if (pad && SDL_GetGamepadID(pad) == e->gdevice.which) {
-            SDL_RumbleGamepad(pad, 0, 0, 0);
-            SDL_CloseGamepad(pad); pad = NULL; note_family();
-            rumble_clear(); rumble_last_lo = rumble_last_hi = 0; rumble_warned = false;
-        }
-        recompute_pad();
+        detach_pad(e->gdevice.which);
         break;
     case SDL_EVENT_GAMEPAD_BUTTON_DOWN: case SDL_EVENT_GAMEPAD_BUTTON_UP:
-        if (!host_test || e->gbutton.which == TEST_DEVICE) {  // (the press as the event has it, before reading the pad)
+    {
+        int player = e->gbutton.which == TEST_DEVICE ? 0 : pad_slot_for_id(e->gbutton.which);
+        if (player >= 0 && (!host_test || e->gbutton.which == TEST_DEVICE)) {  // event state is available before re-reading the device
             uint64_t b = pad_bits(e->gbutton.button);
-            note_press(e->gbutton.down ? b : 0, e->gbutton.down ? 0 : b);
+            note_press(player, e->gbutton.down ? b : 0, e->gbutton.down ? 0 : b);
         }
-        recompute_pad();
+        if (player >= 0) recompute_pad(player);
         break;
+    }
     case SDL_EVENT_GAMEPAD_AXIS_MOTION:
+    {
+        int player = pad_slot_for_id(e->gaxis.which);
         if ((e->gaxis.axis == SDL_GAMEPAD_AXIS_LEFT_TRIGGER || e->gaxis.axis == SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) &&
-            !host_test) {  // (the triggers as buttons: past half way)
-            static bool trig[2];
+            player >= 0 && !host_test) {  // triggers are buttons past halfway
             int t = e->gaxis.axis == SDL_GAMEPAD_AXIS_RIGHT_TRIGGER;
             bool on = e->gaxis.value > 16000;
-            if (on != trig[t]) {
+            if (on != pads[player].trigger_down[t]) {
                 uint64_t b = pad_bits(PADB_LTRIGGER + t);
-                note_press(on ? b : 0, on ? 0 : b);
-                trig[t] = on;
+                note_press(player, on ? b : 0, on ? 0 : b);
+                pads[player].trigger_down[t] = on;
             }
         }
-        recompute_pad();
+        if (player >= 0) recompute_pad(player);
         break;
+    }
     }
 }
 
@@ -506,7 +611,7 @@ static void host_test_frame(uint64_t frame) {
         test_pad = padm;
         test_lx = sx, test_ly = sy;
         if (kch) recompute_keyboard();
-        if (pch) recompute_pad();
+        if (pch) recompute_pad(0);
     }
     if (bspec) {
         snprintf(buf, cap, "%s", bspec);
@@ -592,6 +697,10 @@ void input_frame(uint64_t frame) {
         }
         for (int i = 0; i < 16; i++) if (!strcmp(name, names[i])) b |= 1ull << i;
     }
+    if (movie_overlay_active() && (b & ~script_buttons & 3)) {
+        movie_request_skip();
+        atomic_fetch_or(&movie_consumed[0], b & 3);
+    }
     script_buttons = b;
     script_lx = lx;
     script_ly = ly;
@@ -602,7 +711,9 @@ void input_frame(uint64_t frame) {
 extern bool menu_input_captured(void);  // runtime/ui/menu.mm: overlay menu or name entry up (it has the keys / pad)
 
 // Buttons held right now (keyboard, gamepad, test script), independent of whether the game polls (movies).
-uint64_t input_buttons_now(void) { return (menu_input_captured() ? 0 : key_buttons | pad_buttons) | script_buttons; }
+uint64_t input_buttons_now(void) {
+    return (menu_input_captured() ? 0 : key_buttons | atomic_load(&pads[0].buttons)) | script_buttons;
+}
 
 static int32_t clamp_axis(int32_t v) { return v > 32767 ? 32767 : v < -32767 ? -32767 : v; }
 
@@ -615,32 +726,63 @@ static void fill_state(Cpu *c) {
     *(int64_t *)s = ++sampling;
     static int nlog;
     if (nlog < 6 && (sampling % 600) == 1) { nlog++; LOG("[input] GetNpadState id %#x lr %llx\n", id, c->x[30]); }
-    if (id != 0) return;  // docked: only player 1 (FullKey); Handheld stays disconnected
+    if (id >= LOCAL_PLAYER_COUNT) return;  // handheld and player IDs above the two local controllers are disconnected
+
+    int player = (int)id;
+    static uint64_t tap[LOCAL_PLAYER_COUNT], tap_frame[LOCAL_PLAYER_COUNT];
+    static uint64_t last_b[LOCAL_PLAYER_COUNT], inject_until[LOCAL_PLAYER_COUNT];
+    static uint32_t seen_generation[LOCAL_PLAYER_COUNT];
+    uint32_t generation = atomic_load(&input_generation[player]);
+    if (seen_generation[player] != generation) {
+        tap[player] = tap_frame[player] = last_b[player] = 0;
+        inject_until[player] = 0;
+        seen_generation[player] = generation;
+    }
+    if (player != 0 && !atomic_load(&pads[player].connected)) return;
+
+    // Host video covers the guest's menu: discard presses instead of navigating it unseen.
+    if (movie_overlay_active()) {
+        tap[player] = 0;
+        atomic_store(&tap_buttons[player], 0);
+        atomic_store(&press_unseen[player], 0);
+        *(uint32_t *)(s + 32) = 1;
+        return;
+    }
 
     bool menu = menu_input_captured();
-    uint64_t held = key_buttons | pad_buttons;
-    atomic_fetch_and(&press_unseen, ~held);
-    static uint64_t tap, tap_frame;
+    uint64_t pad = atomic_load(&pads[player].buttons);
+    uint64_t key = player == 0 ? key_buttons : 0;
+    uint64_t held = key | pad;
+    uint64_t consumed = atomic_fetch_and(&movie_consumed[player], held | (player == 0 ? script_buttons : 0));
+    held &= ~consumed;
+    atomic_fetch_and(&press_unseen[player], ~held);
     {
         extern uint64_t renderer_present_count(void);
-        uint64_t t = atomic_exchange(&tap_buttons, 0), f = renderer_present_count();
+        uint64_t t = atomic_exchange(&tap_buttons[player], 0), f = renderer_present_count();
         if (t) {
-            tap |= t, tap_frame = f;
+            tap[player] |= t, tap_frame[player] = f;
             if (getenv("LARECOMP_INPUT")) LOG("[input] short press %#llx\n", (unsigned long long)t);
-        } else if (f > tap_frame) tap = 0;
+        } else if (f > tap_frame[player]) tap[player] = 0;
     }
-    uint64_t b = menu ? script_buttons : held | tap | script_buttons;
+    uint64_t scripted_buttons = player == 0 ? script_buttons & ~consumed : 0;
+    int32_t scripted_lx = player == 0 ? script_lx : 0, scripted_ly = player == 0 ? script_ly : 0;
+    int32_t scripted_rx = player == 0 ? script_rx : 0, scripted_ry = player == 0 ? script_ry : 0;
+    uint64_t b = menu ? scripted_buttons : held | tap[player] | scripted_buttons;
     {   // injected Plus: held for ~10 presented frames
         extern uint64_t renderer_present_count(void);
-        static uint64_t until;
-        if (g_inject_plus > 0) { until = renderer_present_count() + 10; g_inject_plus = 0; }
-        if (renderer_present_count() < until) b |= 1ull << BTN_PLUS;
+        if (player == 0 && g_inject_plus > 0) {
+            inject_until[player] = renderer_present_count() + 10;
+            g_inject_plus = 0;
+        }
+        if (renderer_present_count() < inject_until[player]) b |= 1ull << BTN_PLUS;
     }
-    int32_t lx = clamp_axis((menu ? 0 : key_lx + pad_lx) + script_lx), ly = clamp_axis((menu ? 0 : key_ly + pad_ly) + script_ly);
-    int32_t rx = clamp_axis((menu ? 0 : key_rx + pad_rx) + script_rx), ry = clamp_axis((menu ? 0 : key_ry + pad_ry) + script_ry);
+    int32_t lx = clamp_axis((menu ? 0 : (player == 0 ? key_lx : 0) + atomic_load(&pads[player].lx)) + scripted_lx);
+    int32_t ly = clamp_axis((menu ? 0 : (player == 0 ? key_ly : 0) + atomic_load(&pads[player].ly)) + scripted_ly);
+    int32_t rx = clamp_axis((menu ? 0 : (player == 0 ? key_rx : 0) + atomic_load(&pads[player].rx)) + scripted_rx);
+    int32_t ry = clamp_axis((menu ? 0 : (player == 0 ? key_ry : 0) + atomic_load(&pads[player].ry)) + scripted_ry);
 
     if (!menu && g_settings.dpad_move && (int64_t)lx * lx + (int64_t)ly * ly < 8000ll * 8000) {
-        uint64_t d = key_buttons | pad_buttons | script_buttons;
+        uint64_t d = held | scripted_buttons;
         int dx = (int)((d >> BTN_RIGHT) & 1) - (int)((d >> BTN_LEFT) & 1);
         int dy = (int)((d >> BTN_UP) & 1) - (int)((d >> BTN_DOWN) & 1);
         int32_t m = dx && dy ? 23170 : 32767;
@@ -657,9 +799,10 @@ static void fill_state(Cpu *c) {
     if (ry < -16000) b |= 1ull << 23;
 
     *(uint64_t *)(s + 8) = b;
-    static uint64_t last_b;
-    if (b != last_b && getenv("LARECOMP_INPUT")) LOG("[input] id %#x buttons %#llx (sampling %lld, lr %llx)\n", id, (unsigned long long)b, (long long)sampling, c->x[30]);
-    last_b = b;
+    if (b != last_b[player] && getenv("LARECOMP_INPUT"))
+        LOG("[input] id %#x buttons %#llx (sampling %lld, lr %llx)\n", id, (unsigned long long)b,
+            (long long)sampling, c->x[30]);
+    last_b[player] = b;
     *(int32_t *)(s + 16) = lx;
     *(int32_t *)(s + 20) = ly;
     *(int32_t *)(s + 24) = rx;
@@ -673,12 +816,12 @@ HLE_FUNC("_ZN2nn3hid12GetNpadStateEPNS0_16NpadJoyLeftStateERKj", hid_state_left)
 HLE_FUNC("_ZN2nn3hid12GetNpadStateEPNS0_17NpadHandheldStateERKj", hid_state_handheld) { fill_state(c); }
 HLE_FUNC("_ZN2nn3hid12GetNpadStateEPNS0_17NpadJoyRightStateERKj", hid_state_right) { fill_state(c); }
 
-// FullKey for player 1 only (we report docked mode, where Handheld is unavailable)
+// FullKey for the two local pads (the keyboard remains a virtual player 1).
 HLE_FUNC("_ZN2nn3hid15GetNpadStyleSetERKj", hid_style_set) {
     uint32_t id = *(uint32_t *)(uintptr_t)c->x[0];
     static int nlog;
     if (nlog++ < 4) LOG("[input] GetNpadStyleSet id %#x\n", id);
-    c->x[0] = id == 0 ? 1 : 0;  // docked: no handheld controller
+    c->x[0] = id == 0 || (id == 1 && atomic_load(&pads[1].connected)) ? 1 : 0;
 }
 
 // BindNpadStyleSetUpdateEvent(id, SystemEventType*, clear mode): signaled once so the game sees a

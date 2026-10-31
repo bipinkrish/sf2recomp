@@ -119,10 +119,9 @@ arrived as instrument output after the instrument's commit). Newest first.
   with the generic `-O1` rule (dry-run checked both slow and ordinary chunks).
 - Per-draw and render-queue step logging now requires `SF2_TRACE_RENDER`; detailed
   guest wrapper probes require `SF2_TRACE_GUEST`. Ordinary stats/errors stay on.
-- The real DOTween safe-mode catch code already exists after the normal return in
-  generated `f_700113c300`; the generator currently only extracts function starts
-  from EH metadata and does not connect raises to landing pads. This is the proper
-  exception-handling work remaining, not another null Transform stub.
+- The DOTween safe-mode catch in generated `f_700113c300` was the original
+  failure point. The runtime now matches its LSDA type and resumes its generated
+  landing pad; cleanup/rethrow behavior and full combat remain unverified.
 
 ## 2026-10-30 — first visually verified menu
 
@@ -132,9 +131,9 @@ arrived as instrument output after the instrument's commit). Newest first.
   frames 60/120. Images inspected directly, not inferred from present counters.
 - Menu run passed 5,000 frames. It later raised a real managed NRE in
   `Transform::set_localScale` (`7001a5cdf0`), called by DOTween's Vector3 tweener
-  (`700113c300` -> `7000a5f7b0` -> `7000a5a480`). Guest exceptions currently abort
-  instead of running Unity's callback catch path. Input/story and combat remain
-  unverified; do not suppress this exception and count it as fixed.
+  (`700113c300` -> `7000a5f7b0` -> `7000a5a480`). The October 30 follow-up
+  reproduces and catches this exception at its guest landing pad. Input beyond
+  the scripted Story dialogue and combat remain unverified.
 - Ordered GPU setup successfully selected a DMA-BUF heap, but hardware submission
   still killed the render thread in the AMD kernel's HMM callback. Software Vulkan
   through X11 avoids that path; software Vulkan through Wayland did not establish
@@ -220,3 +219,89 @@ binding walker B chain, eaten to anchor 0, nnMain returns 0. 63 commits.
 - The loadstep null-serve connection stays OPEN: `[[3984 4a0]]` is empty AND `[aotreg]
   7003beffb0 (+0x20: 7003927208)` printed by the loadstep guard is a different global, so the
   two stories are adjacent but not the same object.
+
+## 2026-10-31 — uncommitted-change review and intro regression
+
+- Plain `make` and conversion now run native setup with `--ensure`: reuse a
+  complete local/system SDL, or download, verify and build pinned SDL 3.4.16.
+  Verified from the missing local prefix through installation and a normal build.
+- Movie audio must drain FFmpeg before frame zero is presented. Waiting before
+  reading filled the audio pipe and prevented FFmpeg from producing video.
+- Removed synthetic `FireMovieEvent` injection from graphics presents. End-of-stream
+  injection reproduced a null access in `SwitchVideoPlayerController` after the
+  original guest lifecycle had already progressed. The host overlay now ends
+  independently and reveals the original guest scene.
+- Normal-speed intro completed with software Vulkan/X11 and SDL dummy audio;
+  the window was inspected during the movie and afterward in Shadow/Kenji combat.
+  This verifies that transition, not full combat or audible device output.
+- All 39 tests passed, including a pipe-drain startup regression; existing input
+  and package tests were updated for the two-player state and FFmpeg bundle.
+- Follow-up review fixed LSDA cleanup/type-filter parsing and null catch-all
+  entries. Generated lookup respects clause order; native nested-unwind tests
+  verify selector values, register restoration and frame lifetime. Main/SDK were
+  regenerated and rebuilt. Cleanup-only unwinding and rethrow remain unsupported.
+- The follow-up also blocks guest input behind the movie, validates the decoder
+  bundle before replacing packaged files, and removes duplicate upload geometry
+  and SDL flag selection. All 47 tests pass; a software-Vulkan launch completed
+  the accelerated intro, visibly returned to the main menu and continued after
+  scripted Story inputs without a fatal error. The packaged output was refreshed.
+
+
+## 2026-10-31 — keyboard intro skip and native prompt labels
+
+- The host movie now accepts the original skip actions, HintID A/B, through
+  keyboard/gamepad bindings before guest input is blocked. Decoder teardown runs
+  on the UI thread, and the triggering press is consumed through its release.
+- Image-only `HintUI`, `ButtonHintUI` and generic graphic hints now receive a plain
+  Unity Text child using the game's font and font size. Direction groups share
+  one label; a layout element reserves the measured text width. Controller mode
+  restores original artwork and disables the added text/layout. Destroy hooks
+  release cached hint records when their guest components are destroyed.
+- Verified with the actual INI: J skipped the normal-speed intro, the menu showed
+  `Up / Down Select` and `K OK`, and K opened Story with `MORE K`. A temporary
+  diagnostic INI rebound A to Space to verify that both labels and skip followed
+  the mapping; no Space binding was added to the user's INI.
+- Keyboard label color comes from the replaced sprite's dominant opaque artwork
+  color, multiplied by its own Graphic tint; later tint and alpha changes follow
+  that original graphic. Captions supply only the font. This matters because the
+  dark button beside MORE has a white tint with dark pixels baked into its BC3
+  atlas. Sampling uses the sprite rectangle in the original NVN backing storage,
+  ignores transparent padding, and caches the result until the sprite changes.
+  Unsupported formats retain the original tint. Regression tests cover atlas
+  bounds, tiled RGBA/BC3 palettes, transparency, mapping, restoration and fading.
+- Visually verified dark `MORE K` and cream main-menu keys with the actual INI.
+  All 49 tests pass; the packaged build was refreshed while preserving its INI.
+- Keys inside buttons with a separate visible background now have outline badges
+  in the same color as the mapped key: circles for single characters and rounded
+  rectangles for longer names. The key is sized to fit within the border and the
+  layout reserves its measured width. Standalone footer/header hints stay plain,
+  including legends that happen to have invisible Button components. Borders use
+  feathered Unity UI mesh geometry, following normal canvas clipping and fades;
+  controller mode disables them along with the generated labels.
+- The hint's LayoutElement now lives on the direct child of the nearest horizontal
+  layout, so long labels reserve space beside the caption. Fixed icon slots keep
+  the badge's left edge in place. Launch checks covered circled K and boxed Space
+  and Backspace; the temporary word bindings did not change the user's INI.
+- All 49 tests pass and the packaged executable matches the rebuilt runtime.
+  One final normal-binding launch stalled during Story loading: the main thread
+  waited on condvar 0x7240e5d628 from guest frame 0x7001a81eec, with the render queue
+  fully drained. An identical retry reached the Sensei dialog and rendered the
+  circled K. This intermittent scene-loading stall remains unresolved; its trace
+  is retained at build/validation/outline-story-stall.log.
+
+## 2026-10-31 — experimental keyboard hints default off
+
+- All in-game keyboard prompt replacements, including inline text, image labels,
+  badge outlines and toggle changes, now require `[experimental] keyboard_prompts
+  = true`. The runtime default, supplied INI and existing local build/package INIs
+  set it to false. `prompts = keyboard` alone does not opt in. Keyboard mappings
+  and movie skip remain independent of this display feature.
+- Inline dialogue preserves the game's directional shorthand instead of expanding
+  it into key lists. Standalone direction groups use `WASD`, `Arrows`, or compact
+  numpad names; other names retain familiar abbreviations (`Esc`, `Enter`, `Bksp`).
+  Generated text rectangles follow measured content, and unusually wide names
+  shrink to a bounded width rather than expanding the entire dialog row.
+- All 50 tests pass, including default/INI opt-in behavior, UI restoration,
+  directional shorthand and width limits. Launches verified the original icons
+  with the default INI and compact prompts through the punching-bag tutorial with
+  a temporary opt-in INI. The package was refreshed with the experiment disabled.

@@ -113,6 +113,17 @@ If dependencies were missing during a prior configuration, install them and
 rerun the script. This pins SDL source, not every compiler/system-library version;
 it is a reproducible dependency recipe, not a promise of byte-identical builds.
 
+## Bundled cutscene decoder
+
+`tools/convert.py` builds a minimal FFmpeg 9.0.1 decoder from its checksum-pinned
+upstream source when needed, then includes the executable, shared libraries,
+source archive and license notices in the converted game folder. Players do not
+need FFmpeg installed or available on `PATH`. Building the package needs Clang,
+Make, `tar`, `curl` and a network connection for the pinned source archive; for
+offline setup, set `FFMPEG_SOURCE_ARCHIVE` to that exact archive. `FFMPEG_DIR`
+and `SF2_DEPS_WORK` can relocate the install prefix and source cache. See
+`python3 tools/setup_ffmpeg.py --help-env` for the override summary.
+
 ## Validation in this workspace
 
 The dependency probe passed with the existing SDL 3.4.16 installation and with a
@@ -126,8 +137,9 @@ No distribution packages were installed by the script or this verification.
 The root `third_party/` folder and `deps/include/SDL3/` are ignored local
 dependencies, not vendored source. SDL's installation supplies its headers.
 `--build-sdl` also prepares SMAA; `--fetch-smaa` prepares it separately without
-building SDL or checking system libraries. A direct `make` fetches missing SMAA
-inputs as well. `--check` never downloads and verifies the local SMAA files.
+building SDL or checking system libraries. A direct `make` and conversion use `--ensure` to fetch missing SMAA and build
+pinned SDL when no complete local/system SDL 3.4+ is available. `--check` never
+downloads and verifies the local SMAA files.
 
 `tools/setup_smaa.py` downloads four files from official
 `iryoku/smaa` revision `71c806a838bdd7d517df19192a20f0c61b3ca29d`, checks each

@@ -125,12 +125,12 @@ or restoring unrelated upstream Zelda hooks is not a solution to that decision.
 
 ## Shared game blockers on every OS
 
-- `runtime/dispatch.c:305-317`: guest `__cxa_throw` currently terminates. Correct
-  exception selection, guest state restoration, cleanup and original catch/landing
-  pads are needed where this game uses them. Abandoning callbacks or swallowing
-  exceptions is not equivalent to the original catch path.
-- `runtime/hle/movie.c:14-22`: movie input/track operations deliberately fail.
-  Included cinematics need decoding, output, A/V synchronization and skip behavior.
+- `runtime/dispatch.c`: typed/catch-all LSDA catches now restore the guest state
+  and resume generated landing pads. Cleanup-only unwinding and rethrow remain
+  unsupported; broader exception coverage still needs validation.
+- `runtime/hle/movie.c`: the host FFmpeg path decodes and displays the intro movie
+  with audio/video startup synchronization. Track operations and skip behavior
+  still need broader validation.
 - `runtime/nvn/vulkan/exec.c:3325-3327,3699-3704`: disabling guest shader memory
   or failing import can make global reads return zero. Such a workaround may
   permit a menu capture; it cannot establish faithful full-game rendering.

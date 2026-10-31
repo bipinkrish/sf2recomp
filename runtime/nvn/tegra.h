@@ -45,3 +45,6 @@ void tegra_swizzle_region(const uint8_t *src, uint8_t *dst,
                           uint32_t rw, uint32_t rh, uint32_t rd,
                           uint32_t wb, uint32_t hb, uint32_t bpb,
                           uint32_t block_height_log2, uint32_t block_depth_log2);
+
+// Byte offset of one format block within a block-linear level (slice zero).
+uint64_t tegra_block_offset(const LevelLayout *level, uint32_t bpb, uint32_t x, uint32_t y);

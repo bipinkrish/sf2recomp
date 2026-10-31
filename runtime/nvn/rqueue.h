@@ -12,7 +12,8 @@ bool rq_on(void);
 // Queue items (the game's threads). Item numbers count up from 1; a fence refers to the item that holds it.
 uint64_t rq_submit(uint64_t handle);                     // a recorded command list (nvnQueueSubmitCommands)
 void rq_present(NvnTexture *t, uint64_t frame, bool advance);  // show t (the present pass, overlay, shots); advance:
-                                                              // a new frame (false: backend_represent's repeat)
+                                                              // a new game frame (false: repeat or movie-only present)
+bool rq_try_present(NvnTexture *t, uint64_t frame);  // nonblocking movie-only present; false if the queue is busy
 void rq_destroy_texture(NvnTexture *t);                  // backend_texture_destroyed + free(t), in queue order
 enum { RQ_UPLOAD_RGBA, RQ_UPLOAD_NV12 };
 void rq_upload(NvnTexture *t, int kind, void *data, uint32_t w, uint32_t h, uint32_t stride, uint32_t uv_off);  // takes data
@@ -39,7 +40,7 @@ bool rq_stopping(void);
 void backend_quit(void);
 
 // (backends) called on the render thread
-void backend_present_now(NvnTexture *t, uint64_t frame);
+void backend_present_now(NvnTexture *t, uint64_t frame, bool advance);
 void backend_upload_now(NvnTexture *t, int kind, void *data, uint32_t w, uint32_t h, uint32_t stride, uint32_t uv_off);
 uint64_t renderer_submit_seq(void);  // the backend's latest GPU submission number (handed to the driver)
 // ... the latest it queued: the Vulkan backend's recorder thread (record.c) may still hold the last ones; waited for by

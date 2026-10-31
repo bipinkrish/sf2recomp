@@ -4,6 +4,7 @@
 
 #include "../hle.h"
 #include "../kernel.h"
+#include "../settings.h"
 
 static uint32_t vsync_r, vsync_w;
 static KEvent *vsync_event;
@@ -14,12 +15,22 @@ uint64_t g_native_window;
 
 static void *vsync_thread(void *arg) {
     (void)arg;
-    const uint64_t period = 16666667;
+    const uint32_t hz = g_settings.target_fps >= 30 && g_settings.target_fps <= 360 ?
+                        (uint32_t)g_settings.target_fps : 60;
+    const uint64_t period = 1000000000ull / hz;
+    const uint32_t remainder = (uint32_t)(1000000000ull % hz);
     plat_thread_realtime(period);
     plat_thread_perf_core(PLAT_PERF_VSYNC);
     uint64_t next = plat_now_ns();
+    uint32_t fractional_ns = 0;
+    LOG("[vi] emulated display refresh %u Hz\n", hz);
     for (;;) {
         next += period;
+        fractional_ns += remainder;
+        if (fractional_ns >= hz) {
+            next++;
+            fractional_ns -= hz;
+        }
         plat_sleep_until_ns(next);
         uint64_t now = plat_now_ns();
         if (now > next + period * 3) {
@@ -31,6 +42,7 @@ static void *vsync_thread(void *arg) {
             if (warned++ < 40) LOG("[vi] vsync timer late by %llums (window focused %d, real-time policy %s)\n", (unsigned long long)((now - next) / 1000000),
                                     ui_window_focused(), rt == 0 ? "holds" : rt == 1 ? "was gone: set again" : "unknown");
             next = now;  // don't burst-signal to catch up
+            fractional_ns = 0;
         }
         __atomic_add_fetch(&g_vsync_count, 1, __ATOMIC_RELEASE);
         __atomic_store_n(&g_vsync_ns, now, __ATOMIC_RELEASE);

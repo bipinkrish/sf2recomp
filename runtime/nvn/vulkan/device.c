@@ -10,6 +10,7 @@
 
 #include "../../paths.h"
 #include "../../game_info.h"
+#include "../../hle/movie.h"
 #include "../../rt.h"  // (HEAP_MAX: lazy_heap_predicted)
 #include "../../settings.h"
 #include "../../ui/menu.h"
@@ -916,15 +917,17 @@ void renderer_set_scale(float sx, float sy);
 uint64_t renderer_present_count(void);
 void renderer_save_texture_tex(TexBackend *b, const char *path);
 
-static uint64_t frames, total_frames, g_frame_counter;
-uint64_t renderer_present_count(void) { return total_frames; }  // (the game thread's frame: the HLE hooks')
+static uint64_t frames, g_frame_counter;
+static _Atomic uint64_t total_frames;
+static _Atomic uint64_t last_game_present_ns;
+static _Atomic(NvnTexture *) g_last_presented;
+uint64_t renderer_present_count(void) { return atomic_load(&total_frames); }  // (the game thread's frame: the HLE hooks')
 // The frame whose work is being translated (rqueue.h rq_frame): "once per frame" state of the translation. Without the
 // render thread, total_frames.
-uint64_t renderer_exec_frame(void) { return rq_current_item() ? rq_frame() : total_frames; }
+uint64_t renderer_exec_frame(void) { return rq_current_item() ? rq_frame() : atomic_load(&total_frames); }
 uint64_t vk_frame_counter(void) { return renderer_exec_frame(); }  // (the translation's: g_frame_counter == total_frames)
 static float g_shot_crop[4] = {0, 0, 1, 1};
 static double last_fps_time;
-static NvnTexture *g_last_presented;
 
 const float *vk_shot_crop(void) { return g_shot_crop; }
 
@@ -932,9 +935,11 @@ void backend_present(NvnTexture *t);
 void *backend_pool_push(void) { return NULL; }
 void backend_pool_pop(void *p) { (void)p; }
 void backend_represent(void) {
-    if (!g_last_presented) { SDL_Delay(16); return; }
-    if (rq_on()) rq_present(g_last_presented, total_frames, false);
-    else backend_present_now(g_last_presented, total_frames);
+    NvnTexture *last = atomic_load(&g_last_presented);
+    if (!last) { SDL_Delay(16); return; }
+    uint64_t frame = atomic_load(&total_frames);
+    if (rq_on()) rq_present(last, frame, false);
+    else backend_present_now(last, frame, false);
 }
 
 // (LARECOMP_VK_PROF) the present's time by part, per frame in the fps line ("present/frame"): submit = the frame's
@@ -964,12 +969,19 @@ static const char *pp_text(void) {
 }
 
 // The GPU side of a present (the render thread when it's on, rqueue.c): the present pass, the overlay, shots.
-// frame: the number of this present (the game thread's frame when it was queued).
-void backend_present_now(NvnTexture *t, uint64_t frame) {
+// frame: the game frame when queued; advance is false for repeats and startup movie-only presents.
+void backend_present_now(NvnTexture *t, uint64_t frame, bool advance) {
     if (pp_on < 0) pp_on = getenv("LARECOMP_VK_PROF") != NULL;
     if (pp_on) pp_t = SDL_GetTicksNS();
-    TexBackend *b = vk_tex(t, true);
-    b->presented = true;
+    TexBackend *b = t ? vk_tex(t, true) : NULL;
+    if (b) b->presented = true;
+    TexBackend *movie_b = NULL;
+    bool first_movie_frame = false;
+    if (movie_overlay_active()) {
+        first_movie_frame = movie_render_tick();
+        NvnTexture *movie = renderer_movie_texture();
+        movie_b = vk_tex(movie, true);  // consume the latest NV12 frame before submitting its conversion
+    }
     vk_end_pass();
     // the frame's work goes to the GPU now, in a submission of its own: it starts while we wait for the window's image.
     // Its GPU time is counted, and the window image's submission's from after its wait (exec.c gpu_timer_add)
@@ -1029,17 +1041,28 @@ void backend_present_now(NvnTexture *t, uint64_t frame) {
         float pv[8] = {renderer_origin_lower_left() ? 1.0f : 0.0f, 0, 0, 0, 0, 0, 1, 1};
         memcpy(g_shot_crop, crop, sizeof crop);
         vk_present_draw(cb, b, (float)vx, (float)vy, (float)vw, (float)vh, pv);
+        if (movie_b) {
+            // Raw NV12 is top-down, so this overlay uses the present shader's unflipped UVs. Keep the entire video
+            // visible over the game image; menu UI is still drawn above it below.
+            const float movie_pv[8] = {0, 0, 0, 0, 0, 0, 1, 1};
+            vk_present_draw(cb, movie_b, 0, 0, (float)g_vk.sc_extent.width, (float)g_vk.sc_extent.height, movie_pv);
+        }
         pp_mark(PP_BLIT);
         static long menu_at = -1;
         if (menu_at < 0) menu_at = getenv("LARECOMP_MENU_AT") ? atol(getenv("LARECOMP_MENU_AT")) : 0;
-        if (menu_at && (long)frame + 1 == menu_at) { extern void menu_test_open(void); menu_test_open(); }
+        if (advance && menu_at && (long)frame + 1 == menu_at) { extern void menu_test_open(void); menu_test_open(); }
         // (ImGui records through vk_overlay_begin / vk_overlay_end, when it draws anything)
         menu_render((void *)cb, g_vk.sc_extent.width, g_vk.sc_extent.height);
         pp_mark(PP_OVERLAY);
         static long win_shot = -1;
         if (win_shot < 0) win_shot = getenv("LARECOMP_WINDOW_SHOT") ? atol(getenv("LARECOMP_WINDOW_SHOT")) : 0;
-        bool shot = win_shot && (long)frame + 1 == win_shot;
+        bool shot = advance && win_shot && (long)frame + 1 == win_shot;
         vk_frame_end(shot ? "build/window.png" : NULL);
+        if (first_movie_frame) {
+            // Let the recorder hand frame zero to the swapchain before starting its audio clock.
+            rec_wait_presents(rec_presents_queued());
+            movie_presented();
+        }
         if (shot && getenv("LARECOMP_EXIT_AFTER_SHOT")) exit_after_shot();
     } else {
         renderer_submit();
@@ -1062,8 +1085,8 @@ void backend_present_now(NvnTexture *t, uint64_t frame) {
             if (*p == ',') p++; else break;
         }
     }
-    if (g_debug_frame) LOG("===== debug frame %llu =====\n", (unsigned long long)frame);
-    {   // LARECOMP_SHOT_AT=<frame>,<frame>,... (ascending): the game image at those frames -> build/frames/frame_N.png
+    if (advance && g_debug_frame) LOG("===== debug frame %llu =====\n", (unsigned long long)frame);
+    if (advance) {   // LARECOMP_SHOT_AT=<frame>,<frame>,... (ascending): game frames -> build/frames/frame_N.png
         static const char *next;
         static int init;
         if (!init) { init = 1; next = getenv("LARECOMP_SHOT_AT"); if (next) { mkdir("build", 0755); mkdir("build/frames", 0755); } }
@@ -1080,7 +1103,7 @@ void backend_present_now(NvnTexture *t, uint64_t frame) {
     }
     static long shot_from = -1;
     if (shot_from < 0) { const char *e = getenv("LARECOMP_SCREENSHOT_FROM"); shot_from = e ? atol(e) : 0; }
-    if (shot_every && frame % shot_every == 0 && (long)frame >= shot_from) {
+    if (advance && shot_every && frame % shot_every == 0 && (long)frame >= shot_from) {
         char path[256];
         mkdir("build", 0755);
         if (shot_from) mkdir("build/frames", 0755);
@@ -1115,36 +1138,51 @@ void backend_present_now(NvnTexture *t, uint64_t frame) {
 
 // The game thread's side of a present: the frame counters and the per-frame hooks (input, pacing, test hooks).
 static void present_hooks(void) {
-    total_frames++;
+    uint64_t frame = atomic_fetch_add(&total_frames, 1) + 1;
     g_frame_counter++;
     extern void input_frame(uint64_t frame);
-    input_frame(total_frames);
+    input_frame(frame);
     static long slow_ms = -1;  // LARECOMP_SIM_SLOW_FRAME_MS=<ms>: sleep per presented frame (simulate a slow machine)
     if (slow_ms < 0) slow_ms = getenv("LARECOMP_SIM_SLOW_FRAME_MS") ? atol(getenv("LARECOMP_SIM_SLOW_FRAME_MS")) : 0;
     static long slow_until = -1;  // LARECOMP_SLOW_FRAME_UNTIL=<frame>: the stall ends there (frame pacing recovery tests)
     if (slow_until < 0) slow_until = getenv("LARECOMP_SLOW_FRAME_UNTIL") ? atol(getenv("LARECOMP_SLOW_FRAME_UNTIL")) : 0;
-    if (slow_ms > 0 && total_frames > 2600 && (!slow_until || (long)total_frames < slow_until)) SDL_Delay((Uint32)slow_ms);
+    if (slow_ms > 0 && frame > 2600 && (!slow_until || (long)frame < slow_until)) SDL_Delay((Uint32)slow_ms);
     extern void fnprof_frame(uint64_t frame);
-    fnprof_frame(total_frames);
+    fnprof_frame(frame);
     static long debug_at = -1;
     if (debug_at < 0) { const char *e = getenv("LARECOMP_DEBUG_FRAME"); debug_at = e ? atol(e) : 0; }
     extern volatile int g_debug_frame_request;
-    if (g_debug_frame_request) { g_debug_frame_request = 0; debug_at = (long)total_frames + 1; }
+    if (g_debug_frame_request) { g_debug_frame_request = 0; debug_at = (long)frame + 1; }
     // LARECOMP_DEBUG_FRAMES=<n> (with LARECOMP_DEBUG_FRAME / F9): dump n consecutive frames (build/pass_<frame>_NNN.png)
     static long debug_n = -1;
     if (debug_n < 0) { const char *e = getenv("LARECOMP_DEBUG_FRAMES"); debug_n = e && atol(e) > 1 ? atol(e) : 1; }
-    g_debug_frame = debug_at && total_frames >= (uint64_t)debug_at && total_frames < (uint64_t)debug_at + (uint64_t)debug_n;
+    g_debug_frame = debug_at && frame >= (uint64_t)debug_at && frame < (uint64_t)debug_at + (uint64_t)debug_n;
 }
 
 void backend_present(NvnTexture *t) {
-    g_last_presented = t;
-    uint64_t frame = total_frames, t0 = plat_now_ns();
+    atomic_store(&g_last_presented, t);
+    atomic_store(&last_game_present_ns, SDL_GetTicksNS());
+    uint64_t frame = atomic_load(&total_frames), t0 = plat_now_ns();
     if (rq_on()) rq_present(t, frame, true);
-    else backend_present_now(t, frame);
+    else backend_present_now(t, frame, true);
     uint64_t t1 = plat_now_ns();
     g_present_ns += t1 - t0;  // (LARECOMP_LOG_PACE, pace.c)
     present_hooks();
     g_hooks_ns += plat_now_ns() - t1;
+}
+
+// The guest runs on its own thread. Keep the intro visible while that thread loads game assets
+// and has not issued a game present yet (or is temporarily stalled between presents).
+static void backend_movie_present(void) {
+    if (!movie_overlay_active()) return;
+    uint64_t now = SDL_GetTicksNS();
+    uint64_t last = atomic_load(&last_game_present_ns);
+    if (last && now - last < 50000000ull) return;
+    // With the render queue disabled, backend calls belong to the guest's graphics thread.
+    // Its normal presents still show the movie and keep the frame-zero audio gate intact.
+    if (!rq_on()) return;
+    uint64_t frame = atomic_load(&total_frames);
+    (void)rq_try_present(NULL, frame);
 }
 
 // ================================================================== UI thread
@@ -1278,7 +1316,8 @@ void backend_reset(void) {
     extern void vk_exec_reset(void);
     vk_textures_reset();
     vk_exec_reset();
-    g_last_presented = NULL;
+    atomic_store(&g_last_presented, NULL);
+    atomic_store(&last_game_present_ns, 0);
 }
 void backend_guest_memory_reset(void) {}  // (exec.c re-imports the heap on first use)
 void backend_clear_window(void) {
@@ -1309,5 +1348,7 @@ int ui_run(void) {
         }
         menu_apply_window_requests(window);
         input_rumble_poll();
+        movie_poll();
+        backend_movie_present();
     }
 }

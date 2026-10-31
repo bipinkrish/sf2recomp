@@ -276,7 +276,7 @@ static void *run(void *arg) {
                        (unsigned long long)q, it.kind, kind_name[it.kind], (unsigned long long)it.handle);
         switch (it.kind) {
         case IT_EXEC: backend_execute(it.handle); break;
-        case IT_PRESENT: backend_present_now(it.tex, it.frame); break;
+        case IT_PRESENT: backend_present_now(it.tex, it.frame, it.advance); break;
         case IT_DESTROY: { extern void nvn_texture_destroy(NvnTexture *t); nvn_texture_destroy(it.tex); break; }
         case IT_UPLOAD: backend_upload_now(it.tex, it.up_kind, it.data, it.w, it.h, it.stride, it.uv_off); break;
         case IT_FLUSH: { extern void renderer_flush(void); renderer_flush(); break; }
@@ -375,6 +375,23 @@ uint64_t rq_submit(uint64_t handle) {
 void rq_present(NvnTexture *t, uint64_t frame, bool advance) {
     Item it = {.kind = IT_PRESENT, .tex = t, .frame = frame, .advance = advance};
     enqueue(&it, NULL, 0);
+}
+
+bool rq_try_present(NvnTexture *t, uint64_t frame) {
+    lock_timed();
+    if (atomic_load(&stopping) || q_enq - q_done >= RQ_CAP || presents_pending) {
+        pthread_mutex_unlock(&lock);
+        return false;
+    }
+    uint64_t q = ++q_enq;
+    items[q % RQ_CAP] = (Item){.kind = IT_PRESENT, .tex = t, .frame = frame, .advance = false};
+    kind_of[q % RQ_HIST] = IT_PRESENT;
+    enq_ns[q % RQ_HIST] = plat_now_ns();
+    presents_pending = 1;
+    last_present_q = q;
+    pthread_cond_signal(&cv_work);
+    pthread_mutex_unlock(&lock);
+    return true;
 }
 
 void rq_destroy_texture(NvnTexture *t) {
