@@ -9,6 +9,7 @@
 #include "gamelib.h"
 #include "hle.h"
 #include "kernel.h"
+#include "network.h"
 
 typedef struct { const uint64_t *addrs; const GuestFn *fns; uint64_t count, lo, hi; } FnTable;
 static FnTable tables[2];
@@ -39,6 +40,7 @@ __attribute__((section(".hle$z"), used)) static const HleImpl __stop_hle_impls[1
 #endif
 
 HostFn hle_lookup_impl(const char *name) {
+    if (network_hle_blocked(name)) return NULL;
     const char *skip = getenv("LARECOMP_HLE_SKIP");  // debugging: disable HLE for names containing this
     if (skip && strstr(name, skip)) return NULL;
     const HleImpl *start = __start_hle_impls, *stop = __stop_hle_impls;

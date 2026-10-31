@@ -181,8 +181,13 @@ static char **movie_spawn_environment(const char *library_dir, char *ld_library_
                                       char ***owned_env) {
     *owned_env = NULL;
     if (!library_dir || !*library_dir) return environ;
-    const char *old_path = getenv("LD_LIBRARY_PATH");
-    int n = snprintf(ld_library_path, path_size, "LD_LIBRARY_PATH=%s%s%s", library_dir,
+#ifdef __APPLE__
+    const char *variable = "DYLD_LIBRARY_PATH";
+#else
+    const char *variable = "LD_LIBRARY_PATH";
+#endif
+    const char *old_path = getenv(variable);
+    int n = snprintf(ld_library_path, path_size, "%s=%s%s%s", variable, library_dir,
                      old_path && *old_path ? ":" : "", old_path && *old_path ? old_path : "");
     if (n < 0 || (size_t)n >= path_size) return NULL;
     size_t count = 0;
@@ -191,7 +196,8 @@ static char **movie_spawn_environment(const char *library_dir, char *ld_library_
     if (!env) return NULL;
     size_t used = 0;
     for (size_t i = 0; i < count; i++)
-        if (strncmp(environ[i], "LD_LIBRARY_PATH=", 16)) env[used++] = environ[i];
+        if (strncmp(environ[i], variable, strlen(variable)) || environ[i][strlen(variable)] != '=')
+            env[used++] = environ[i];
     env[used++] = ld_library_path;
     env[used] = NULL;
     *owned_env = env;

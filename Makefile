@@ -4,17 +4,19 @@ CXX := clang++
 .DEFAULT_GOAL := all
 ifeq ($(OS),Windows_NT)
 TARGET  ?= windows
+else ifeq ($(shell uname -s),Darwin)
+TARGET  ?= macos
 else
 TARGET  ?= linux
 endif
-ifeq ($(filter $(TARGET),linux windows),)
-$(error Unsupported TARGET=$(TARGET); use linux or windows)
+ifeq ($(filter $(TARGET),linux windows macos),)
+$(error Unsupported TARGET=$(TARGET); use linux, windows or macos)
 endif
-B       ?= $(if $(filter windows,$(TARGET)),build/windows,build)
+B       ?= $(if $(filter linux,$(TARGET)),build,build/$(TARGET))
 GEN     ?= game/gen
 GAME    ?= game/extracted/update
 PYTHON  ?= python3
-SDL_DIR ?= $(if $(filter windows,$(TARGET)),$(or $(MINGW_PREFIX),$(CURDIR)/deps/windows),$(CURDIR)/deps)
+SDL_DIR ?= $(if $(filter windows,$(TARGET)),$(or $(MINGW_PREFIX),$(CURDIR)/deps/windows),$(if $(filter macos,$(TARGET)),$(CURDIR)/deps/macos,$(CURDIR)/deps))
 # Default to the local prefix that runtime-deps can prepare. Prefer a suitable
 # system SDL only when there is no complete local installation.
 SDL_CFLAGS := -I$(SDL_DIR)/include
@@ -41,6 +43,18 @@ SHADERC  ?= $(shell pkg-config --libs shaderc 2>/dev/null || echo -lshaderc)
 LDFLAGS  := -fuse-ld=lld -rdynamic -Wl,-rpath,'$$ORIGIN/lib' $(SDL_LIBS) -lvulkan $(SHADERC) -latomic -pthread -lm -ldl
 
 EXE := $(B)/sf2
+ifeq ($(TARGET),macos)
+# Apple Silicon has native 128-bit atomics; -mcx16 is an x86-only switch.
+HOST_ARCH := $(shell uname -m)
+MACOS_MIN ?= 13.0
+MACFLAGS := -mmacosx-version-min=$(MACOS_MIN) $(if $(filter x86_64,$(HOST_ARCH)),-mcx16)
+GENFLAGS := $(filter-out -mcx16,$(GENFLAGS)) $(MACFLAGS)
+RTFLAGS := $(filter-out -mcx16,$(RTFLAGS)) $(MACFLAGS) -Ideps/vma/include $(shell pkg-config --cflags vulkan shaderc)
+CXXFLAGS := $(filter-out -mcx16,$(CXXFLAGS)) $(MACFLAGS) -Ideps/vma/include $(shell pkg-config --cflags vulkan shaderc)
+# Darwin's system linker/libSystem supply atomics, pthread, math and dl APIs.
+LDFLAGS := $(MACFLAGS) -Wl,-headerpad_max_install_names -Wl,-rpath,@executable_path/lib $(SDL_LIBS) \
+           $(shell pkg-config --libs vulkan shaderc) -framework CoreFoundation
+endif
 ifeq ($(TARGET),windows)
 OSFLAGS := -D_FILE_OFFSET_BITS=64 -D_POSIX_THREAD_SAFE_FUNCTIONS -D_CRT_RAND_S \
            -DWIN32_LEAN_AND_MEAN -DNOMINMAX -D_WIN32_WINNT=0x0A00
@@ -53,6 +67,15 @@ LDFLAGS := -fuse-ld=lld -Wl,--stack,16777216 $(SDL_LIBS) -lvulkan-1 $(SHADERC) \
 EXE := $(B)/sf2.exe
 WINDRES ?= windres
 endif
+
+# Native host gate, independent of proprietary files and graphics initialization.
+.PHONY: macos-smoke
+macos-smoke:
+	@test "$(TARGET)" = macos || { echo "Use make TARGET=macos macos-smoke on macOS" >&2; exit 1; }
+	@mkdir -p $(B)
+	$(CC) $(MACFLAGS) -Wall -Iruntime tests/macos_platform.c runtime/platform/macos.c runtime/paths.c \
+	    -o $(B)/macos-platform-test -framework CoreFoundation
+	$(B)/macos-platform-test
 
 # Download pinned SMAA sources only when absent; generated files stay out of Git.
 SMAA_INPUTS := third_party/smaa/smaa_hlsl.inc third_party/smaa/Textures/AreaTex.h third_party/smaa/Textures/SearchTex.h
@@ -103,7 +126,10 @@ $(EXE): $(RT_OBJ) $(GEN_OBJ) Makefile | check-generated
 # Fast compile for the monolithic functions that cause Clang -O1 optimizer stalls:
 SLOW_CHUNKS := $(B)/obj/main/main_047.o $(B)/obj/main/main_183.o $(B)/obj/main/main_662.o \
                $(B)/obj/main/main_704.o $(B)/obj/main/main_735.o $(B)/obj/main/main_746.o \
-               $(B)/obj/main/main_759.o
+               $(B)/obj/main/main_759.o \
+               $(B)/obj/main/main_048.o $(B)/obj/main/main_188.o $(B)/obj/main/main_526.o \
+               $(B)/obj/main/main_673.o $(B)/obj/main/main_715.o $(B)/obj/main/main_770.o \
+               $(B)/obj/sdk/sdk_090.o
 
 $(SLOW_CHUNKS): $(B)/obj/%.o: $(GEN)/%.c runtime/cpu.h runtime/simd.h runtime/simd_fp.h
 	@mkdir -p $(dir $@)
@@ -131,7 +157,7 @@ clean:
 # Prepare native dependencies before any runtime compile, including partial-prefix recovery.
 .PHONY: runtime-deps
 runtime-deps:
-	TARGET="$(TARGET)" SDL_DIR="$(SDL_DIR)" bash tools/setup_runtime.sh --ensure
+	TARGET="$(TARGET)" SDL_DIR="$(SDL_DIR)" PYTHON="$(PYTHON)" bash tools/setup_runtime.sh --ensure
 	$(PYTHON) tools/setup_fonts.py --output "$(B)/lib/fonts"
 
 $(RT_OBJ): | runtime-deps

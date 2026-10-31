@@ -2,6 +2,7 @@
 // loading, object construction and exception behavior remain in the original code.
 #include "hle.h"
 #include "../settings.h"
+#include "../network.h"
 #include "../input_bind.h"
 #include "../nvn/texture_color.h"
 #include "../ui/menu.h"
@@ -675,6 +676,7 @@ RT_ON_RESET(reset_keyboard_hint_state) {
 // experiments require a restart; guest UI objects are never hot-unhooked.
 static void reset_developer_state(void);
 void rt_hooks_configure(void) {
+    LOG("[network] %s\n", g_settings.network_enabled ? "original network paths enabled" : "disabled (offline policy)");
     reset_keyboard_hint_state();
     reset_developer_state();
     rt_hook_features = g_settings.experimental_keyboard_prompts ? RT_HOOK_KEYBOARD_PROMPTS : 0;
@@ -781,7 +783,12 @@ static void enable_desktop_exit(Cpu *c, uint64_t list) {
     }
 }
 
+#include "widescreen_hooks.inc"
+
 int rt_hook(Cpu *c, uint64_t site) {
+    int wide_result = widescreen_hook(c, site);
+    if (wide_result >= 0) return wide_result;
+    if (network_hook(c, site)) return 1;
     switch (site) {
     case 0x7000fc9230ull:  // PvpSettings.UpdateCharactersLock
         return unlock_sparring_characters(c);

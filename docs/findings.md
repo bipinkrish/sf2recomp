@@ -3,6 +3,33 @@
 Persistent store for cross-cycle findings that don't fit one commit message (or that
 arrived as instrument output after the instrument's commit). Newest first.
 
+## 2026-10-31 — optional native 21:9 screen mode
+
+- `[video] aspect_ratio = 21:9` opts into a 2520x1080 native Unity screen;
+  `original` / `16:9` keeps the default. Restart is required. Screen modes,
+  graphics-device color/depth descriptors, NVN storage sizing and buffer creation
+  agree before cameras/canvases initialize. Original instruction words are checked
+  by generation. The game's UI border policy accepts 21:9 without pillarboxing.
+- Presentation scales uniformly and fits exactly 7:3 (3440x1440 gives a 3360x1440
+  image with 40-pixel side bars). Wide-mode scaling identifies the native screen
+  buffers specifically, avoiding 16:9 artwork being mistaken for a render target
+  and copied into a smaller Vulkan image. Movies fit their own source dimensions
+  over black; the 720x400 intro occupies 1944x1080 in a 2520x1080 window.
+- NVIDIA RTX 4070 Laptop GPU, strict Vulkan validation: the final wide and original
+  runs each reached frame 3400 and exited normally after captures. Both entered
+  Sparring and exercised movement and attacks. The wide run showed Wraith versus
+  Agony on the garden/bridge stage; the original run showed Wraith versus May on
+  the stone-pillars stage. These are separate randomized rounds, not a matched
+  performance or image-quality comparison. A separate wide movie run passed.
+- Captures confirm visible HUD and additional scene width, but the garden stage
+  exposes finite sky-layer edges near the top corners. Some menus/background art
+  retain their original width. This is an experimental option; all-stage and
+  full-campaign visual coverage remains unverified.
+- Local evidence: `build/validation/widescreen-21-9/{wide-final,original-final,movie-final}`
+  contains configurations, scripted input, logs, exit results and captures.
+  Regression coverage checks disabled CPU/memory preservation, native interface
+  sizes, invalid settings, scaling limits, window fitting and movie proportions.
+
 ## 2026-10-30 — official identity, measured performance and persistent saves
 
 - Corrected display-version assumption: base NACP is 1.0.0, update NACP is 1.1.0.

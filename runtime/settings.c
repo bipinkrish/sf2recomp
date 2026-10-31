@@ -37,6 +37,7 @@ Settings g_settings = {
     .bg_input = true,
     .prompts = PROMPTS_AUTO,
     .experimental_keyboard_prompts = false,
+    .network_enabled = false,
     .unlock_all_sparring_characters = true,
     .show_intro = true,
     .ai_enabled = true,
@@ -146,11 +147,12 @@ int settings_language_index(const char *code) {
 // the INI parser. Unknown sections/keys are reserved for future versions.
 typedef enum {
     CONFIG_LANGUAGE, CONFIG_BOOL, CONFIG_VOLUME, CONFIG_PATH,
-    CONFIG_FRAME_RATE, CONFIG_RESOLUTION, CONFIG_UPSCALER, CONFIG_ANTIALIAS, CONFIG_PROMPTS
+    CONFIG_FRAME_RATE, CONFIG_RESOLUTION, CONFIG_UPSCALER, CONFIG_ANTIALIAS, CONFIG_PROMPTS, CONFIG_ASPECT
 } ConfigType;
 typedef struct { const char *section, *key; ConfigType type; void *value; size_t capacity; } ConfigOption;
 static const ConfigOption config_options[] = {
     {"general", "language", CONFIG_LANGUAGE, &g_settings.language},
+    {"network", "enabled", CONFIG_BOOL, &g_settings.network_enabled},
     {"gameplay", "unlock_all_sparring_characters", CONFIG_BOOL, &g_settings.unlock_all_sparring_characters},
     {"gameplay", "unlock_all_videos", CONFIG_BOOL, &g_settings.unlock_all_videos},
     {"gameplay", "show_intro", CONFIG_BOOL, &g_settings.show_intro},
@@ -168,6 +170,7 @@ static const ConfigOption config_options[] = {
     {"audio", "volume", CONFIG_VOLUME, &g_settings.volume},
     {"audio", "reverb", CONFIG_BOOL, &g_settings.reverb},
     {"video", "fullscreen", CONFIG_BOOL, &g_settings.fullscreen},
+    {"video", "aspect_ratio", CONFIG_ASPECT, &g_settings.aspect},
     {"video", "target_fps", CONFIG_FRAME_RATE, &g_settings.target_fps},
     {"video", "internal_resolution", CONFIG_RESOLUTION, &g_settings.res_mode},
     {"video", "upscaler", CONFIG_UPSCALER, &g_settings.upscaler},
@@ -195,7 +198,11 @@ static void config_remove_comment(char *s) {
 }
 
 static bool config_assign(const ConfigOption *option, const char *value) {
-    if (option->type == CONFIG_LANGUAGE) {
+    if (option->type == CONFIG_ASPECT) {
+        if (!strcasecmp(value, "original") || !strcmp(value, "16:9")) *(int *)option->value = ASPECT_ORIGINAL;
+        else if (!strcmp(value, "21:9")) *(int *)option->value = ASPECT_21_9;
+        else return false;
+    } else if (option->type == CONFIG_LANGUAGE) {
         if (!strcasecmp(value, "auto")) { *(int *)option->value = LANG_AUTO; return true; }
         int language = settings_language_index(value);
         if (language < 0) return false;

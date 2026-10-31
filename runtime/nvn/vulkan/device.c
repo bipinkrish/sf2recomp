@@ -147,6 +147,10 @@ static void create_instance(void) {
     for (Uint32 i = 0; i < n_sdl && n_ext < 14; i++) ext[n_ext++] = sdl_ext[i];
     bool strict = getenv("LARECOMP_VK_VALIDATION_STOP") != NULL;
     bool validate = strict || getenv("LARECOMP_VK_VALIDATION") != NULL;
+#ifdef __APPLE__
+    // The Vulkan loader hides MoltenVK devices unless portability is requested.
+    ext[n_ext++] = VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME;
+#endif
     if (validate) ext[n_ext++] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
     const char *layers[] = {"VK_LAYER_KHRONOS_validation"};
     VkApplicationInfo app = {.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO, .pApplicationName = SF2_APP_NAME,
@@ -155,6 +159,9 @@ static void create_instance(void) {
     VkInstanceCreateInfo ci = {.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, .pApplicationInfo = &app,
                                .enabledExtensionCount = n_ext, .ppEnabledExtensionNames = ext,
                                .enabledLayerCount = validate ? 1 : 0, .ppEnabledLayerNames = layers};
+#ifdef __APPLE__
+    ci.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+#endif
     VkResult r = vkCreateInstance(&ci, NULL, &g_vk.inst);
     if (r != VK_SUCCESS && validate) {
         if (strict) {
@@ -319,9 +326,12 @@ static void create_device(void) {
     vkEnumerateDeviceExtensionProperties(g_vk.phys, NULL, &ne, NULL);
     VkExtensionProperties *ep = calloc(ne, sizeof *ep);
     vkEnumerateDeviceExtensionProperties(g_vk.phys, NULL, &ne, ep);
-    const char *ext[16];
+    const char *ext[20];
     uint32_t n_ext = 0;
     ext[n_ext++] = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+    // Mandatory whenever advertised (MoltenVK). Use the string because this
+    // extension's header declarations are guarded by VK_ENABLE_BETA_EXTENSIONS.
+    if (has_ext(ep, ne, "VK_KHR_portability_subset")) ext[n_ext++] = "VK_KHR_portability_subset";
     g_vk.custom_border = has_ext(ep, ne, VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME);
     if (g_vk.custom_border) ext[n_ext++] = VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME;
     g_vk.divisor = has_ext(ep, ne, VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME);
@@ -1062,12 +1072,14 @@ void backend_present_now(NvnTexture *t, uint64_t frame, bool advance) {
         float crop[4] = {0, 0, 1, 1};
         float pv[8] = {renderer_origin_lower_left() ? 1.0f : 0.0f, 0, 0, 0, 0, 0, 1, 1};
         memcpy(g_shot_crop, crop, sizeof crop);
-        vk_present_draw(cb, b, (float)vx, (float)vy, (float)vw, (float)vh, pv);
+        if (!movie_b) vk_present_draw(cb, b, (float)vx, (float)vy, (float)vw, (float)vh, pv);
         if (movie_b) {
-            // Raw NV12 is top-down, so this overlay uses the present shader's unflipped UVs. Keep the entire video
-            // visible over the game image; menu UI is still drawn above it below.
+            // Raw NV12 is top-down. Fit the entire video over black, preserving
+            // its own aspect ratio independently of the game/window dimensions.
             const float movie_pv[8] = {0, 0, 0, 0, 0, 0, 1, 1};
-            vk_present_draw(cb, movie_b, 0, 0, (float)g_vk.sc_extent.width, (float)g_vk.sc_extent.height, movie_pv);
+            OutputRect movie_rect;
+            output_fit(dw, dh, movie_b->width, movie_b->height, &movie_rect);
+            vk_present_draw(cb, movie_b, movie_rect.x, movie_rect.y, movie_rect.w, movie_rect.h, movie_pv);
         }
         pp_mark(PP_BLIT);
         static long menu_at = -1;

@@ -4,6 +4,7 @@
 
 #include "hle.h"
 #include "ipc.h"
+#include "network.h"
 
 #ifdef __APPLE__
 extern const ServiceDef __start_services[] __asm__("section$start$__DATA$__services");
@@ -23,6 +24,10 @@ static void stub_handler(Service *s, IpcReq *req, IpcResp *resp) {
     resp_size(resp, 0x40);  // zeroed outputs
 }
 
+static void offline_handler(Service *s, IpcReq *req, IpcResp *resp) {
+    network_deny_ipc(s->name, req, resp);
+}
+
 Service *service_new(const char *name, ServiceHandler h, void *state) {
     Service *s = calloc(1, sizeof *s);
     s->name = strdup(name);
@@ -32,6 +37,7 @@ Service *service_new(const char *name, ServiceHandler h, void *state) {
 }
 
 Service *service_lookup(const char *name) {
+    if (network_service_blocked(name)) return service_new(name, offline_handler, NULL);
     const ServiceDef *start = __start_services, *stop = __stop_services;
     __asm__("" : "+r"(start), "+r"(stop));  // separate objects: keep the compiler from reasoning about them
     for (const ServiceDef *d = start; d < stop; d++)
@@ -173,7 +179,10 @@ int ipc_handle_request(Cpu *c, uint32_t handle) {
             target = req.domain_obj < 256 ? sess->domain->objs[req.domain_obj] : NULL;
             if (!target) { LOG("[ipc] domain object %u missing\n", req.domain_obj); return 0xE401; }
         }
-        target->handler(target, &req, &resp);
+        // Check the root session too: domain objects may use interface names
+        // rather than the original network service's name.
+        if (network_service_blocked(sess->svc->name)) network_deny_ipc(sess->svc->name, &req, &resp);
+        else target->handler(target, &req, &resp);
     } else if (req.type == 5 || req.type == 7) {  // control
         req.cmd = *(uint32_t *)(payload + 8);
         LOG("[ipc] control %u on %s (handle %x)\n", req.cmd, sess->svc->name, handle);

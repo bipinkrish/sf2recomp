@@ -7,6 +7,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+from host_tools import host_target, require_host
 
 ROOT = Path(__file__).resolve().parent.parent
 VERSION = "9.0.1"
@@ -26,7 +27,7 @@ CONFIGURE = [
 
 
 def paths(target="linux"):
-    default = ROOT / ("deps/ffmpeg-windows" if target == "windows" else "deps/ffmpeg")
+    default = ROOT / ("deps/ffmpeg" if target == "linux" else f"deps/ffmpeg-{target}")
     prefix = Path(os.environ.get("FFMPEG_DIR", default)).resolve()
     work = Path(os.environ.get("SF2_DEPS_WORK", ROOT / "build/dependencies")).resolve()
     return prefix, work
@@ -36,7 +37,7 @@ def installed(prefix, target="linux"):
     marker = prefix / "share/ffmpeg/BUILD.txt"
     return (
         (prefix / ("bin/ffmpeg.exe" if target == "windows" else "bin/ffmpeg")).is_file()
-        and any(p.is_file() for p in prefix.glob("bin/avcodec-*.dll" if target == "windows" else "lib/libavcodec.so.*"))
+        and any(p.is_file() for p in prefix.glob("bin/avcodec-*.dll" if target == "windows" else ("lib/libavcodec.*.dylib" if target == "macos" else "lib/libavcodec.so.*")))
         and marker.is_file()
         and f"FFmpeg {VERSION}" in marker.read_text()
         and (prefix / "share/ffmpeg" / ARCHIVE_NAME).is_file()
@@ -81,11 +82,16 @@ def build(prefix, work, force=False, target="linux"):
         shutil.rmtree(source)
     source.mkdir(parents=True)
     subprocess.run([
-        "tar", "--force-local", "-xJf", archive.as_posix(), "--strip-components=1", "-C", source.as_posix(),
+        "tar", *(["--force-local"] if target == "windows" else []), "-xJf", archive.as_posix(), "--strip-components=1", "-C", source.as_posix(),
     ], check=True)
 
     config = ["--cc=clang", f"--prefix={prefix.as_posix()}", f"--bindir={(prefix / 'bin').as_posix()}",
               f"--libdir={(prefix / 'lib').as_posix()}", *CONFIGURE]
+    if target == "macos":
+        minimum = os.environ.get("MACOS_MIN", "13.0")
+        config += ["--target-os=darwin", "--install-name-dir=@rpath",
+                   f"--extra-cflags=-mmacosx-version-min={minimum}",
+                   f"--extra-ldflags=-mmacosx-version-min={minimum} -Wl,-headerpad_max_install_names"]
     if target == "windows":
         config.remove("--enable-pthreads")
         config += ["--target-os=mingw32", "--arch=x86_64", "--enable-w32threads"]
@@ -121,7 +127,7 @@ def build(prefix, work, force=False, target="linux"):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--target", choices=("linux", "windows"), default="windows" if os.name == "nt" else "linux")
+    parser.add_argument("--target", choices=("linux", "windows", "macos"), default=host_target())
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--check", action="store_true", help="check for the built decoder without downloading")
     mode.add_argument("--build", action="store_true", help="build FFmpeg from the pinned upstream source")
@@ -135,6 +141,7 @@ def main(argv=None):
         return 0
     prefix, work = paths(args.target)
     try:
+        require_host(args.target)
         if args.target == "windows" and (os.name != "nt" or os.environ.get("MSYSTEM") != "UCRT64"):
             raise ValueError("Build Windows FFmpeg in the MSYS2 UCRT64 shell on Windows x64.")
         if args.check:

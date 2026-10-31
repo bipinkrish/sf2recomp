@@ -1,10 +1,10 @@
-// Host OS layer: Linux and Windows x86-64.
+// Host OS layer: Linux/Windows x86-64 and macOS arm64/x86-64.
 #pragma once
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
 #include <pthread.h>  // (platform.h's cross-thread backtrace takes pthread_t)
 #endif
 

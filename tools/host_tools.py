@@ -1,20 +1,21 @@
-"""Native input-tool paths and subprocess helpers shared by Linux and Windows."""
+"""Native input-tool paths and subprocess helpers shared by all supported hosts."""
 import hashlib
 import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def host_target():
-    return "windows" if os.name == "nt" else "linux"
+    return "windows" if os.name == "nt" else "macos" if sys.platform == "darwin" else "linux"
 
 
 def require_host(target):
-    if target not in {"linux", "windows"} or target != host_target():
+    if target not in {"linux", "windows", "macos"} or target != host_target():
         raise ValueError(f"Run {target} input-tool builds on a native {target} host.")
     if target == "windows" and os.environ.get("MSYSTEM") != "UCRT64":
         raise ValueError("Use native Windows Python from an MSYS2 UCRT64 shell; see docs/windows.md.")
@@ -22,7 +23,7 @@ def require_host(target):
 
 def tool_directory(target=None):
     target = target or host_target()
-    return ROOT / "tools/bin" / "windows" if target == "windows" else ROOT / "tools/bin"
+    return ROOT / "tools/bin" / target if target != "linux" else ROOT / "tools/bin"
 
 
 def tool_path(name, target=None):
@@ -33,7 +34,14 @@ def tool_path(name, target=None):
 def native_executable(path, target=None):
     try:
         with Path(path).open("rb") as stream:
-            return stream.read(4).startswith(b"MZ" if (target or host_target()) == "windows" else b"\x7fELF")
+            magic = stream.read(4)
+            target = target or host_target()
+            if target == "macos":
+                # 64-bit Mach-O (either byte order), fat and fat64 containers.
+                return magic in {b"\xcf\xfa\xed\xfe", b"\xfe\xed\xfa\xcf",
+                                 b"\xca\xfe\xba\xbe", b"\xbe\xba\xfe\xca",
+                                 b"\xca\xfe\xba\xbf", b"\xbf\xba\xfe\xca"}
+            return magic.startswith(b"MZ" if target == "windows" else b"\x7fELF")
     except OSError:
         return False
 

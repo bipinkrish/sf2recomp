@@ -13,7 +13,7 @@ The Switch version was chosen because it includes **Sparring mode**, which offer
 > if you use the optional NSP extraction workflow below. Recompilation and running
 > the converted game do not require keys.
 
-[Status](#status) · [Requirements](#requirements) ·
+[Status](#status) · [Features](#features) · [Requirements](#requirements) ·
 [Getting started](#getting-started) · [NSP extraction](#optional-extract-from-an-nsp) ·
 [Settings and controls](#settings-and-controls) · [Development](#development)
 
@@ -27,7 +27,7 @@ also passed; full combat stability and campaign completion remain unverified.
 | --- | --- |
 | Linux x86-64 | Current development target; tested with AMD Radeon 680M, NVIDIA RTX 4070 Laptop GPU and Mesa lavapipe software Vulkan |
 | Windows x86-64 | Experimental host/build/package support implemented; no verified native build. See the [Windows guide](docs/windows.md). |
-| macOS | Requires porting work; no verified native build |
+| macOS arm64 / x86-64 | Experimental host/build/conversion support implemented; native build and GPU validation pending. See the [macOS guide](docs/macos.md). |
 
 The CPU game code runs natively, with a Vulkan renderer and SDL for windowing,
 input and audio. Keyboard/controller remapping, resolution scaling, FSR 1, SMAA
@@ -35,10 +35,46 @@ and persistent saves are available. Compatibility with other GPUs remains
 unverified. See the [validation notes](docs/development.md#validation-notes) and
 [working findings](docs/findings.md) for test results and historical measurements.
 
+## Features
+
+The recompilation adds desktop features and graphics options beyond the Switch
+release, and exposes some of the game's original developer tools. Settings below
+live in **`sf2recomp.ini` beside the converted executable** and take effect after
+restarting; no rebuild is needed.
+
+| Feature | What it provides |
+| --- | --- |
+| **Ultrawide 21:9 (experimental)** | `[video] aspect_ratio = 21:9` widens the camera and layout with a native 2520×1080 base before scaling. Disabled by default; some artwork retains its original width and some stages expose background edges. Movies keep their original proportions. |
+| **Native display resolution** | `[video] internal_resolution = auto` or `match` renders at the window's fitted drawable pixel size, following window resizing and fullscreen. Higher resolutions improve geometry edges; bitmap artwork and font atlases retain their original detail. |
+| **Resolution scaling** | Fixed internal-resolution presets of `0.25x`, `0.50x`, `0.75x`, `1x`, `2x`, `3x` and `4x` let you trade rendering detail for performance, within the GPU's texture-size limit. |
+| **Dynamic resolution** | `[video] internal_resolution = dynamic` adjusts render scale in response to GPU load to work toward the configured frame-rate target. |
+| **AMD FSR 1 upscaling** | `[video] upscaler = fsr1` enables spatial upscaling and sharpening when the rendered image is smaller than its window area. Use a lower internal resolution to activate it; `auto` selects bilinear on integrated GPUs and FSR 1 on discrete GPUs. |
+| **SMAA anti-aliasing** | `[video] antialiasing = smaa` enables optional post-process edge smoothing. Disabled by default. |
+| **Configurable frame rate** | `[video] target_fps` accepts **30–360**, including targets above 60 FPS, and sets the game's target frame rate and presentation pacing. Achievable performance depends on hardware; set the host display refresh rate separately. |
+| **Desktop window modes** | A resizable window or fullscreen, selected with `[video] fullscreen`. |
+| **Remappable keyboard and controllers** | `[controls.keyboard]` and `[controls.gamepad]` map desktop inputs to Switch actions, including unbinding actions and sharing inputs. |
+| **Keyboard prompts (experimental)** | `[experimental] keyboard_prompts = true` replaces supported in-game button hints with your mapped keys. Automatic selection follows controller presence. Disabled by default; some screens may need layout adjustments. |
+| **Desktop Exit button** | The main menu's localized **Exit** option closes the game and returns to the desktop, including in fullscreen. |
+| **Game network blocking** | `[network] enabled = false` is the default and blocks game connections, DNS, uploads, online multiplayer, external web links and the remote developer listener. Offline Sparring remains available. Enabling networking does not implement missing online services. |
+| **Unlocked Sparring roster** | `[gameplay] unlock_all_sparring_characters = true` makes every Sparring character available without campaign progression. Enabled by default; does not change saved Story unlocks. |
+| **Unlocked Extras movies** | `[gameplay] unlock_all_videos = true` enables gallery movie playback without changing watched-video save flags. Enabled in the supplied INI. |
+| **Intro and gameplay toggles** | Skip the intro with either mapped A or B, or disable it with `[gameplay] show_intro = false`. `ai_enabled` and `show_time_results` expose the original AI and timing-display controls. |
+| **Desktop developer console** | Opt in with `[developer] console = true`; **F1** or **backtick** opens the original console with desktop text input, command history and scrolling. |
+| **Fight trainer and shop cheats** | Optional `[developer] trainer` and `shop_cheats` expose the original fight controls and local shop actions through the console. Disabled by default; currency, items, levels and fight results can be saved by the game. |
+| **Debug overlays** | Opt in with `[developer] overlays = true`, then use **F2** to toggle the original FPS, memory, build and model/animation displays in supported scenes. |
+| **Configurable save location and imports** | `[storage] save_directory` selects a portable or custom save folder. Existing `userdata/` backups can be imported under its `save_0/` directory. |
+| **Desktop configuration** | The INI also provides language selection (including system-locale detection), master volume and reverb controls. Alternate configuration and writable data locations can be selected at launch. |
+
+See the [settings and controls guide](docs/runtime-guide.md) for setup, commands
+and limitations, and the [supplied INI](sf2recomp.ini) for shipped defaults.
+Full-game stability and timing at every supported frame-rate setting remain
+unverified; see [Status](#status).
+
 ## Requirements
 
 For the complete experimental Windows workflow, including local extraction and
 symbol analysis, follow the [Windows guide](docs/windows.md).
+For Apple Silicon and Intel Macs, follow the [macOS guide](docs/macos.md).
 
 To build and convert on **Linux x86-64**, install:
 
@@ -154,6 +190,10 @@ For extraction tools, supported layouts and offline setup, see the
 
 Edit **`sf2recomp.ini` beside the converted executable**, then restart the game.
 Settings are read at launch; changing them does not require rebuilding.
+
+Game networking is disabled by default with `[network] enabled = false`, including
+DNS, uploads, multiplayer and external web links. Existing INIs without this
+section also default to offline. See the [offline networking settings](docs/runtime-guide.md#offline-networking).
 
 | Input | Default keyboard binding |
 | --- | --- |

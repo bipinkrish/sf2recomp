@@ -1,5 +1,5 @@
 // Output resolution, shared by the Metal and Vulkan backends (each calls output_scale() once per presented frame).
-// Render targets the game sizes for the Switch's 1920x1080 screen are allocated at (sx, sy) times their size; the
+// Screen targets (1920x1080 original, 2520x1080 in native 21:9 mode) are allocated at (sx, sy) times their size; the
 // image is then drawn into (vx, vy, vw, vh) of the window. Video tab "Internal resolution" (g_settings.res_mode):
 //   Match display  render at the window's own pixel size (default)
 //   1x .. 4x       N times the Switch's docked image: 1080 lines x N (wide windows keep their shape: 32:9 at 2x =
@@ -424,12 +424,19 @@ void output_scale_log(unsigned long long frame, double dw, double dh, const OutS
     psx = o->sx, psy = o->sy, pdw = dw, pdh = dh;
 }
 
+void output_fit(double dw, double dh, double sw, double sh, OutputRect *rect) {
+    double fit = fmin(dw / sw, dh / sh);
+    rect->w = sw * fit; rect->h = sh * fit;
+    rect->x = (dw - rect->w) / 2; rect->y = (dh - rect->h) / 2;
+}
+
 void output_scale(double dw, double dh, bool reshape_allowed, double now, double game_ms, double win_ms, OutScale *o) {
-    double fit = fmin(dw / 1920.0, dh / 1080.0);
+    double base_width = g_settings.aspect == ASPECT_21_9 ? 2520.0 : 1920.0;
+    double fit = fmin(dw / base_width, dh / 1080.0);
     static double forced = -1, wide_test = -1;
     if (forced < 0) forced = getenv("LARECOMP_SCALE") ? atof(getenv("LARECOMP_SCALE")) : 0;
     if (wide_test < 0) wide_test = getenv("LARECOMP_WIDE_TEST") ? atof(getenv("LARECOMP_WIDE_TEST")) : 0;
-    double shape = wide_test > 0 ? wide_test : (dw / dh) / (16.0 / 9.0);
+    double shape = wide_test > 0 ? wide_test : (dw / dh) / (base_width / 1080.0);
     bool reshape = reshape_allowed && fabs(shape - 1.0) > 0.005;
     if (!reshape) shape = 1.0;
     // render height in units of the Switch's 1080 lines
@@ -451,16 +458,16 @@ void output_scale(double dw, double dh, bool reshape_allowed, double now, double
     }
     h = fmax(h, 0.1);  // (.25x of a small window)
     double ax = h * shape, ay = h;
-    double cap = fmin(MAX_TEX / (1920.0 * ax), MAX_TEX / (1080.0 * ay));
+    double cap = fmin(MAX_TEX / (base_width * ax), MAX_TEX / (1080.0 * ay));
     if (cap < 1.0) { ax *= cap; ay *= cap; }
     o->ax = ax; o->ay = ay;
     o->sx = ax * dyn; o->sy = ay * dyn; o->shape = shape;
-    // where the image goes in the window: fills it when reshaped, else a fitted 16:9 box
+    // Native SF2 wide mode uses uniform scaling; fit its chosen aspect to the window.
     if (reshape) { o->vw = dw; o->vh = dh; }
-    else { o->vw = 1920.0 * fit; o->vh = 1080.0 * fit; }
+    else { o->vw = base_width * fit; o->vh = 1080.0 * fit; }
     if (wide_test > 0) {
-        double f2 = fmin(dw / (1920.0 * wide_test), dh / 1080.0);
-        o->vw = 1920.0 * wide_test * f2; o->vh = 1080.0 * f2;
+        double f2 = fmin(dw / (base_width * wide_test), dh / 1080.0);
+        o->vw = base_width * wide_test * f2; o->vh = 1080.0 * f2;
     }
     o->vx = (dw - o->vw) / 2; o->vy = (dh - o->vh) / 2;
 }

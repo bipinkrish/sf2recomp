@@ -6,11 +6,12 @@ Downloaded and built tools stay in ignored directories.
 
 ## Requirements
 
-Input preparation has native Linux x86_64 and experimental Windows UCRT64 entry
+Input preparation has native Linux x86_64, experimental macOS arm64/x86_64 and Windows UCRT64 entry
 points, using Python 3.12+, a .NET 8+ SDK, Clang/Clang++, CMake and Ninja.
 See the [complete Windows setup](../docs/windows.md) for native CPython and MSYS2
 dependencies; Windows no longer requires Linux-prepared inputs. Native game compilation additionally needs the
 Clang/LLD, SDL3, Vulkan and shaderc dependencies described in the root README.
+The [macOS guide](../docs/macos.md) covers GNU Make, MoltenVK and Darwin libraries.
 
 ```sh
 python3 -m venv .venv
@@ -37,7 +38,8 @@ vendored source/license files byte for byte; no local source patches are require
 Sources under `tools/third_party/` and executables under `tools/bin/` are ignored.
 The CMake driver compiles in `build/tools/extraction/<host>`; Windows executables
 are installed in `tools/bin/windows` with `.exe` suffixes, separate from Linux
-tools and objects. The legacy `.sh` entry points delegate to the Python drivers.
+tools and objects. macOS Mach-O tools use `tools/bin/macos`. The legacy `.sh` entry
+points delegate to the Python drivers.
 Git submodule initialization is not needed. Original upstream notices remain in
 the downloaded source trees; tracked license copies live centrally in `licenses/`.
 

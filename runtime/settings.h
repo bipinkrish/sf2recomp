@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-enum { ASPECT_UNLOCKED = 0, ASPECT_ORIGINAL = 1 };
+enum { ASPECT_UNLOCKED = 0, ASPECT_ORIGINAL = 1, ASPECT_21_9 = 2 };
 enum { RES_MATCH = 0, RES_DYNAMIC = 9, RES_Q75 = 10, RES_Q25 = 11, RES_Q50 = 12 };
 enum { UPSCALE_BILINEAR = 0, UPSCALE_METALFX = 1, UPSCALE_FSR1 = 2 };
 #define UPSCALE_SHARP UPSCALE_FSR1
@@ -44,6 +44,7 @@ typedef struct Settings {
     bool bg_input;
     int prompts;
     bool experimental_keyboard_prompts;
+    bool network_enabled;
     bool unlock_all_sparring_characters;
     bool unlock_all_videos;
     bool show_intro;

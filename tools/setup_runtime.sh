@@ -5,6 +5,11 @@ root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 if [[ ${TARGET:-} == windows || ${OS:-} == Windows_NT ]]; then
     exec bash "$root/tools/setup_windows.sh" "$@"
 fi
+python=${PYTHON:-python3}
+macos=false
+if [[ $(uname -s) == Darwin ]]; then macos=true; fi
+prefix=${SDL_DIR:-"$root/deps"}
+if $macos; then prefix=${SDL_DIR:-"$root/deps/macos"}; fi
 mode=${1:---check}
 if (( $# > 1 )) || [[ $mode != --check && $mode != --ensure && $mode != --build-sdl && $mode != --fetch-smaa && $mode != --help ]]; then
     echo "Usage: $0 [--check|--ensure|--build-sdl|--fetch-smaa|--help]" >&2
@@ -16,49 +21,64 @@ if [[ $mode == --help ]]; then
 --check      Compile/link native dependency probe; no downloads (default).
 --build-sdl  Prepare SMAA, build/install verified SDL 3.4.16 locally, then check.
 --fetch-smaa Download verified SMAA sources and generate its shader include only.
-SDL_DIR      Installation prefix (default: repo/deps). No sudo is used.
+SDL_DIR      Installation prefix (repo/deps, or repo/deps/macos on Mac). No sudo is used.
+PYTHON       Python 3.12+ executable (default: python3).
 JOBS         Parallel SDL compilation jobs (default: 4).
 SDL_SOURCE_ARCHIVE  Optional local SDL3-3.4.16.tar.gz; same SHA256 required.
 SF2_DEPS_WORK      Source/build cache (default: repo/build/dependencies).
 SMAA_SOURCE_DIR    Optional offline SMAA source folder; same checksums required.
 SF2_FONT_SOURCE_DIR Optional offline Noto font folder; same checksums required.
-See tools/runtime-dependencies.md for system packages and licenses.
+See tools/runtime-dependencies.md or docs/macos.md for system packages and licenses.
 HELP
     exit
 fi
 if [[ $mode == --ensure ]]; then
-    python3 "$root/tools/setup_fonts.py"
-    prefix=${SDL_DIR:-"$root/deps"}
-    if [[ -f $prefix/include/SDL3/SDL.h && ( -f $prefix/lib/libSDL3.so || -f $prefix/lib/libSDL3.a ) ]] ||
+    "$python" "$root/tools/setup_fonts.py"
+    if [[ -f $prefix/include/SDL3/SDL.h && ( -f $prefix/lib/libSDL3.so || -f $prefix/lib/libSDL3.dylib || -f $prefix/lib/libSDL3.a ) ]] ||
        pkg-config --atleast-version=3.4.0 sdl3 2>/dev/null; then
-        python3 "$root/tools/setup_smaa.py"
+        "$python" "$root/tools/setup_smaa.py"
         mode=--check
     else
         mode=--build-sdl
     fi
 fi
 if [[ $mode == --fetch-smaa ]]; then
-    exec python3 "$root/tools/setup_smaa.py"
+    exec "$python" "$root/tools/setup_smaa.py"
 fi
 if [[ $mode == --build-sdl ]]; then
-    python3 "$root/tools/setup_fonts.py"
-    python3 "$root/tools/setup_smaa.py"
+    "$python" "$root/tools/setup_fonts.py"
+    "$python" "$root/tools/setup_smaa.py"
 else
-    python3 "$root/tools/setup_fonts.py" --check
-    python3 "$root/tools/setup_smaa.py" --check
+    "$python" "$root/tools/setup_fonts.py" --check
+    "$python" "$root/tools/setup_smaa.py" --check
 fi
-[[ $(uname -s) == Linux && $(uname -m) == x86_64 ]] || {
-    echo "The current runtime build targets Linux x86_64." >&2; exit 1;
-}
-for command in clang clang++ ld.lld make pkg-config; do
+native_flags=()
+link_flags=()
+cmake_flags=()
+if $macos; then
+    [[ $(uname -m) == arm64 || $(uname -m) == x86_64 ]] || { echo "Unsupported Mac architecture" >&2; exit 1; }
+    export MACOSX_DEPLOYMENT_TARGET=${MACOS_MIN:-13.0}
+    native_flags=(-mmacosx-version-min="$MACOSX_DEPLOYMENT_TARGET" "-I$root/deps/vma/include")
+    # Keep this nonempty: Bash 3.2 treats an empty array as unset under nounset.
+    link_flags=(-Wl,-headerpad_max_install_names)
+    if [[ $(uname -m) == x86_64 ]]; then native_flags+=(-mcx16); fi
+    cmake_flags=(-DCMAKE_OSX_DEPLOYMENT_TARGET="$MACOSX_DEPLOYMENT_TARGET" -DCMAKE_SHARED_LINKER_FLAGS=-Wl,-headerpad_max_install_names)
+else
+    [[ $(uname -s) == Linux && $(uname -m) == x86_64 ]] || {
+        echo "Build on Linux x86_64 or macOS arm64/x86_64." >&2; exit 1;
+    }
+    command -v ld.lld >/dev/null || { echo "Missing tool: ld.lld" >&2; exit 1; }
+    native_flags=(-mcx16)
+    link_flags=(-fuse-ld=lld -latomic -pthread -lm -ldl)
+fi
+for command in clang clang++ make pkg-config; do
     command -v "$command" >/dev/null || { echo "Missing tool: $command" >&2; exit 1; }
 done
 pkg-config --atleast-version=1.3 vulkan || { echo "Install Vulkan 1.3+ development files." >&2; exit 1; }
 pkg-config --exists shaderc || { echo "Install shaderc development files (pkg-config shaderc)." >&2; exit 1; }
-prefix=${SDL_DIR:-"$root/deps"}
-prefix=$(realpath -m -- "$prefix")
+prefix=$("$python" -c 'import pathlib,sys; print(pathlib.Path(sys.argv[1]).resolve())' "$prefix")
 if [[ $mode == --build-sdl ]]; then
-    for command in cmake curl sha256sum tar; do
+    for command in cmake curl tar; do
         command -v "$command" >/dev/null || { echo "Missing SDL build tool: $command" >&2; exit 1; }
     done
     jobs=${JOBS:-4}
@@ -68,26 +88,26 @@ if [[ $mode == --build-sdl ]]; then
     url="https://github.com/libsdl-org/SDL/releases/download/release-$version/SDL3-$version.tar.gz"
     work=${SF2_DEPS_WORK:-"$root/build/dependencies"}
     mkdir -p -- "$work"
-    work=$(realpath -- "$work")
+    work=$(cd -- "$work" && pwd)
     archive=${SDL_SOURCE_ARCHIVE:-"$work/SDL3-$version.tar.gz"}
     if [[ ! -f $archive ]]; then
         [[ ! ${SDL_SOURCE_ARCHIVE:-} ]] || { echo "Archive not found: $archive" >&2; exit 1; }
         curl --fail --location --proto '=https' --tlsv1.2 --connect-timeout 20 --max-time 180 --retry 2 "$url" -o "$archive.part"
         mv -- "$archive.part" "$archive"
     fi
-    actual=$(sha256sum -- "$archive")
+    actual=$("$python" -c 'import hashlib,sys; print(hashlib.file_digest(open(sys.argv[1], "rb"), "sha256").hexdigest())' "$archive")
     [[ ${actual%% *} == "$sha256" ]] || { echo "SDL archive checksum mismatch: $archive" >&2; exit 1; }
     source_dir="$work/SDL3-$version"
     if [[ ! -f $source_dir/CMakeLists.txt ]]; then
         mkdir -p -- "$source_dir"
         tar -xzf "$archive" --strip-components=1 -C "$source_dir"
     fi
-    cmake -S "$source_dir" -B "$work/sdl-$version-build" \
+    cmake -S "$source_dir" -B "$work/sdl-$version-$(uname -s)-$(uname -m)-build" \
         -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$prefix" \
-        -DCMAKE_INSTALL_LIBDIR=lib -DSDL_SHARED=ON -DSDL_STATIC=OFF \
+        -DCMAKE_INSTALL_LIBDIR=lib -DSDL_SHARED=ON -DSDL_STATIC=OFF "${cmake_flags[@]}" \
         -DSDL_TEST_LIBRARY=OFF -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF
-    cmake --build "$work/sdl-$version-build" --parallel "$jobs"
-    cmake --install "$work/sdl-$version-build"
+    cmake --build "$work/sdl-$version-$(uname -s)-$(uname -m)-build" --parallel "$jobs"
+    cmake --install "$work/sdl-$version-$(uname -s)-$(uname -m)-build"
     mkdir -p -- "$prefix/share/licenses/SDL3"
     cp -- "$source_dir/LICENSE.txt" "$prefix/share/licenses/SDL3/LICENSE.txt"
     printf 'SDL %s\nURL %s\nSHA256 %s\n' "$version" "$url" "$sha256" > "$prefix/share/licenses/SDL3/SOURCE.txt"
@@ -95,7 +115,7 @@ fi
 
 # Prefer a complete local SDL prefix; otherwise accept the system package.
 sdl_flags=()
-if [[ -f $prefix/include/SDL3/SDL.h && ( -f $prefix/lib/libSDL3.so || -f $prefix/lib/libSDL3.a ) ]]; then
+if [[ -f $prefix/include/SDL3/SDL.h && ( -f $prefix/lib/libSDL3.so || -f $prefix/lib/libSDL3.dylib || -f $prefix/lib/libSDL3.a ) ]]; then
     sdl_flags=("-I$prefix/include" "-L$prefix/lib" "-Wl,-rpath,$prefix/lib" -lSDL3)
     echo "SDL prefix: $prefix"
 else
@@ -138,7 +158,7 @@ int main() {
     return allocation.usage == VMA_MEMORY_USAGE_AUTO ? 0 : 4;
 }
 CPP
-clang++ -std=c++17 -mcx16 -fuse-ld=lld "$probe/check.cpp" -o "$probe/check" \
-    "${sdl_flags[@]}" "${graphics_flags[@]}" -latomic -pthread -lm -ldl
+clang++ -std=c++17 "${native_flags[@]}" "$probe/check.cpp" -o "$probe/check" \
+    "${sdl_flags[@]}" "${graphics_flags[@]}" "${link_flags[@]}"
 "$probe/check"
-printf 'Native dependency check passed. Build with: make SDL_DIR="%s" -j%s\n' "$prefix" "${JOBS:-4}"
+printf 'Native dependency check passed. Build with GNU Make (gmake on macOS): SDL_DIR="%s" -j%s\n' "$prefix" "${JOBS:-4}"

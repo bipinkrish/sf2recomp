@@ -7,6 +7,11 @@ Windows executable. Game extraction and CPU-code
 generation are separate steps: no proprietary game files or generated game code
 are supplied by this setup script.
 
+The [experimental macOS guide](../docs/macos.md) covers Apple Silicon and Intel
+Macs. The shared setup script also supports Darwin, using local `.dylib` SDL,
+the system linker and `libSystem`, plus Vulkan/MoltenVK and shaderc development
+packages. Its pinned SDL/SMAA/font sources are the same as on Linux.
+
 | Dependency | Used for | Supported / checked here |
 |---|---|---|
 | Clang / Clang++, LLD, GNU Make | Compile and link translated C and runtime C/C++ | Clang/LLD 18 checked; generated calls require Clang's `musttail` |

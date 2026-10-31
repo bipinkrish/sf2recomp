@@ -44,6 +44,27 @@ a = east
 b = south
 ```
 
+## Offline networking
+
+Networking is disabled by default, including when an older INI has no network
+section. To keep the game offline, use:
+
+```ini
+[network]
+enabled = false
+```
+
+The translated game reports no internet connection. Socket creation, connections,
+sends, DNS lookups, external web links and the CUDLR network listener are blocked.
+The runtime also denies network IPC services and host network overrides, so adding
+a transport implementation later does not enable it by default. Local assets,
+cinematics and save files remain available.
+
+Setting `enabled = true` and restarting restores the original network paths; it
+does not implement missing online services. This option covers game networking;
+dependency downloads during setup/build and local desktop display/audio IPC are
+separate.
+
 ## Saves
 
 `[storage] save_directory` is read on each launch. It accepts an absolute path
@@ -163,6 +184,17 @@ is connected and controller glyphs when one is connected. Input mappings and int
 skip work regardless of this display experiment.
 
 ## Graphics and frame rate
+
+Optional **21:9** support is experimental and disabled by default. Set
+`[video] aspect_ratio = 21:9`, then restart. `original` (or `16:9`) restores
+the original framing. This changes Unity's native screen modes, camera/layout
+dimensions and color/depth buffers together; it does not stretch the final image.
+The native wide size is 2520×1080 before resolution scaling. Other window sizes
+fit that exact 21:9 ratio: 3440×1440 has 40-pixel bars on each side. Movies retain
+their original proportions with black bars. Some menus and artwork may retain
+their original width. Wider framing can expose background edges: the garden
+stage showed small sky gaps near its top corners during testing. Coverage of
+every stage and campaign screen is unverified.
 
 NVN presentation enforces the configured frame limit, including when a mailbox
 swapchain or disabled vsync would otherwise run uncapped. A positive game

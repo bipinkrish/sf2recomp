@@ -11,7 +11,7 @@ Forked from [LAS Recomp](https://github.com/Peiikai/LASRecomp)'s generator
 | `lifter.py`, `simd_c.py` | Instruction and portable FP/SIMD lowering |
 | `gen.py` | C generation; `--symbols` seeds IL2CPP function boundaries and names |
 | `game_addresses.py` | Supported SF2 build IDs and guest address definitions |
-| `patches.py` | Console-stream, Unity frame-rate, and runtime keyboard-hint hooks; no instruction patches or SDK hooks |
+| `patches.py` | Console-stream, frame-rate, keyboard-hint and default offline hooks; no instruction patches |
 
 Hook metadata is `(instruction, jump_targets, description[, feature_bit])`.
 Optional groups are configured before guest threads start. A disabled site's
@@ -37,6 +37,13 @@ and Vulkan rendering. Main and SDK are translated; the runtime loader replaces
 `rtld`, and movie imports from `subsdk0` use the host decoder in
 `runtime/hle/movie.c`. This does not translate the entire movie module; track
 operations and broader cinematic behavior remain limited.
+
+`runtime/network_hooks.inc` supplies checked main/SDK entry guards. By default,
+the game reports offline and cannot create/connect/send on sockets, resolve DNS,
+open external web links or start the CUDLR listener. Runtime IPC and HLE import
+guards also keep future host network implementations behind `[network] enabled`.
+These mandatory hooks remain installed independently of optional UI hook groups.
+Regenerate both modules after changing the network hook list.
 
 Only update v131072 is accepted. Generated tables embed all 32 main/SDK NSO build-ID
 bytes; the runtime refuses mismatched files before starting a graphics device.

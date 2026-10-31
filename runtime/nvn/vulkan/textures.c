@@ -14,6 +14,7 @@
 #include "../astc.h"
 #include "../tex_hash.h"
 #include "../renderer.h"
+#include "../../settings.h"
 
 // ================================================================== formats
 typedef struct { VkFormat vf; uint8_t expand_rgb, alpha_one; } VkFmt;
@@ -199,6 +200,9 @@ static bool tex_scalable(const NvnTexture *t) {
     if (off < 0) off = getenv("LARECOMP_NO_SCALE") != NULL;
     if (off) return false;
     if (t->target != 1 || t->samples > 1 || !(t->flags & 8) || t->width < 32 || t->height < 16) return false;
+    // The wide screen buffers have an exact native size. Do not classify 16:9
+    // artwork as a screen target: CPU texture copies retain their original size.
+    if (g_settings.aspect == ASPECT_21_9) return t->width == 2520 && t->height == 1080;
     float a = (float)t->width / (float)t->height;
     return a > 1.74f && a < 1.81f;
 }

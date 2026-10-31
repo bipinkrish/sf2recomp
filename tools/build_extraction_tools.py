@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build pinned native hactool/NSTool executables on Linux or Windows UCRT64."""
+"""Build pinned native hactool/NSTool executables on Linux, macOS or Windows UCRT64."""
 import argparse
 import json
 import os
@@ -72,7 +72,7 @@ def ensure_tools(target=None):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--target", choices=("linux", "windows"), default=host_target())
+    parser.add_argument("--target", choices=("linux", "windows", "macos"), default=host_target())
     parser.add_argument("--jobs", type=int)
     parser.add_argument("--offline", action="store_true", help="use the existing checksum-verified source archive cache")
     args = parser.parse_args(argv)

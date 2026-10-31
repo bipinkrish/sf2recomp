@@ -10,6 +10,14 @@ No scene-loading, object-creation, binding-walker or scheduler bypasses live her
 PATCHES = {}
 
 HOOKS = {
+    0x70015c8948: (0x1e212000, (), "21:9 UI without the original pillarbox borders"),
+    0x70019016c0: (0xf81c0ff7, (), "21:9 graphics device resolution"),
+    0x700190160c: (0xd63f02e0, (), "21:9 color surface descriptor"),
+    0x700191177c: (0xd63f0100, (), "21:9 backbuffer storage sizing"),
+    0x7001911810: (0xd63f0100, (), "21:9 depth storage sizing"),
+    0x70019119cc: (0xd63f0100, (), "21:9 backbuffer creation"),
+    0x70015fbb24: (0xb9006a69, (), "21:9 initial Switch screen width"),
+    0x70015fbcf0: (0xd102c3ff, (), "21:9 Switch display modes"),
     0x70005c07c0: (0xf81d0ff5, (), "desktop console field uses SDL instead of Switch's modal keyboard"),
     0x7000f41cd0: (0xf81d0ff5, (), "desktop developer input on the guest update thread"),
     0x7000ceb3c0: (0xf81d0ff5, (), "desktop console input bridge"),
@@ -51,3 +59,22 @@ HOOKS = {
 }
 
 HOOKS_SDK = {}
+
+# One checked list drives both generated call-site guards and runtime policy.
+# These hooks stay unconditional: runtime opt-in can restore the original code,
+# but disabling an optional UI feature must never remove the offline guard.
+import re
+from pathlib import Path
+
+for line in (Path(__file__).resolve().parents[2] / "runtime/network_hooks.inc").read_text().splitlines():
+    if not line or line.startswith("//"):
+        continue
+    match = re.fullmatch(r'NETWORK_HOOK\((0x[0-9a-f]+), (0x[0-9a-f]+), [A-Z]+, "([^"]+)"\)', line)
+    if not match:
+        raise ValueError(f"invalid network hook: {line}")
+    site, word, description = match.groups()
+    site, word = int(site, 16), int(word, 16)
+    table = HOOKS if site < 0x7004000000 else HOOKS_SDK
+    if site in table:
+        raise ValueError(f"duplicate network hook: {site:#x}")
+    table[site] = (word, (), "offline policy: " + description)
