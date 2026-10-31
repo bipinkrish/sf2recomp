@@ -238,11 +238,17 @@ Some menus and artwork may retain their original width. Wider framing can
 expose background edges: the garden stage showed sky gaps near its top corners
 at 21:9. In 32:9, stage scenery uses uniform 2× cover scaling to fill the wider
 view, cropping background detail vertically. This applies only to backdrop and
-static scenery layers; fighter, gameplay-effect and HUD sizing stays unchanged.
+static scenery layers. 21:9 and 32:9 keep the original 16:9 fight-camera zoom
+reference so fighters' feet and ground markers remain in view. This also avoids
+zooming gameplay effects vertically; HUD proportions remain unchanged. Scenery
+that follows fight zoom is anchored to the original floor so the black ground
+stays beneath the fighters.
 The night mountain/lake stage's former black side gaps were retested at
 5120×1440 during movement and attacks and no longer appeared. Sparring was
-tested in all three modes with zero Vulkan validation errors. Coverage of every
-stage and campaign screen is unverified.
+tested in all three modes with zero Vulkan validation errors. Normal Story
+Tournament combat (Shadow versus Thorn) was also tested with movement and
+attacks at 16:10, 21:9 and 32:9, with zero Vulkan validation errors. Coverage of
+every stage and campaign screen is unverified.
 
 NVN presentation enforces the configured frame limit, including when a mailbox
 swapchain or disabled vsync would otherwise run uncapped. A positive game

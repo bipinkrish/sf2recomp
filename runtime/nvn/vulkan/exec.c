@@ -183,9 +183,17 @@ void vk_wait_seq(uint64_t seq) {
     __atomic_fetch_add(&cum_wait, waited, __ATOMIC_RELAXED);
     wait_account(waited);
     // Callers recycle command buffers and allocations after this returns; a timeout is not completion.
-    if (r == VK_TIMEOUT) FATAL("[vk] GPU did not finish submission %llu within 10 s; stopping before reusing in-flight resources\n",
-                              (unsigned long long)seq);
-    else if (r == VK_SUCCESS) cq_resolve_done(seq);  // (the game reads its timing counters after waiting)
+    if (r == VK_TIMEOUT) {
+        uint64_t done = 0;
+        VkResult status = vkGetSemaphoreCounterValue(g_vk.dev, g_vk.timeline, &done);
+        LOG("[vk] timed out waiting for %llu: GPU completed %llu (status %d), driver submitted %llu\n",
+            (unsigned long long)seq, (unsigned long long)done, status, (unsigned long long)rec_submitted());
+        extern void vk_devlost_dump(void);
+        vk_devlost_dump();
+        vk_device_fault_report();
+        FATAL("[vk] GPU did not finish submission %llu within 10 s; stopping before reusing in-flight resources\n",
+              (unsigned long long)seq);
+    } else if (r == VK_SUCCESS) cq_resolve_done(seq);  // (the game reads its timing counters after waiting)
     else {
         extern void vk_devlost_dump(void);
         vk_devlost_dump();
@@ -444,10 +452,12 @@ static void dl_note(const char *fmt, ...) {
     vsnprintf(dl_ring[dl_n++ & 63], sizeof dl_ring[0], fmt, ap);
     va_end(ap);
 }
-void vk_dl_note_upload(void *img, uint32_t w, uint32_t h, uint32_t lv) { dl_note("  upload %p %ux%u lv%u", img, w, h, lv); }
+void vk_dl_note_upload(void *img, uint32_t w, uint32_t h, uint32_t lv, VkFormat fmt, uint64_t off, uint32_t row) {
+    dl_note("  upload %p %ux%u lv%u fmt %d offset %llu row %u", img, w, h, lv, fmt, (unsigned long long)off, row);
+}
 void vk_devlost_dump(void) {
     if (!dl_on) return;
-    LOG("[vk] last GPU operations before the device loss (oldest first):\n");
+    LOG("[vk] last GPU operations before the stall or device loss (oldest first):\n");
     for (unsigned i = dl_n > 64 ? dl_n - 64 : 0; i < dl_n; i++) LOG("[vk]   %s\n", dl_ring[i & 63]);
 }
 static void gp_mark(VkCommandBuffer cb, const char *fmt, ...) {

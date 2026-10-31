@@ -122,4 +122,6 @@ and original control icon. No game icon is shipped in the public source tree.
 A guarded CPU buffer-copy change improved one matched software-Vulkan Story test
 from 49.38 to 55.87 FPS (+13.1%). This is not a combat or native-GPU performance
 claim. [Working findings](findings.md) retain the historical measurements;
-full combat stability and campaign completion remain unverified.
+normal campaign Tournament combat has since been checked at 16:10, 21:9 and
+32:9 (see the widescreen findings). Full combat stability and campaign completion
+remain unverified.

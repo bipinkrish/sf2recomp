@@ -749,6 +749,10 @@ bool vk_frame_begin(const float clear[4]) {
     cur_frame.secondary = false;
     slot_seq[slot] = vk_pending_seq();
     VkCommandBuffer cb = vk_cmd();
+    // The output pass samples the game's render target from an earlier
+    // submission. The swapchain image barrier only covers the window image;
+    // make the game's colour writes visible to these shader reads as well.
+    vk_full_barrier(cb);
     image_barrier(cb, g_vk.sc_images[cur_frame.image], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     vk_gpu_timer_window_start();  // (the GPU timer: this submission's work starts after that barrier, which waits for the image)
     VkRenderingAttachmentInfo ca = {.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO, .imageView = g_vk.sc_views[cur_frame.image],

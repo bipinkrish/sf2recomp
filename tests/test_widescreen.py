@@ -16,9 +16,18 @@ class WidescreenTests(unittest.TestCase):
 #include "settings.h"
 #include "hle/widescreen_hooks.inc"
 
-static unsigned calls;
+static unsigned calls, floor_calls;
+static float floor_expected=176;
 static uint64_t scenery[2];
 void guest_call(Cpu *c, uint64_t pc) {
+    if (pc==0x7001033f40ull) {
+        assert(c->x[0]==scenery[0] || c->x[0]==scenery[1]);
+        assert(c->x[1]==0);
+        float y; memcpy(&y,&c->v[0],4); assert(y==floor_expected);
+        floor_calls++;
+        memset(c,0x17,sizeof *c);
+        return;
+    }
     assert(pc==0x7001033e70ull && c->x[1]==0);
     assert(c->x[0]==scenery[calls%2]);
     float scale;
@@ -33,30 +42,49 @@ void guest_call(Cpu *c, uint64_t pc) {
 
 int main(void) {
     Cpu c, before;
-    const int unchanged[]={ASPECT_ORIGINAL,ASPECT_16_10,ASPECT_21_9};
+    const int unchanged[]={ASPECT_ORIGINAL,ASPECT_16_10};
     for (unsigned i=0;i<sizeof unchanged/sizeof *unchanged;i++) {
         g_settings.aspect=unchanged[i];
         memset(&c,0xa5,sizeof c); before=c; // deliberately invalid pointers
         assert(widescreen_hook(&c,0x7000eabfe0ull)==0 && !memcmp(&c,&before,sizeof c));
         assert(widescreen_hook(&c,0x7001033e70ull)==0 && !memcmp(&c,&before,sizeof c));
     }
+    g_settings.aspect=ASPECT_21_9;
+    memset(&c,0xa5,sizeof c); before=c;
+    assert(widescreen_hook(&c,0x7000ead4c0ull)==0 && !memcmp(&c,&before,sizeof c));
     g_settings.aspect=ASPECT_32_9;
     unsigned char render[0xb0]={0}, location[0x80]={0}, list[0x20]={0}, items[0x40]={0};
     unsigned char layers[4][0x50]={{0}};
     const unsigned types[]={1,2,3,0}; // backdrop, fighters, static scenery, unknown
     for (int i=0;i<4;i++) {
         ST32(layers[i]+0x34,types[i]);
+        ST8(layers[i]+0x30,1);
         ST64(items+0x20+i*8,(uintptr_t)layers[i]);
     }
     scenery[0]=(uintptr_t)layers[0]; scenery[1]=(uintptr_t)layers[2];
+    float height=512, margin=80;
+    memcpy(location+0x44,&height,4); memcpy(location+0x34,&margin,4);
     ST64(render+0xa0,(uintptr_t)location); ST64(location+0x70,(uintptr_t)list);
     ST64(list+0x10,(uintptr_t)items); ST32(list+0x18,4);
     memset(&c,0xa5,sizeof c); c.x[19]=(uintptr_t)render; before=c;
     for (int i=0;i<2;i++) {
+        float width=1200, minimum=1.6f;
+        memcpy(render+0x84,&width,4); memcpy(render+0x88,&minimum,4);
         assert(widescreen_hook(&c,0x7000eabfe0ull)==0);
         assert(!memcmp(&c,&before,sizeof c));
-        assert(calls==2*(i+1));
+        assert(calls==2*(i+1) && floor_calls==2*(i+1));
+        memcpy(&width,render+0x84,4); memcpy(&minimum,render+0x88,4);
+        assert(width==600 && minimum==.8f);
     }
+    // 21:9 keeps the same vertical fight framing without scenery enlargement.
+    g_settings.aspect=ASPECT_21_9;
+    float width=787.5f, minimum=1.05f;
+    memcpy(render+0x84,&width,4); memcpy(render+0x88,&minimum,4);
+    assert(widescreen_hook(&c,0x7000eabfe0ull)==0);
+    assert(!memcmp(&c,&before,sizeof c) && calls==4);
+    memcpy(&width,render+0x84,4); memcpy(&minimum,render+0x88,4);
+    assert(fabsf(width-600)<.001f && fabsf(minimum-.8f)<.00001f);
+    g_settings.aspect=ASPECT_32_9;
     // Camera scale updates cover scenery only and preserve every other register.
     for (int i=0;i<4;i++) {
         memset(&c,0xa5,sizeof c); c.x[0]=(uintptr_t)layers[i];
@@ -66,6 +94,20 @@ int main(void) {
         assert(widescreen_hook(&c,0x7001033e70ull)==0);
         assert(!memcmp(&c,&before,sizeof c));
     }
+    // Scenery remains grounded as the original fight camera changes zoom.
+    unsigned previous=floor_calls;
+    for (int i=0;i<4;i++) {
+        memset(&c,0xa5,sizeof c); c.x[19]=(uintptr_t)render;
+        c.x[0]=(uintptr_t)layers[i];
+        float scale=.75f; memcpy(&c.v[0],&scale,4); before=c;
+        floor_expected=132;
+        assert(widescreen_hook(&c,0x7000ead4c0ull)==0);
+        assert(!memcmp(&c,&before,sizeof c));
+    }
+    assert(floor_calls==previous+2); // fighters and unknown layer are untouched
+    ST8(layers[0]+0x30,0); c.x[0]=(uintptr_t)layers[0]; before=c;
+    assert(widescreen_hook(&c,0x7000ead4c0ull)==0);
+    assert(floor_calls==previous+2 && !memcmp(&c,&before,sizeof c));
     return 0;
 }
 '''
@@ -92,7 +134,7 @@ int main(int argc, char **argv) {
     const unsigned native_width = atoi(argv[5]), screen_width = atoi(argv[6]);
     const uint64_t sites[] = {0x70019016c0ull, 0x700190160cull, 0x700191177cull,
         0x7001911810ull, 0x70019119ccull, 0x70015fbb24ull, 0x70015fbcf0ull,
-        0x7000eabfe0ull, 0x7001033e70ull};
+        0x7000eabfe0ull, 0x7001033e70ull, 0x7000ead4c0ull};
     Cpu c, before;
     memset(&c, 0xa5, sizeof c); before = c;
     // Disabled hooks must not even dereference the intentionally invalid pointers.

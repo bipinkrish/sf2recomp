@@ -10,7 +10,8 @@ No scene-loading, object-creation, binding-walker or scheduler bypasses live her
 PATCHES = {}
 
 HOOKS = {
-    0x7000eabfe0: (0xf94013f5, (), "32:9 stage backdrop coverage after Render.Init"),
+    0x7000eabfe0: (0xf94013f5, (), "Wide fight framing and 32:9 stage backdrop coverage after Render.Init"),
+    0x7000ead4c0: (0x94061a6c, (), "32:9 foreground cover anchored to the fight floor during camera updates"),
     0x7001033e70: (0xd100c3ff, (), "32:9 stage backdrop scale during camera updates"),
     0x70015c8948: (0x1e212000, (), "Configured aspect UI without the original pillarbox borders"),
     0x70019016c0: (0xf81c0ff7, (), "Configured aspect graphics device resolution"),

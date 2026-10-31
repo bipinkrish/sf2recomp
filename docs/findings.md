@@ -3,6 +3,95 @@
 Persistent store for cross-cycle findings that don't fit one commit message (or that
 arrived as instrument output after the instrument's commit). Newest first.
 
+## 2026-10-31 — Vulkan GPU timeout: tiny NVIDIA image allocations
+
+- The first keyboard/controller launch aborted waiting for GPU submission 3289.
+  Its stack resolves to `copy_buffer_to_buffer` flushing GPU work before a CPU
+  copy. The kernel logged NVIDIA Xid 39 for that process, a
+  [copy-engine exception](https://docs.nvidia.com/deploy/xid-errors/analyzing-xid-catalog.html).
+  Repeated isolated runs located the stall at an 8×8 RGBA8 upload when entering
+  Sparring. Increasing the timeout would not repair the copy-engine exception.
+- An allocation trace captured the failing image in recycled memory: in
+  `lifetime-pooled-6`, a 512×512 R8 image occupied bytes 2079744–2341887 of a VMA
+  memory block and was destroyed at submission 455, with 454 complete. The new
+  8×8 RGBA8 image occupied bytes 2293760–2294271 of that block at submission
+  4407, where GPU progress stopped. Its handle was fresh: handle reuse alone
+  does not explain the fault. Retaining dead resources and using dedicated
+  allocations both avoided this reuse during comparisons.
+- `create_image` now requests `VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT` on
+  Linux/NVIDIA for single-layer, single-sample 2D images at most 16×16. This
+  keeps these small images out of recycled VMA suballocations while preserving
+  normal resource destruction. Large images and other devices/platforms retain
+  their allocation policy. The allocation regression compiles the real image
+  creation path against a fake allocator and checks the flags reaching VMA,
+  including the excluded sizes, vendors, arrays, volumes and multisampling.
+- The dedicated path passed 29 runs: 23 cold-launch checks and six full Sparring
+  sessions, including strict synchronization validation, a 9000-frame session
+  with repeated movement/attacks, and cold/warm-cache runs with tracing disabled.
+  All had zero GPU timeouts; strict validation reported no errors. The pooled
+  path reproduced the exception in an alternating comparison on the same
+  instrumented binary. All 97 tests pass and the game is rebuilt. Exact exit
+  codes and validation results are in `build/validation/vulkan-timeout/summary.json`.
+  These observations support the memory-reuse workaround. The standalone probes
+  did not establish a driver defect.
+- Frame overlap, heap imports, system-memory uploads, disabling the recorder,
+  256-byte upload alignment and explicit transfer layouts each still reproduced
+  the timeout. In particular, the transfer-layout candidate passed ten cold
+  launches before another run failed. Those speculative policies were removed.
+  A standalone probe completed 640,000 small transfers, and another completed
+  20,000 recycled-format transfers, without reproducing the game fault.
+- Synchronization validation independently found a deterministic defect: the
+  unchanged build fails at frame 3 with `SYNC-HAZARD-READ-AFTER-WRITE` when the
+  output fragment shader samples the preceding game's color attachment. The
+  swapchain image barrier cannot publish writes to that distinct source image.
+  `vk_frame_begin` now records the existing full memory barrier before its output
+  pass. See the [Vulkan synchronization examples](https://docs.vulkan.org/guide/latest/synchronization_examples.html).
+  Regression coverage checks output visibility and stopping/reporting on timeout
+  or device loss. The ten-second guard still stops before in-flight resources
+  can be reused; it now logs completed/submitted timeline values and dumps the
+  optional operation history (including upload format, offset and row length).
+- Logs, configurations, inputs, kernel events, captures, isolated experimental
+  sources and fixed test binaries remain under `build/validation/vulkan-timeout`.
+  Hardware: RTX 4070 Laptop GPU, NVIDIA 595.99.02, Linux 7.0.0-38. User INI
+  settings, saves, driver and system configuration were not changed.
+
+## 2026-10-31 — widescreen fight framing and floor alignment
+
+- The first ultrawide captures exposed two visual defects: screen-width-based
+  camera zoom clipped feet/ground markers, and 32:9 scenery enlargement pushed
+  the black foreground floor below the visible fight. The earlier backdrop
+  tests established side coverage, but missed these vertical framing defects.
+- At the end of `Render.Init`, 21:9 and 32:9 now normalize `_screenWidth` and
+  `_minScale` to the authored 16:9 camera reference. Actual screen/backbuffer
+  dimensions stay wide, revealing more sides while retaining vertical framing.
+- In 32:9, scaling scenery layers are enlarged uniformly about their floor
+  rather than zero. The original model baseline is `floorMargin - height/2`;
+  `LocationSelector.SetPositionY` applies the opposite extra scaled offset.
+  Guarded hook `0x7000ead4c0` updates that absolute offset before every original
+  camera `SetScale` call. Initialization sets it too. Game/fighter layers are
+  excluded, and original/16:10/21:9 floor positioning is untouched.
+- Regression coverage exercises zoom references, floor alignment at changing
+  camera scales, scenery/fighter selection, absolute reinitialization and CPU
+  register preservation. Captures, configurations, scripted controller inputs
+  and logs are retained under `build/validation/campaign-aspects`.
+- Night lake (Wraith/Aquaris) and forest (Wraith/Puma) Sparring were retested
+  at 5120×1440 through frame 3400 with movement/attacks, normal exits and zero
+  stop-on-error Vulkan validation errors. Reviewed gameplay frames 2800–3300 show the
+  black floor, complete feet and ground markers. The README's two ultrawide
+  images were replaced with unmodified frame-2800 captures from these runs.
+- Normal Story campaign combat was verified through the real menu/map flow:
+  Hero Reborn, Tournament stage 5/24, Shadow versus Thorn. 16:10 (1728×1080),
+  21:9 (2520×1080) and final 32:9 (5120×1440) runs each exercised movement and
+  attacks through frame 3400, exited normally and logged zero Vulkan validation
+  errors. The final 32:9 arena has its ground restored. These runs use isolated
+  copies of an existing level-52 save; the source save's SHA-256 is unchanged.
+  This verifies representative campaign combat, not every stage or completion.
+  Some finite 21:9 stage backgrounds still expose scenery-edge gaps.
+- All 97 tests passed. An original-aspect comparison and the first forest
+  attempt stalled during startup (before fight initialization) and hit the
+  100-second harness timeout. The forest retry completed; failed attempts are
+  retained separately, and are not counted as passing gameplay runs.
+
 ## 2026-10-31 — 32:9 backdrop coverage
 
 - Fixed the large black side areas reported below by uniformly enlarging stage

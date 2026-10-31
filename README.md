@@ -7,16 +7,39 @@ The Switch version was chosen because it includes **Sparring mode**, which offer
 **offline player-versus-player (PvP)** fights.
 
 > [!IMPORTANT]
-> **No game files, assets, keys or generated game code are included.**
+> **No playable game files, extracted assets, keys or generated game code are included.**
 > The supported game is **v1.1.0 (Switch update v131072)**.
 > **Already extracted files do not require `prod.keys`.** Keys are only needed
 > if you use the optional NSP extraction workflow below. Recompilation and running
 > the converted game do not require keys.
 
-[Status](#status) · [Features](#features) · [Requirements](#requirements) ·
+[Screenshots](#screenshots) · [Status](#status) · [Features](#features) · [Requirements](#requirements) ·
 [Getting started](#getting-started) · [NSP extraction](#optional-extract-from-an-nsp) ·
 [Settings and controls](#settings-and-controls) · [Development](#development) ·
 [Legal](#legal)
+
+## Screenshots
+
+Captured from the native Linux/Vulkan build. Click any image for full resolution.
+
+[![Wraith versus Aquaris on the night lake stage, filling the 32:9 view](docs/screenshots/ultrawide-night.png)](docs/screenshots/ultrawide-night.png)
+
+*32:9 gameplay at 5120×1440. Experimental ultrawide mode uses scenery cover scaling;
+see the [graphics guide](docs/runtime-guide.md#graphics-and-frame-rate).*
+
+| Desktop main menu | Sparring combat |
+| :---: | :---: |
+| [![The main menu framed by autumn trees and an open dojo gate](docs/screenshots/main-menu.png)](docs/screenshots/main-menu.png) | [![Wraith and Hurricane fighting against a sunlit mountain village backdrop](docs/screenshots/sparring.png)](docs/screenshots/sparring.png) |
+| 16:10 · 1728×1080 | 16:10 · 1728×1080 |
+
+| Sparring character selection | Sunset arena |
+| :---: | :---: |
+| [![The Sparring character roster with Wraith selected](docs/screenshots/character-select.png)](docs/screenshots/character-select.png) | [![Wraith and May facing off between glowing stone pillars at sunset](docs/screenshots/sunset-arena.png)](docs/screenshots/sunset-arena.png) |
+| 16:10 · 1728×1080 | Original 16:9 · 1920×1080 |
+
+[![Wraith and Puma fighting beneath giant forest branches in 32:9](docs/screenshots/ultrawide-forest.png)](docs/screenshots/ultrawide-forest.png)
+
+*Forest Sparring at 5120×1440, with corrected fight framing and ground alignment.*
 
 ## Status
 
