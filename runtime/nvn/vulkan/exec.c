@@ -3351,6 +3351,7 @@ static void pretouch_host(void *host, uint64_t size) {
 // Host memory [host, host + size) as a buffer (VK_EXT_external_memory_host; page-aligned). The allocation's result:
 // out of memory tells whole_import_probe_oom to go lazy.
 static VkResult host_import_ptr(void *host, uint64_t size, VkBuffer *out_buf, VkDeviceMemory *out_mem, bool bda) {
+    if (g_vk.managed_heap) FATAL("host-pointer import attempted with a driver-managed guest heap\n");
     PFN_vkGetMemoryHostPointerPropertiesEXT props =
         (PFN_vkGetMemoryHostPointerPropertiesEXT)vkGetDeviceProcAddr(g_vk.dev, "vkGetMemoryHostPointerPropertiesEXT");
     VkMemoryHostPointerPropertiesEXT mp = {.sType = VK_STRUCTURE_TYPE_MEMORY_HOST_POINTER_PROPERTIES_EXT};
@@ -3535,7 +3536,7 @@ static void heap_unmap_placed(void) {
 static bool guest_heap_dmabuf(void) {
     if (gmem_buf || !g_vk.dev || !(g_vk.dmabuf || g_vk.map_placed) || getenv("LARECOMP_VK_NO_GMEM")) return false;
     const char *e = getenv("LARECOMP_VK_HEAP_DMABUF");
-    if (e ? !atoi(e) : !strstr(g_vk.props.deviceName, "RADV")) return false;
+    if (!g_vk.managed_heap && (e ? !atoi(e) : !strstr(g_vk.props.deviceName, "RADV"))) return false;
     const uint64_t size = HEAP_MAX;
     VkPhysicalDeviceMemoryProperties mp;
     vkGetPhysicalDeviceMemoryProperties(g_vk.phys, &mp);
@@ -3588,9 +3589,20 @@ static bool guest_heap_dmabuf(void) {
     VkDeviceMemory mem;
     VkResult r = vkAllocateMemory(g_vk.dev, &ai, NULL, &mem);
     if (r != VK_SUCCESS) { LOG("[vk] heap as driver memory: allocation failed (%d)\n", r); vkDestroyBuffer(g_vk.dev, buf, NULL); return false; }
+    // Bind before publishing a mapping to the guest. An allocation/bind failure must not replace live guest pages.
+    r = vkBindBufferMemory(g_vk.dev, buf, mem, 0);
+    if (r != VK_SUCCESS) {
+        LOG("[vk] heap as driver memory: binding failed (%d)\n", r);
+        vkDestroyBuffer(g_vk.dev, buf, NULL);
+        vkFreeMemory(g_vk.dev, mem, NULL);
+        return false;
+    }
     const char *why = NULL;
+    // Unregister the old anonymous window before replacing it with a DRM mapping. Write protection must never
+    // be applied to the driver-owned heap, nor survive into a userptr fallback after a partial failure.
+    plat_write_tracking_off("preparing the driver-managed guest heap");
     if (placed) {
-        why = vkBindBufferMemory(g_vk.dev, buf, mem, 0) != VK_SUCCESS ? "binding failed" : heap_map_placed(mem);
+        why = heap_map_placed(mem);
         if (why) {
             LOG("[vk] heap as driver memory: placed mapping at %llx failed (%s): the heap is shared as before\n",
                 (unsigned long long)HEAP_BASE, why);
@@ -3621,11 +3633,6 @@ static bool guest_heap_dmabuf(void) {
         if (!plat_reset_guest(HEAP_BASE, HEAP_BASE + size)) FATAL("cannot restore the guest heap mapping\n");
     }
     if (fd >= 0) close(fd);  // (the mapping keeps the dma-buf)
-    VkResult br = why ? VK_SUCCESS : vkBindBufferMemory(g_vk.dev, buf, mem, 0);
-    if (!why && br != VK_SUCCESS) {
-        why = "binding failed";
-        if (!plat_reset_guest(HEAP_BASE, HEAP_BASE + size)) FATAL("cannot restore the guest heap mapping\n");
-    }
     if (why) {
         LOG("[vk] heap as driver memory: mapping at %llx failed (%s): the heap is shared as before\n",
             (unsigned long long)HEAP_BASE, why);
@@ -3681,6 +3688,9 @@ void backend_guest_heap_prepare(void) {
     gmem_userptr = false;
 #ifdef __linux__
     guest_heap_dmabuf();
+    if (g_vk.managed_heap && !gmem_dmabuf)
+        FATAL("cannot allocate/map the driver-managed guest heap; refusing unsafe host-pointer imports. "
+              "Use tools/run_linux.sh --software for software rendering.\n");
 #endif
     if (!g_vk.dev) return;
     gmem_chunk_shift();  // (the chunk / lazy decision, before the first draw binds anything)
@@ -4542,15 +4552,16 @@ void vk_exec_reset(void) {
     gcopy_gen++;
     if (gmem_buf) {
 #ifdef __linux__
-        bool placed = gmem_placed;
+        bool driver_heap = gmem_dmabuf;
         heap_unmap_placed();
+        // Drop the dma-buf CPU mapping before freeing its Vulkan allocation, too (not just placed maps).
+        if (driver_heap && !plat_reset_guest(HEAP_BASE, HEAP_BASE + HEAP_MAX)) FATAL("cannot restore the guest heap mapping\n");
 #endif
         vkDestroyBuffer(g_vk.dev, gmem_buf, NULL);
         vkFreeMemory(g_vk.dev, gmem_mem, NULL);
         gmem_buf = VK_NULL_HANDLE;
         gmem_mem = VK_NULL_HANDLE;
 #ifdef __linux__
-        if (placed && !plat_reset_guest(HEAP_BASE, HEAP_BASE + HEAP_MAX)) FATAL("cannot restore the guest heap mapping\n");
         gmem_dmabuf = false;  // (the next boot decides again)
 #endif
     }
@@ -5483,7 +5494,7 @@ static void draw_(CmdRec *r, bool indexed) {
     if (ss_need(SS_DOP, ss.dop == dop)) { ss.dop = dop; rec_CmdSetDepthCompareOp(cb, dop); }
     bool sten = st.ds[3] && pass_stencil;
     if (ss_need(SS_STEN, ss.sten == (VkBool32)sten)) { ss.sten = sten; rec_CmdSetStencilTestEnable(cb, sten); }
-    if (sten) {
+    {   // Initialize all declared dynamic stencil state, including draws with stencil testing disabled.
         uint32_t ops = st.ds[5] | st.ds[6] << 8 | st.ds[7] << 16;
         for (int f = 0; f < 2; f++) {
             uint32_t o = f ? ops >> 12 : ops;

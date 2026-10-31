@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Check native dependencies, or prepare pinned SDL/SMAA sources locally.
+# Check native dependencies, or prepare pinned SDL/SMAA/font sources locally.
 set -euo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 mode=${1:---check}
@@ -9,7 +9,7 @@ if (( $# > 1 )) || [[ $mode != --check && $mode != --ensure && $mode != --build-
 fi
 if [[ $mode == --help ]]; then
     cat <<'HELP'
---ensure     Prepare missing SDL/SMAA automatically, then check.
+--ensure     Prepare missing SDL/SMAA/fonts automatically, then check.
 --check      Compile/link native dependency probe; no downloads (default).
 --build-sdl  Prepare SMAA, build/install verified SDL 3.4.16 locally, then check.
 --fetch-smaa Download verified SMAA sources and generate its shader include only.
@@ -18,11 +18,13 @@ JOBS         Parallel SDL compilation jobs (default: 4).
 SDL_SOURCE_ARCHIVE  Optional local SDL3-3.4.16.tar.gz; same SHA256 required.
 SF2_DEPS_WORK      Source/build cache (default: repo/build/dependencies).
 SMAA_SOURCE_DIR    Optional offline SMAA source folder; same checksums required.
+SF2_FONT_SOURCE_DIR Optional offline Noto font folder; same checksums required.
 See tools/runtime-dependencies.md for system packages and licenses.
 HELP
     exit
 fi
 if [[ $mode == --ensure ]]; then
+    python3 "$root/tools/setup_fonts.py"
     prefix=${SDL_DIR:-"$root/deps"}
     if [[ -f $prefix/include/SDL3/SDL.h && ( -f $prefix/lib/libSDL3.so || -f $prefix/lib/libSDL3.a ) ]] ||
        pkg-config --atleast-version=3.4.0 sdl3 2>/dev/null; then
@@ -36,8 +38,10 @@ if [[ $mode == --fetch-smaa ]]; then
     exec python3 "$root/tools/setup_smaa.py"
 fi
 if [[ $mode == --build-sdl ]]; then
+    python3 "$root/tools/setup_fonts.py"
     python3 "$root/tools/setup_smaa.py"
 else
+    python3 "$root/tools/setup_fonts.py" --check
     python3 "$root/tools/setup_smaa.py" --check
 fi
 [[ $(uname -s) == Linux && $(uname -m) == x86_64 ]] || {

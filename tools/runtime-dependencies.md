@@ -9,6 +9,7 @@ are supplied by this setup script.
 |---|---|---|
 | Clang / Clang++, LLD, GNU Make | Compile and link translated C and runtime C/C++ | Clang/LLD 18 checked; generated calls require Clang's `musttail` |
 | SDL3 | Window, input, audio, captures | 3.4.0+; source build pinned to 3.4.16 |
+| Noto Sans / Noto Sans CJK | Shared-font service fallback | Pinned upstream font files, SIL OFL 1.1; prepared automatically |
 | Vulkan headers and loader | Graphics API | Vulkan 1.3+ |
 | shaderc development library | Compile translated GPU shaders to SPIR-V | System shaderc; 2023.8 checked locally |
 | Vulkan Memory Allocator headers | GPU memory allocation | VMA 3.x; 3.0.1 package checked locally |
@@ -150,6 +151,22 @@ For offline setup, set `SMAA_SOURCE_DIR` to a folder containing the pinned
 `SMAA.hlsl`, `LICENSE.txt`, `Textures/AreaTex.h` and `Textures/SearchTex.h` files;
 the same checksum checks apply. The SMAA license remains tracked as
 `licenses/SMAA.txt` and is copied into converted output with the other notices.
+
+## Shared fallback fonts
+
+`tools/setup_fonts.py` downloads checksum-pinned Noto Sans and Noto Sans CJK
+files and their SIL OFL 1.1 licenses into `deps/share/fonts`. `--ensure` and
+`--build-sdl` prepare these automatically; `--check` verifies without downloads.
+The exact revisions, URLs and SHA256 values are recorded in the setup script and
+the generated `SOURCE.txt`. Set `SF2_FONT_SOURCE_DIR` to a folder containing the
+four pinned files for offline setup; checksums still apply.
+
+`make` copies verified files into `<build>/lib/fonts`; conversion includes the
+same folder and `licenses/Noto` in its output. The font service loads them lazily
+when requested and maps their bytes through the regular shared-memory API.
+The standard and CJK faces are substitutes, not copies of console firmware
+fonts. The CJK face covers Chinese, Japanese and Korean; Nintendo-specific
+private-use icon glyphs are not supplied by the standard fallback face.
 
 ## Distribution
 

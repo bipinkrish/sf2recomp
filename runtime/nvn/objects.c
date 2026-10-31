@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "../kernel.h"
+#include "../settings.h"
 #include "nvn.h"
 #include "rqueue.h"
 
@@ -822,6 +823,29 @@ NVN(nvnQueueAcquireTexture) {
     w->next = (w->next + 1) % (w->active ? w->active : 1);
     RET(0);
 }
+
+static void window_wait_present(NvnWindow *w) {
+    uint32_t hz = g_settings.target_fps >= 30 && g_settings.target_fps <= 360 ?
+                  (uint32_t)g_settings.target_fps : 60;
+    // A zero interval disables vsync, but the configured FPS cap still applies.
+    uint32_t interval = w->interval > 0 ? (uint32_t)w->interval : 1;
+    uint64_t period = 1000000000ull * interval / hz;
+    if (period != w->present_period) {
+        w->present_period = period;
+        w->present_deadline = 0;
+        LOG("[pace] NVN interval %d, virtual display %u Hz, frame limit %.1f fps\n",
+            w->interval, hz, (double)hz / interval);
+    }
+    uint64_t now = plat_now_ns();
+    if (w->present_deadline > now) {
+        plat_sleep_until_ns(w->present_deadline);
+        now = plat_now_ns();
+    }
+    // Rebase on the actual present after a late/slow frame: never burst frames
+    // to catch up after loading, a debugger pause, or restoring the window.
+    w->present_deadline = now + period;
+}
+
 NVN(nvnQueuePresentTexture) {
     NvnWindow *w = HOST(NvnWindow, A(1));
     int i = (int)A(2);
@@ -831,7 +855,10 @@ NVN(nvnQueuePresentTexture) {
         extern const char *renderer_stats(void);
         LOG("[nvn] QueuePresentTexture frame=%d i=%d stats=(%s)\n", npresent, i, renderer_stats());
     }
-    if (w && i >= 0 && i < w->num) backend_present(HOST(NvnTexture, w->textures[i]));
+    if (w && i >= 0 && i < w->num) {
+        window_wait_present(w);
+        backend_present(HOST(NvnTexture, w->textures[i]));
+    }
 }
 
 // ================================================================== small state objects

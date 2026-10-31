@@ -154,6 +154,7 @@ int main(int argc, char **argv) {
     // before the SDK starts allocating in it. The old boot order raced this setup.
     extern void ui_window_init(void);
     ui_window_init();
+    rt_hooks_configure();
     boot(root);
     extern int ui_run(void);
     ui_run();

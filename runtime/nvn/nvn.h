@@ -92,6 +92,7 @@ typedef struct NvnWindow {
     uint64_t textures[8];  // guest NVNtexture*
     int num, active, interval, next;
     int crop[4];
+    uint64_t present_deadline, present_period;
 } NvnWindow;
 
 typedef struct NvnSync {

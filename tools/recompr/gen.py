@@ -470,13 +470,16 @@ class Module:
                 out.append(f'L_{a:x}:;')
             if a in HOOKS:  # hook site (tools/recompr/patches.py HOOKS): the runtime decides, the instruction stays as it is
                 flush()
-                word, targets, _ = HOOKS[a]
+                word, targets, _ = HOOKS[a][:3]
                 w = struct.unpack_from('<I', self.nso.image, a - self.base)[0]
                 if w != word:
                     raise ValueError(f'hook {a:#x}: instruction {w:#010x}, expected {word:#010x}')
                 body = ' '.join(self.render_single(ins, a, jump, refs))
                 jumps = ' '.join(f'else if (h_ == {k + 2}) goto L_{t:x};' for k, t in enumerate(targets))
-                out.append(f'    {{ int h_ = rt_hook(c, {hx(a)}); if (h_ == 1) return; if (h_ == 0) {{ {body} }} {jumps} }}'
+                callback = f'rt_hook(c, {hx(a)})'
+                if len(HOOKS[a]) == 4:
+                    callback = f'((rt_hook_features & {HOOKS[a][3]}) ? {callback} : 0)'
+                out.append(f'    {{ int h_ = {callback}; if (h_ == 1) return; if (h_ == 0) {{ {body} }} {jumps} }}'
                            f'  /* {a:#x}: hook (runtime/hle/hooks.c) */')
                 last = 'op'
                 continue

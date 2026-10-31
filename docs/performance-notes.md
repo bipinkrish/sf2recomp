@@ -83,7 +83,7 @@ are expected once shaders are ready. Lavapipe adds its own CPU rendering workers
 which accounted for most measured CPU time. Making every core busy would not
 necessarily improve throughput or preserve the game's ordering.
 
-AMD hardware rendering was not retested because guest-heap imports previously
+At the time of the CPU-copy measurements, AMD hardware rendering was not retested because guest-heap imports previously
 triggered kernel HMM faults. The current software launcher sets `NO_GMEM=1`:
 arbitrary shader global-heap reads then return zero. That is an incomplete fallback,
 not a substitute for correct native GPU memory support.
@@ -93,3 +93,37 @@ uploads, GPU-write readbacks at the proper fences, and correct global-pointer
 addressing. Existing copy/chunk helpers can support that work, but arbitrary
 shader accesses and CPU/GPU write ordering must be covered before claiming
 hardware compatibility or performance gains.
+
+The October 31 hardware follow-up instead uses a shared, coherent driver-owned
+heap mapped at the guest address. CPU and GPU access the same backing memory;
+there is no separate mirror to upload or read back. RADV now disables the host
+import extension and userptr/probe paths in this mode, disables write tracking
+before replacing the anonymous mapping, binds the buffer before publishing the
+mapping, and removes the CPU mapping before freeing driver memory on reset.
+Allocation failure stops boot. An isolated compute test checked both directions
+of visibility at three widely separated heap offsets through two allocation
+cycles. A Radeon 680M game run reached frame 1,200 in the Sensei movement tutorial
+with strict Khronos validation and no reported errors. Warm sections logged
+59.8 FPS at 1280x720/60 FPS; cold shader compilation and loading caused dips.
+These are scene-specific observations, not a matched GPU speedup benchmark or
+full combat validation. Logs are under `build/validation/gpu-amd-validation-fixed`
+and `build/validation/gpu-heap-roundtrip.log`.
+
+A further 3,000-frame scripted run using the current 120 FPS repository settings
+reached a Kenji sparring fight, with movement/attack inputs and visually checked
+captures at frames 2,400 and 3,000. Strict validation reported no errors, and the
+process exited normally. Warm sections logged about 119.2 FPS; loading and shader
+compilation still caused dips. Evidence is under
+`build/validation/gpu-amd-tutorial` (the directory name reflects the planned
+test, which progressed into sparring). This is an initial combat-scene check,
+not a complete fight/progression/stability qualification.
+
+After repairing the host driver and rebooting into 7.0.0-38, the RTX 4070 Laptop
+GPU (NVIDIA 595.99.02) also passed a 3,000-frame strict-validation run reaching
+Kenji sparring. `nvidia-smi` confirmed `sf2` running on the dedicated GPU. Its
+X11 swapchain selected FIFO and steady sections logged 59.9 FPS at 1280x720,
+with a configured target of 120. This presentation behavior differs from the
+AMD mailbox test and does not establish a relative GPU speedup. Cold shader
+compilation and scene loading caused dips. The separate driver-owned heap
+compute round-trip also passed on NVIDIA across two allocation cycles.
+Evidence: `build/validation/gpu-nvidia-post-reboot`.

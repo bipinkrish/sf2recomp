@@ -17,6 +17,12 @@ Runtime and generator
 - SDL3: zlib license, licenses/SDL3.txt; headers and library are installed locally
   by tools/setup_runtime.sh --build-sdl or supplied by a system development package.
   https://github.com/libsdl-org/SDL
+- Noto Sans and Noto Sans CJK: SIL Open Font License 1.1,
+  licenses/NotoSans.txt and licenses/NotoSansCJK.txt. Shared-font substitutes,
+  fetched with pinned revisions/checksums by tools/setup_fonts.py and bundled
+  in lib/fonts with their upstream licenses and source records.
+  https://github.com/notofonts/noto-fonts
+  https://github.com/notofonts/noto-cjk
 - Vulkan Memory Allocator: AMD, MIT, licenses/VulkanMemoryAllocator.txt.
   Included from the host development package, compiled by runtime/nvn/vulkan/vma.cpp.
   https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator

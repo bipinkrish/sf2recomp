@@ -38,6 +38,11 @@ bool rt_guest_try_call(Cpu *c, uint64_t site, uint64_t target, GuestFn function)
 // hook site (tools/patches.py HOOKS, runtime/hle/hooks.c): 0 = run the instruction, 1 = the hook did it all,
 // 2.. = jump to the site's first.. target
 int rt_hook(Cpu *c, uint64_t site);
+// Optional hook groups are configured before guest threads start. Generated
+// sites bypass callbacks entirely when their group is disabled.
+enum { RT_HOOK_KEYBOARD_PROMPTS = 1u << 0 };
+extern uint32_t rt_hook_features;
+void rt_hooks_configure(void);
 void rt_svc(Cpu *c, uint32_t imm, uint64_t pc);
 void rt_brk(Cpu *c, uint32_t imm, uint64_t pc) __attribute__((noreturn));
 void rt_udf(Cpu *c, uint64_t pc) __attribute__((noreturn));

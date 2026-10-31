@@ -101,5 +101,6 @@ clean:
 .PHONY: runtime-deps
 runtime-deps:
 	SDL_DIR="$(SDL_DIR)" tools/setup_runtime.sh --ensure
+	$(PYTHON) tools/setup_fonts.py --output "$(B)/lib/fonts"
 
 $(RT_OBJ): | runtime-deps

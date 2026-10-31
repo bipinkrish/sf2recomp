@@ -89,6 +89,7 @@ static bool whole_import_fits(bool budget_ext, bool *probe) {
 // *probe: one import is to be tried first (whole_import_fits), lazy chunks if it runs out of memory.
 static bool lazy_heap_predicted(bool budget_ext, bool *probe) {
     *probe = false;
+    if (g_vk.managed_heap) return false;  // windows of driver memory, never userptr chunks or their probe
     const char *e = getenv("LARECOMP_VK_GMEM_LAZY");
     if (e) return atoi(e) != 0;
     if (getenv("LARECOMP_VK_NO_GMEM")) return false;
@@ -325,7 +326,15 @@ static void create_device(void) {
     if (g_vk.custom_border) ext[n_ext++] = VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME;
     g_vk.divisor = has_ext(ep, ne, VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME);
     if (g_vk.divisor) ext[n_ext++] = VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME;
-    g_vk.host_import = has_ext(ep, ne, VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME);  // guest heap as a GPU buffer (exec.c)
+    const char *managed = getenv("LARECOMP_VK_MANAGED_HEAP");
+#ifdef __linux__
+    g_vk.managed_heap = managed ? atoi(managed) != 0 : strstr(g_vk.props.deviceName, "RADV") != NULL;
+#else
+    g_vk.managed_heap = managed && atoi(managed) != 0;
+#endif
+    if (getenv("LARECOMP_VK_NO_GMEM")) g_vk.managed_heap = false;
+    g_vk.host_import = !g_vk.managed_heap && has_ext(ep, ne, VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME);
+    if (g_vk.managed_heap) LOG("[vk] guest heap: driver-managed memory required; host-pointer imports disabled\n");
     if (g_vk.host_import) ext[n_ext++] = VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME;
     bool fault = has_ext(ep, ne, VK_EXT_DEVICE_FAULT_EXTENSION_NAME);  // device-lost diagnostics (vk_device_fault_report)
     if (fault) ext[n_ext++] = VK_EXT_DEVICE_FAULT_EXTENSION_NAME;
@@ -587,7 +596,7 @@ void vk_pipeline_cache_save(void) {
 
 // ================================================================== swapchain
 static VkPresentModeKHR present_mode(void) {
-    // MAILBOX by default: the game paces itself (vi.c's emulated 60 Hz vsync), and with FIFO every submission
+    // MAILBOX by default: NVN presentation enforces the configured frame period, and with FIFO every submission
     // queued behind the one waiting for a window image, so the game's fence waits followed the presentation engine:
     // a throttled / captured / busy compositor slowed the whole game (4-21 fps with the GPU mostly idle; mailbox:
     // 60). No tearing. LARECOMP_VK_PRESENT=fifo|immediate|mailbox to choose.
@@ -1031,6 +1040,19 @@ void backend_present_now(NvnTexture *t, uint64_t frame, bool advance) {
         extern void renderer_set_alloc_scale(float ax, float ay);
         renderer_set_alloc_scale((float)os.ax, (float)os.ay);
         renderer_set_scale((float)sx, (float)sy);
+        // Report actual source allocation as well as the requested scale, so
+        // resizing tests can distinguish target reallocation from a final blit.
+        if (b) {
+            static uint32_t previous[4];
+            uint32_t dimensions[4] = {b->width, b->height, (uint32_t)dw, (uint32_t)dh};
+            if (memcmp(previous, dimensions, sizeof previous)) {
+                LOG("[output] render %ux%u -> window %ux%u (guest %ux%u, scalable %d, samples %u, flags %#x)\n",
+                    b->width, b->height, (uint32_t)dw, (uint32_t)dh,
+                    t ? t->width : 0, t ? t->height : 0, b->scalable,
+                    t ? t->samples : 0, t ? t->flags : 0);
+                memcpy(previous, dimensions, sizeof previous);
+            }
+        }
         pp_mark(PP_SCALE);
         static int nlog_pres;
         if (nlog_pres++ < 5) LOG("[vk] present_now frame=%llu t=%p b=%p have=%d img=%p %ux%u sc=%ux%u v=[%.1f,%.1f,%.1f,%.1f]\n",
@@ -1327,6 +1349,13 @@ void backend_clear_window(void) {
     if (g_vk.dev && vk_frame_begin(black)) vk_frame_end(NULL);
 }
 
+static _Noreturn void ui_quit(void) {
+    input_rumble_stop();
+    LOG("desktop exit requested\n");
+    backend_quit();
+    exit(0);
+}
+
 int ui_run(void) {
     ui_window_init();
     atomic_store(&ui_ready, true);
@@ -1334,18 +1363,14 @@ int ui_run(void) {
         SDL_Event e;
         while (SDL_WaitEventTimeout(&e, 16)) {
             input_rumble_poll();
-            if (e.type == SDL_EVENT_QUIT) {
-                input_rumble_stop();
-                LOG("window closed\n");
-                backend_quit();  // (before exit(): see there)
-                exit(0);
-            }
+            if (e.type == SDL_EVENT_QUIT || menu_quit_requested()) ui_quit();
             extern bool input_user_blocked(const SDL_Event *e);
             if (input_user_blocked(&e)) continue;  // scripted test runs: the real keyboard / mouse / pads do nothing (as metal.m)
             input_cursor_event(&e);
             if (menu_handle_event(&e)) continue;
             input_handle_event(&e);
         }
+        if (menu_quit_requested()) ui_quit();
         menu_apply_window_requests(window);
         input_rumble_poll();
         movie_poll();

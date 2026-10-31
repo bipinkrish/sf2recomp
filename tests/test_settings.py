@@ -34,6 +34,7 @@ def compile_harness(source, output):
     subprocess.run(["clang", "-O2", "-Wno-format", "-ffunction-sections", "-fdata-sections",
                     "-I", str(ROOT / "runtime"), *cflags,
                     str(ROOT / "runtime/settings.c"), str(ROOT / "runtime/hle/bindings.c"),
+                    str(ROOT / "runtime/ui/developer.c"),
                     str(source), "-Wl,--gc-sections", *libs,
                     "-lm", "-ldl", "-pthread", "-o", str(output)], check=True)
 
@@ -126,8 +127,11 @@ volatile int g_inject_plus;
 int main(int argc, char **argv) {
     assert(argc == 3);
     unsetenv("LARECOMP_LANG"); unsetenv("LARECOMP_VOLUME"); unsetenv("LARECOMP_REVERB");
-    // The shipped complete map must exactly match built-in defaults.
+    // Runtime INIs are user-editable; check built-in defaults independently,
+    // then reset the loaded map so custom local bindings cannot affect this test.
+    assert(bind_is_default(BIND_DEV_KEY) && bind_is_default(BIND_DEV_PAD));
     assert(settings_load_file(argv[1]));
+    bind_reset(BIND_DEV_KEY); bind_reset(BIND_DEV_PAD);
     assert(bind_is_default(BIND_DEV_KEY) && bind_is_default(BIND_DEV_PAD));
     assert(settings_load_file(argv[2]));
     assert(g_bind_key[BIND_A] == SDL_SCANCODE_SPACE);

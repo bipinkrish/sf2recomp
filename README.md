@@ -18,9 +18,13 @@ pad, and the intro cinematic is decoded and displayed by the host movie path.
 Cleanup-only unwinding and rethrow are unsupported. Full combat stability, later
 cinematics, and Windows remain unverified.
 
-The verified rendering configuration is X11/Xwayland with Mesa lavapipe software
-Vulkan. This machine's AMD hardware path has encountered kernel-driver faults;
-hardware acceleration is not validated. The CPU game code executes natively.
+Rendering has been checked with X11/Xwayland on Mesa lavapipe software Vulkan,
+an AMD Radeon 680M (RADV, Mesa 25.2.8), and an NVIDIA RTX 4070 Laptop GPU
+(595.99.02). The Radeon uses a driver-owned, coherent guest heap with host-pointer
+imports disabled. Selected menu/Story/tutorial tests and 3,000-frame runs reaching
+a Kenji sparring fight passed strict Vulkan validation on both hardware GPUs.
+Full-game stability and other GPUs remain unverified. The CPU game code executes
+natively.
 
 The runtime preserves original scene initialization and Unity internal calls.
 Generated main and SDK build IDs must match the loaded files exactly before boot.
@@ -61,11 +65,17 @@ python3 tools/convert.py \
   --output "$HOME/Games/Shadow Fight 2"
 ```
 
-SDL headers/libraries and SMAA sources are local dependencies, excluded from Git.
+SDL headers/libraries, SMAA sources and fallback font binaries are local dependencies, excluded from Git.
 `make` and conversion run `tools/setup_runtime.sh --ensure`, which prepares
-missing SDL/SMAA automatically. Existing local or system SDL 3.4+ is reused.
+missing SDL/SMAA/fonts automatically. Existing local or system SDL 3.4+ is reused.
 `--check` verifies dependencies without downloads; `--build-sdl` explicitly
 rebuilds the pinned SDL source. Setup verifies source checksums.
+
+The `pl:u` shared-font service supplies bundled Noto Sans and Noto Sans CJK
+substitutes when Unity requests system fallback fonts. Keep `lib/fonts/` beside
+the executable; `make` installs it for development builds and conversion includes
+it with OFL licenses. No console firmware fonts are required. Nintendo's private
+icon font is not reproduced; that slot uses the standard fallback face.
 
 The supported NSP input is a **combined base + update v131072 bundle containing
 its CNMT XML sidecars and tickets**. The supplied development NSP has this layout.
@@ -149,6 +159,9 @@ keyboard_prompts = false
 [storage]
 save_directory = save
 
+[gameplay]
+unlock_all_sparring_characters = true
+
 [controls.keyboard]
 a = Space
 b = J
@@ -168,6 +181,59 @@ existing `userdata/` backup, copy it under `<save_directory>/save_0/`; keep your
 original backup untouched. The SD-card mount, when used, is separate under
 `<save_directory>/sdcard/` and does not use save journaling.
 
+Sparring characters are all unlocked by default, independently of campaign saves.
+Set `[gameplay] unlock_all_sparring_characters = false` to restore the original
+save-based unlocks, then restart. This option changes only the sparring roster in
+memory; it does not add unlocks to your save or change Story progression.
+
+The original developer console and debug overlays are optional and disabled by
+default. Enable the desired `[developer]` options in the INI, then restart.
+Press **F1** or **backtick (`)** to open/close the enabled console, **Enter** to submit,
+**Esc** to close, **Up/Down** to browse command history and **PageUp/PageDown** or
+the mouse wheel to scroll output. Keyboard and
+controller gameplay input is captured while the console is open. **F2** toggles
+the original FPS, memory, build-info and model/animation overlays; build/model
+details appear in the scenes supported by the game. The console uses desktop
+text input instead of the Switch software keyboard.
+
+```ini
+[developer]
+console = false
+trainer = false
+shop_cheats = false
+overlays = false
+overlays_on_start = false
+fps = true
+memory = true
+build_info = true
+model_info = true
+
+[gameplay]
+unlock_all_videos = false
+show_intro = true
+ai_enabled = true
+show_time_results = false
+```
+
+Type `devhelp` for desktop controls and `help` for the game's original commands.
+`trainer` lists fight actions: `trainer god`, `trainer bot_god`, `trainer critical`,
+`trainer slow`, `trainer pause`, `trainer hud` and `trainer perks` toggle their
+corresponding features; `trainer magic`, `trainer combo`, `trainer style`,
+`trainer win`, `trainer win_round`, `trainer lose`, `trainer lose_round`,
+`trainer reset`, `trainer reset_round` and `trainer step` use the original fight
+handlers. Fight actions require an active fight and the game's allowed state.
+In the Story shop, `shop show` reveals the original cheat buttons; `shop hide`
+hides them. `shop money`, `shop gems`, `shop level` and `shop items` also expose
+the implemented shop actions. Currency, items, levels and fight results can be
+saved by the game.
+
+`overlay on`, `overlay off` and `overlay toggle` control overlay visibility.
+`config ai on/off`, `config intro on/off` and `config timings on/off` change the
+internal settings for this session; edit the INI to keep them across launches.
+Set the individual `[developer]` options to `false` and restart to disable those
+features. Local shop checks are scoped to that panel; online/admin permissions
+and the remote developer server are not enabled.
+
 Committed saves persist across launches. Changes are staged as `.pending` files,
 then synced/renamed on game Commit; abandoned pending copies are discarded at the
 next mount, including nested folders. A copied existing save was loaded, committed
@@ -182,6 +248,10 @@ unbinds an action. Analog gamepad sticks keep their normal axes. Multiple action
 may share a host input. Invalid recognized values warn and preserve the previous
 binding; unknown sections/keys are ignored for future additions.
 
+The main menu includes **Exit** to close the native game and return to the
+desktop, including in fullscreen. It uses the game's menu navigation and
+localized button artwork.
+
 `language = auto` follows the system locale. `SF2_CONFIG=/path/to/custom.ini`
 selects another INI; relative overrides are resolved against the launch directory.
 Precedence is built-in defaults, then INI, then existing `LARECOMP_*` session
@@ -194,12 +264,24 @@ Replacing in-game icons/text with keyboard labels is experimental and **off by
 default**. Opt in with `[experimental] keyboard_prompts = true`; `prompts = keyboard`
 alone does not enable it. With this experiment enabled, labels use current INI
 bindings and `prompts = keyboard` forces them even with a controller connected.
+When disabled, its hook group bypasses callbacks and runs the original game
+instructions; no hint cache or replacement UI is allocated. Each optional site
+retains a flag check, and the feature's code remains in the executable.
 Direction groups use compact names (`WASD`, `Arrows`); inline dialogue keeps the
 game's directional shorthand. Long key names shrink to a bounded width.
 Keys inside visible action buttons have matching outline badges: circles for single characters and rounded
 rectangles for longer names. Standalone hints stay plain. During the intro, either
 mapped A or B skips playback (**K** or **J** with the shipped bindings). The skip
 press is consumed so it cannot also activate the menu behind the movie.
+
+NVN presentation enforces the configured frame limit, including when a mailbox
+swapchain or disabled vsync would otherwise run uncapped. A positive game
+presentation interval multiplies the virtual display period (for example, 2 at
+60 Hz gives 30 FPS). `internal_resolution = auto` renders at the window's drawable
+pixel size and follows resizing/fullscreen; it does not select a lower-resolution
+FSR input. Choose a fractional internal resolution with `upscaler = fsr1` to use
+FSR. Higher render resolution improves geometry edges; the game's bitmap artwork
+and font atlases retain their original detail.
 With the experiment enabled, auto displays mapped keyboard labels when no gamepad
 is connected and controller glyphs when one is connected. Input mappings and intro
 skip work regardless of this display experiment.
@@ -218,8 +300,31 @@ requests 60 FPS in several startup paths, so this setting overrides those reques
 Set the host display to a matching refresh rate separately. Higher targets need
 enough CPU and GPU headroom to finish each frame in time.
 
-The developer launcher `tools/run_linux.sh --software` uses the repository INI
-and keeps run data under `build/run`.
+The developer launcher `tools/run_linux.sh` selects hardware Vulkan when available,
+uses the repository INI, and keeps run data under `build/run`. To select this
+machine's Radeon explicitly:
+
+```sh
+VK_DRIVER_FILES=/usr/share/vulkan/icd.d/radeon_icd.json tools/run_linux.sh
+```
+
+`tools/run_linux.sh --software` selects lavapipe. On Linux RADV, the default
+driver-managed heap shares coherent driver-allocated memory directly with the
+CPU, preserving shader global-memory reads and writes without importing anonymous
+guest pages. Allocation/mapping failure stops boot instead of silently using
+userptr imports. `LARECOMP_VK_MANAGED_HEAP=0` restores the legacy path for developer
+diagnostics; that path previously triggered AMD kernel faults on this machine.
+Do not carry `LARECOMP_VK_NO_GMEM=1` or a software ICD override into a hardware test.
+
+The opt-in memory check uses the production heap allocator without game files:
+
+```sh
+VK_DRIVER_FILES=/usr/share/vulkan/icd.d/radeon_icd.json python3 tools/test_gpu_heap.py
+```
+
+It requires Clang, Vulkan headers/loader and `glslc`, allocates the full 3.25 GiB
+heap, checks CPU-to-compute-shader-to-CPU visibility at the beginning/middle/end,
+and repeats with a fresh allocation. The regular unit tests require no GPU.
 
 ## Development and verification
 

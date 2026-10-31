@@ -13,6 +13,7 @@ class KeyboardHintTests(unittest.TestCase):
 #include <stdlib.h>
 #include <SDL3/SDL.h>
 #include "hle/hooks.c"
+#include "ui/menu_stubs.c"
 static Cpu *active_cpu;
 void *hle_alloc(size_t size) { return calloc(1, size); }
 bool rt_probe_u64(uint64_t a, uint64_t *v) { *v = 0x9000; return true; }
@@ -120,8 +121,11 @@ int main(void) {
     g_settings.prompts = PROMPTS_KEYBOARD;
     assert(!g_settings.experimental_keyboard_prompts && !keyboard_prompts_active());
     apply_image_label(&cpu, 0x1000, HINT_A);
-    assert(image_enabled && !text_enabled && hint_images_used == 0);
+    assert(image_enabled && !text_enabled && hints == NULL);
     g_settings.experimental_keyboard_prompts = true;
+    rt_hooks_configure();
+    assert(rt_hook_features == RT_HOOK_KEYBOARD_PROMPTS && !hints);
+    assert(ensure_keyboard_hint_state());
     g_bind_key[BIND_A] = SDL_SCANCODE_SPACE;
     missing_font = true;
     apply_image_label(&cpu, 0x1000, HINT_A);
@@ -220,6 +224,25 @@ int main(void) {
     assert(hint_key_label(HINT_RIGHT_STICK, label, sizeof label) && !strcmp(label, "Num8456"));
     g_bind_key[BIND_A] = SDL_SCANCODE_BACKSPACE;
     assert(hint_key_label(HINT_A, label, sizeof label) && !strcmp(label, "Bksp"));
+    g_settings.experimental_keyboard_prompts = false;
+    rt_hooks_configure();
+    assert(!rt_hook_features && !hints);
+    Cpu before;
+    memset(&cpu, 0xa5, sizeof cpu); before = cpu;
+    const uint64_t sites[] = {0x700011efb0, 0x7000114f90, 0x7000cd7130, 0x7000cdb690,
+        0x7000ce0dd0, 0x7000d9aec0, 0x7000ce0f40, 0x7000ce0de0, 0x7000ce10a0, 0x7000f9a060};
+    for (unsigned i = 0; i < sizeof sites / sizeof sites[0]; ++i) {
+        assert(rt_hook(&cpu, sites[i]) == 0 && !hints);
+        assert(!memcmp(&cpu, &before, sizeof cpu)); // no guest reads or writes, even with invalid pointers
+    }
+    cpu.x[1] = 999; g_settings.target_fps = 60;
+    assert(rt_hook(&cpu, 0x7001217700ull) == 0 && cpu.x[1] == 60 && !hints);
+    g_settings.experimental_keyboard_prompts = true;
+    rt_hooks_configure();
+    assert(rt_hook_features == RT_HOOK_KEYBOARD_PROMPTS && !hints);
+    assert(ensure_keyboard_hint_state());
+    reset_keyboard_hint_state();
+    assert(!hints); // reboot frees cache storage while retaining the configured hook group
     return 0;
 }
 '''

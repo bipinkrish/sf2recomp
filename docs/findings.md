@@ -305,3 +305,170 @@ binding walker B chain, eaten to anchor 0, nnMain returns 0. 63 commits.
   directional shorthand and width limits. Launches verified the original icons
   with the default INI and compact prompts through the punching-bag tutorial with
   a temporary opt-in INI. The package was refreshed with the experiment disabled.
+
+## 2026-10-31 — optional hooks bypass disabled callbacks
+
+- Keyboard hooks are now a separate runtime group configured after INI loading
+  and before guest threads start. Each generated optional site checks its group
+  bit before calling the hook; when disabled it executes the original, validated
+  instruction directly. Console and frame-rate compatibility hooks remain active.
+- Hint caches and cached Unity types moved from fixed global arrays into one
+  lazily allocated state block. Disabled runs allocate no hint state or UI and
+  perform no keyboard-hook lookups/scans. Reset frees the state. The executable
+  still contains the feature code and a flag check at each optional site.
+- Generator regression tests execute original and gated instructions and count
+  callbacks. Runtime tests exercise every disabled site with invalid guest
+  pointers, verify CPU state is preserved, check lazy allocation/reset and confirm
+  that frame-rate hooks remain active. All 52 tests pass.
+- Regenerated/rebuilt main and SDK. Both launch checks skipped the intro using J
+  and entered Story with K: disabled mode showed the original A icon, while opt-in
+  mode showed the circled K. The packaged executable was refreshed with the
+  experiment still disabled in its INI.
+
+
+### 2026-10-31 — live play: shared-font wait and missing half comparison
+
+The live session in `build/validation/play-session-20261031-104311` froze
+returning from gameplay to the menu. Its automatic hang dump shows presentation
+stopped with the render queue drained. The main guest thread repeatedly queried
+`pl:u` command 1; the generic successful service stub returned zero (not loaded)
+forever. This is distinct from the earlier intermittent Story loading wait.
+The retained `freeze-diagnostic.log` includes the thread stacks and preceding
+font-service polls. External debugger attachment was unavailable, so diagnosis
+used the runtime's built-in hang dump.
+
+Added the `pl:u` service, which loads pinned OFL Noto Sans/CJK substitutes before
+returning loaded state and exposes their actual sizes, offsets and shared-memory
+bytes. Fonts are loaded only on demand and freed at reboot reset. The build and
+conversion pipelines prepare/copy the fonts and licenses automatically. This
+uses the normal runtime service interface without changing guest game logic.
+The Nintendo private icon font is not reproduced; its slot uses Noto Sans.
+
+The same session also logged an unsupported fragment instruction
+`7e83038400070307` at shader PC `0x78`, followed by skipped draws. It is the
+constant-buffer HSETP2 form, previously missing from the translator. Added the
+constant/immediate HSETP2 and HSET2 forms using their distinct comparison and
+H_AND/BF field positions. The exact logged instruction now translates and its
+GLSL compiles to SPIR-V; register-form behavior is covered as well. This error
+alone did not establish the cause of the earlier empty dialog/freeze.
+
+All 56 tests pass, including shared-font data/ranges/reset, bounded output lists,
+checksum rejection, packaging preservation and half-comparison translation.
+A hidden AMD Vulkan run using a separate save copy reproduced font requests
+while leaving the Dojo, mapped both fonts, and continued through a populated
+Sensei level-up dialog into Profile. It exited normally after 12,000 frames;
+no hang or shader-translation failures were logged. Screenshots and log:
+`build/validation/menu-return-font-check`. This is one transition test, not a
+full-game stability claim.
+
+
+### 2026-10-31 — uncapped presentation and resolution checks
+
+Live play reported fast blinking. The log confirmed 650–1,300 guest presents
+per second despite `target_fps = 60`: NVN stored the window presentation interval
+but never waited for it. The mailbox swapchain did not throttle those submissions.
+Added per-window monotonic presentation deadlines at the NVN boundary. Positive
+intervals multiply the configured virtual display period; interval zero still
+respects the configured FPS cap. Late frames rebase instead of bursting to catch
+up. No guest animation or game timing code was patched.
+
+The test build held about 59.7–59.9 FPS after loading. Added an actual NVN-entry
+regression test for the cap, interval changes, late-frame recovery and invalid
+presents. Scripted window resize requests had also been lost when the overlay
+was removed; the UI stub now applies those requests on the UI thread.
+
+Enlargement blur was reported from a previous run, not the current live session.
+Automatic/native resolution followed scripted resize correctly: actual Vulkan
+render targets changed from 1280x720 to 1920x1080, 960x540 and 2560x1440. Added
+`[output]` logging for actual source and window dimensions so future reports can
+be checked against real allocations. `build/validation/pacing-resize-check`
+contains the log and final 2560x1440 capture. A separate fixed-2x test rendered
+at 3840x2160 into a 1920x1080 window; a fractional-resolution FSR test rendered
+at 960x540 and logged the FSR pass to 1920x1080. Both exited normally; logs and
+captures are in `pacing-fixed-2x-check` and `pacing-fsr-half-check` beside the
+resize test. Bitmap artwork/font atlas detail is independent of render-target
+resolution; these tests did not reproduce the earlier scaling complaint.
+
+All 57 tests pass. These checks cover the presentation API and selected scenes,
+not full-game timing/stability at every configured frame rate.
+
+## 2026-10-31 — Radeon driver-owned guest heap
+
+RADV now requires driver-owned coherent heap backing by default and disables
+external host-pointer imports, their whole-heap probe and lazy userptr chunks.
+The buffer is bound before the guest mapping is published; write tracking is
+disabled before replacing anonymous pages with the DRM mapping. Reset removes
+the CPU mapping before freeing its Vulkan allocation. Allocation/mapping failure
+stops boot instead of silently falling back to the previously faulting userptr
+path. No `NO_GMEM` zero-read fallback is used in the hardware tests.
+
+The Radeon 680M (Mesa RADV 25.2.8, Linux 7.0.0-34, X11) reached 1,200 frames,
+including the animated menu, Story dialogue and Sensei movement tutorial, with
+strict Khronos validation enabled and no reported validation errors. The first
+validation attempt identified uninitialized dynamic stencil operations on draws
+with stencil disabled; initializing the declared state fixed that error. Warm
+sections of the successful run logged 59.8 FPS at 1280x720, with loading/shader
+compilation dips. The final scene was visually checked. This does not establish
+full combat or full-game compatibility.
+
+`tools/test_gpu_heap.py` compiles the actual production heap allocator into an
+isolated Vulkan compute test, with no game inputs. CPU-written data at the first,
+middle and last heap pages is modified by the GPU and checked on the CPU after
+a host-read barrier and fence; a fresh allocation repeats the test and checks
+zero initialization. Both cycles passed on the Radeon with the full 3,328 MiB
+heap. Regular regression tests also cover allocation failure stopping boot and
+real global-memory binding when host-pointer import support is disabled.
+
+Evidence: `build/validation/gpu-amd-story`,
+`build/validation/gpu-amd-validation-fixed`,
+`build/validation/gpu-heap-roundtrip.log`, and
+`build/validation/gpu-unit-tests.log` (61 tests passed).
+
+A longer scripted run subsequently reached frame 3,000 and entered a Kenji
+sparring fight using the current 120 FPS repository settings. Captures at frames
+2,400 and 3,000 show both fighters and combat animation. Movement and attack
+inputs were scripted, strict validation reported no errors, and the process
+exited normally. Warm sections logged about 119.2 FPS; shader compilation and
+loading caused dips. This checks one combat scene, not complete fights or the
+full campaign. Evidence: `build/validation/gpu-amd-tutorial`, including
+`environment.json`, `result.json`, logs and screenshots.
+
+The RTX 4070 is physically present and NVIDIA 595.71.05 is installed. Its kernel
+module is installed for 6.17.0-35, but not the running 7.0.0-34 kernel:
+`modinfo nvidia` fails, PCI has no bound NVIDIA driver, and `nvidia-smi` fails.
+An explicit NVIDIA-ICD test failed Vulkan physical-device enumeration before
+allocating any memory (`build/validation/gpu-nvidia-attempt.log`). Dedicated-GPU
+validation therefore remains blocked by host driver availability. Secure Boot
+is enabled; a repair must use an appropriately signed matching module. No
+system packages, kernel modules or boot settings were changed.
+
+The installed module for 6.17.0-35 is NVIDIA 595.71.05 and is signed by
+Canonical Ltd. Kernel Module Signing; the matching kernel and initramfs are
+present. Booting that kernel is a concrete option for a subsequent RTX test,
+subject to verifying `nvidia-smi` and Vulkan enumeration after boot. The current
+7.0.0-34 module package available in APT requires a different NVIDIA version
+than the installed driver, and an installation simulation did not resolve its
+dependencies. No driver repair or reboot was attempted.
+
+## 2026-10-31 — RTX 4070 validated after driver repair and reboot
+
+NVIDIA was subsequently upgraded to 595.99.02 with Canonical-signed modules for
+7.0.0-38, and GRUB's saved Ubuntu entry was set to that kernel. After the user's
+reboot, the running kernel is 7.0.0-38, PCI reports the NVIDIA driver bound to the
+RTX 4070 Laptop GPU, and both `nvidia-smi` and Vulkan enumerate it normally.
+
+The isolated production-allocator compute test passed two full 3,328 MiB
+driver-owned heap allocation cycles on NVIDIA, including CPU-to-shader-to-CPU
+visibility at beginning/middle/end. The game itself was tested with its default
+NVIDIA host-import path (3,236 MiB imported for shader global memory), strict
+Khronos validation, an isolated settings snapshot and separate saves. It reached
+frame 3,000 in Kenji sparring and exited with status 0, with no reported Vulkan
+validation errors. Captures at frames 2,400 and 3,000 were visually inspected;
+movement, attacks, health changes and knockdown are visible. `nvidia-smi` listed
+`sf2` using the dedicated GPU during the test.
+
+This NVIDIA/X11 run selected FIFO presentation and logged about 59.9 FPS in warm
+sections at 1280x720, despite the 120 FPS target. This is not a matched performance
+comparison with the AMD mailbox run; shader/loading dips also occurred. Full-game
+stability remains unverified. Evidence: `build/validation/gpu-nvidia-post-reboot`
+(heap log, settings/environment, game log, result JSON and screenshots).

@@ -4,6 +4,7 @@
 #include "../settings.h"
 #include "../input_bind.h"
 #include "../nvn/texture_color.h"
+#include "../ui/menu.h"
 #include <SDL3/SDL_scancode.h>
 #include <math.h>
 
@@ -50,11 +51,21 @@ typedef struct {
     bool original_enabled;
 } HintImageState;
 
-static HintTextState hint_texts[HINT_COMPONENT_CAP];
-static HintImageState hint_images[HINT_COMPONENT_CAP];
-static size_t hint_images_used;
-static uint64_t hint_text_type, hint_rect_type, hint_type_type, hint_layout_type, hint_image_type;
-static uint64_t hint_button_type, hint_horizontal_type;
+typedef struct {
+    HintTextState texts[HINT_COMPONENT_CAP];
+    HintImageState images[HINT_COMPONENT_CAP];
+    size_t images_used;
+    uint64_t text_type, rect_type, type_type, layout_type, image_type;
+    uint64_t button_type, horizontal_type;
+} KeyboardHintState;
+
+static KeyboardHintState *hints;
+uint32_t rt_hook_features;
+
+static bool ensure_keyboard_hint_state(void) {
+    if (!hints) hints = calloc(1, sizeof *hints);
+    return hints != NULL;
+}
 
 // Invoke one recompiled guest method while preserving the caller's CPU state.
 static uint64_t guest_invoke4(Cpu *caller, uint64_t pc, uint64_t x0, uint64_t x1, uint64_t x2, uint64_t x3) {
@@ -252,10 +263,11 @@ static uint64_t guest_string(Cpu *caller, const char *utf8) {
 }
 
 static HintTextState *hint_text_state(Cpu *c, uint64_t text, bool create) {
+    if (!hints) return NULL;
     HintTextState *empty = NULL;
     for (size_t i = 0; i < HINT_COMPONENT_CAP; ++i) {
-        if (hint_texts[i].component == text) return &hint_texts[i];
-        if (!hint_texts[i].component && !empty) empty = &hint_texts[i];
+        if (hints->texts[i].component == text) return &hints->texts[i];
+        if (!hints->texts[i].component && !empty) empty = &hints->texts[i];
     }
     if (!create || !empty) return NULL;
     empty->component = text;
@@ -265,16 +277,17 @@ static HintTextState *hint_text_state(Cpu *c, uint64_t text, bool create) {
 }
 
 static HintImageState *hint_image_state(Cpu *c, uint64_t image, bool create) {
+    if (!hints) return NULL;
     HintImageState *empty = NULL;
     for (size_t i = 0; i < HINT_COMPONENT_CAP; ++i) {
-        if (hint_images[i].component == image) return &hint_images[i];
-        if (!hint_images[i].component && !empty) empty = &hint_images[i];
+        if (hints->images[i].component == image) return &hints->images[i];
+        if (!hints->images[i].component && !empty) empty = &hints->images[i];
     }
     if (!create || !empty) return NULL;
     empty->component = image;
     for (int i = 0; i < 3; ++i) empty->artwork_rgb[i] = 1;
-    size_t used = (size_t)(empty - hint_images) + 1;
-    if (used > hint_images_used) hint_images_used = used;
+    size_t used = (size_t)(empty - hints->images) + 1;
+    if (used > hints->images_used) hints->images_used = used;
     empty->original_enabled = guest_invoke2(c, GUEST_BEHAVIOUR_GET_ENABLED, image, 0) != 0;
     return empty;
 }
@@ -288,16 +301,16 @@ static void hide_hint_image(Cpu *c, uint64_t image) {
 
 // Create a plain UI child without cloning localization scripts or scaling.
 static uint64_t create_hint_graphic(Cpu *c, uint64_t source, uint64_t parent, uint64_t type, const char *name) {
-    if (!hint_rect_type) hint_rect_type = guest_invoke2(c, 0x70008ea5c0ull, 0,
+    if (!hints->rect_type) hints->rect_type = guest_invoke2(c, 0x70008ea5c0ull, 0,
         guest_string(c, "UnityEngine.RectTransform, UnityEngine"));
-    if (!hint_type_type) hint_type_type = guest_invoke2(c, 0x70008ea5c0ull, 0,
+    if (!hints->type_type) hints->type_type = guest_invoke2(c, 0x70008ea5c0ull, 0,
         guest_string(c, "System.Type"));
-    if (!type || !hint_rect_type || !hint_type_type) return 0;
+    if (!type || !hints->rect_type || !hints->type_type) return 0;
     uint64_t source_go = guest_invoke2(c, 0x700121e720ull, source, 0);
     uint64_t go = guest_invoke2(c, 0x7000b5b110ull, LD64(source_go), 0);
-    uint64_t types = guest_invoke4(c, 0x70006e6740ull, 0, hint_type_type, 1, 0);
+    uint64_t types = guest_invoke4(c, 0x70006e6740ull, 0, hints->type_type, 1, 0);
     if (!go || !types) return 0;
-    ST64(types + 0x20, hint_rect_type);
+    ST64(types + 0x20, hints->rect_type);
     guest_invoke4(c, 0x7001225f80ull, go, guest_string(c, name), types, 0);
     uint64_t graphic = guest_invoke2(c, 0x70012260e0ull, go, type);
     if (!graphic) return 0;
@@ -312,19 +325,19 @@ static uint64_t create_hint_graphic(Cpu *c, uint64_t source, uint64_t parent, ui
 }
 
 static uint64_t create_hint_label(Cpu *c, uint64_t image) {
-    if (!hint_text_type) hint_text_type = guest_invoke2(c, 0x70008ea5c0ull, 0,
+    if (!hints->text_type) hints->text_type = guest_invoke2(c, 0x70008ea5c0ull, 0,
         guest_string(c, "UnityEngine.UI.Text, UnityEngine.UI"));
-    if (!hint_text_type) return 0;
+    if (!hints->text_type) return 0;
     uint64_t transform = guest_invoke2(c, 0x700121e6b0ull, image, 0);
     uint64_t parent = transform, prototype = 0;
     for (int depth = 0; parent && depth < 8 && !prototype; ++depth) {
         parent = guest_invoke2(c, 0x70015d8be0ull, parent, 0);
-        if (parent) prototype = guest_invoke4(c, 0x700121e970ull, parent, hint_text_type, 1, 0);
+        if (parent) prototype = guest_invoke4(c, 0x700121e970ull, parent, hints->text_type, 1, 0);
     }
     if (!prototype) return 0;
     uint64_t font = guest_invoke2(c, 0x70005bce40ull, prototype, 0);
     if (!font) return 0;
-    uint64_t text = create_hint_graphic(c, image, transform, hint_text_type, "Keyboard hint");
+    uint64_t text = create_hint_graphic(c, image, transform, hints->text_type, "Keyboard hint");
     if (!text) return 0;
     guest_invoke2(c, 0x70005dcc40ull, text, font);
     uint64_t font_size = guest_invoke2(c, 0x70005dd1e0ull, prototype, 0);
@@ -394,8 +407,8 @@ static void copy_hint_color(Cpu *c, const HintImageState *state, uint64_t text) 
 // The neighbouring caption supplies only the font, never the label color.
 static void update_hint_color(Cpu *c) {
     uint64_t source = c->x[0];
-    for (size_t i = 0; i < hint_images_used; ++i) {
-        HintImageState *state = &hint_images[i];
+    for (size_t i = 0; i < hints->images_used; ++i) {
+        HintImageState *state = &hints->images[i];
         if (state->component != source || !state->keyboard_text) continue;
         Cpu saved = *c;
         set_hint_color(c, state, state->keyboard_text);
@@ -404,16 +417,16 @@ static void update_hint_color(Cpu *c) {
 }
 
 static bool hint_inside_action_button(Cpu *c, uint64_t owner) {
-    if (!hint_button_type) hint_button_type = guest_invoke2(c, 0x70008ea5c0ull, 0,
+    if (!hints->button_type) hints->button_type = guest_invoke2(c, 0x70008ea5c0ull, 0,
         guest_string(c, "UnityEngine.UI.Button, UnityEngine.UI"));
-    if (!hint_image_type) hint_image_type = guest_invoke2(c, 0x70008ea5c0ull, 0,
+    if (!hints->image_type) hints->image_type = guest_invoke2(c, 0x70008ea5c0ull, 0,
         guest_string(c, "UnityEngine.UI.Image, UnityEngine.UI"));
-    uint64_t button = hint_button_type ? guest_invoke2(c, 0x700121ead0ull, owner, hint_button_type) : 0;
-    if (!button || !hint_image_type) return false;
+    uint64_t button = hints->button_type ? guest_invoke2(c, 0x700121ead0ull, owner, hints->button_type) : 0;
+    if (!button || !hints->image_type) return false;
     uint64_t background = guest_invoke2(c, 0x70005d8220ull, button, 0); // Selectable.targetGraphic
     // Footer legends also have Button components, but no separate visible art.
     if (!background || background == owner ||
-        guest_invoke2(c, 0x700121e790ull, background, hint_image_type) != background ||
+        guest_invoke2(c, 0x700121e790ull, background, hints->image_type) != background ||
         !guest_invoke2(c, 0x700011d4a0ull, background, 0) ||
         !guest_invoke2(c, GUEST_BEHAVIOUR_GET_ENABLED, background, 0)) return false;
     Cpu saved = *c;
@@ -443,7 +456,7 @@ static float layout_hint_badge(Cpu *c, HintImageState *group, uint64_t owner, co
     if (enclosed) {
         if (!group->keyboard_outline) {
             uint64_t parent = guest_invoke2(c, 0x700121e6b0ull, group->keyboard_text, 0);
-            group->keyboard_outline = create_hint_graphic(c, owner, parent, hint_image_type, "Key outline");
+            group->keyboard_outline = create_hint_graphic(c, owner, parent, hints->image_type, "Key outline");
         }
         if (group->keyboard_outline) {
             group->circle = strlen(label) == 1;
@@ -466,8 +479,8 @@ static float layout_hint_badge(Cpu *c, HintImageState *group, uint64_t owner, co
 // normal canvas mesh preserves clipping, transforms, batching and CanvasGroup fades.
 static int populate_hint_outline(Cpu *c) {
     HintImageState *state = NULL;
-    for (size_t i = 0; i < hint_images_used; ++i)
-        if (hint_images[i].keyboard_outline == c->x[0]) { state = &hint_images[i]; break; }
+    for (size_t i = 0; i < hints->images_used; ++i)
+        if (hints->images[i].keyboard_outline == c->x[0]) { state = &hints->images[i]; break; }
     if (!state || !c->x[0]) return 0;
     Cpu saved = *c;
     uint64_t mesh = c->x[1];
@@ -519,13 +532,13 @@ static int populate_hint_outline(Cpu *c) {
 // Reserve width on the direct child of a horizontal layout, rather than an
 // icon nested inside that child. Otherwise longer names overlap the caption.
 static uint64_t hint_layout_owner(Cpu *c, uint64_t owner, bool *centered) {
-    if (!hint_horizontal_type) hint_horizontal_type = guest_invoke2(c, 0x70008ea5c0ull, 0,
+    if (!hints->horizontal_type) hints->horizontal_type = guest_invoke2(c, 0x70008ea5c0ull, 0,
         guest_string(c, "UnityEngine.UI.HorizontalLayoutGroup, UnityEngine.UI"));
     uint64_t child = guest_invoke2(c, 0x700121e6b0ull, owner, 0);
-    for (int depth = 0; child && hint_horizontal_type && depth < 4; ++depth) {
+    for (int depth = 0; child && hints->horizontal_type && depth < 4; ++depth) {
         uint64_t parent = guest_invoke2(c, 0x70015d8be0ull, child, 0);
         if (!parent) break;
-        if (guest_invoke2(c, 0x700121e790ull, parent, hint_horizontal_type)) {
+        if (guest_invoke2(c, 0x700121e790ull, parent, hints->horizontal_type)) {
             *centered = true;
             return child;
         }
@@ -562,12 +575,12 @@ static void apply_image_group(Cpu *c, uint64_t image, int id, uint64_t owner, bo
     uint64_t rect = guest_invoke2(c, 0x700121e6b0ull, text, 0);
     guest_invoke2(c, GUEST_TEXT_SET, text, guest_string(c, label));
     // Let the original layout group reserve the width of the mapped label.
-    if (!hint_layout_type) hint_layout_type = guest_invoke2(c, 0x70008ea5c0ull, 0,
+    if (!hints->layout_type) hints->layout_type = guest_invoke2(c, 0x70008ea5c0ull, 0,
         guest_string(c, "UnityEngine.UI.LayoutElement, UnityEngine.UI"));
-    if (!group->keyboard_layout && hint_layout_type) {
+    if (!group->keyboard_layout && hints->layout_type) {
         uint64_t layout_owner = hint_layout_owner(c, owner, &group->centered_layout);
         uint64_t go = guest_invoke2(c, 0x700121e720ull, layout_owner, 0);
-        group->keyboard_layout = guest_invoke2(c, 0x70012260e0ull, go, hint_layout_type);
+        group->keyboard_layout = guest_invoke2(c, 0x70012260e0ull, go, hints->layout_type);
         guest_invoke2(c, 0x70005c2800ull, group->keyboard_layout, 10);
     }
     float width = layout_hint_badge(c, group, owner, label);
@@ -623,9 +636,9 @@ static void apply_hint_image(Cpu *c, bool sprite_art) {
     if (!c->x[0] || !c->x[1]) return;
     if (!sprite_art) {
         // RefreshGraphics accepts any Graphic. Only Images have a sprite.
-        if (!hint_image_type) hint_image_type = guest_invoke2(c, 0x70008ea5c0ull, 0,
+        if (!hints->image_type) hints->image_type = guest_invoke2(c, 0x70008ea5c0ull, 0,
             guest_string(c, "UnityEngine.UI.Image, UnityEngine.UI"));
-        sprite_art = hint_image_type && guest_invoke2(c, 0x700121e790ull, c->x[1], hint_image_type) == c->x[1];
+        sprite_art = hints->image_type && guest_invoke2(c, 0x700121e790ull, c->x[1], hints->image_type) == c->x[1];
     }
     apply_image_group(c, c->x[1], (int32_t)LD32(c->x[0] + 0x18), c->x[0], sprite_art);
 }
@@ -644,21 +657,27 @@ static void apply_toggle_hint(Cpu *c) {
 static void forget_hint_component(uint64_t component) {
     uint64_t text = 0;
     for (size_t i = 0; i < HINT_COMPONENT_CAP; ++i)
-        if (hint_images[i].component == component) text = hint_images[i].keyboard_text;
+        if (hints->images[i].component == component) text = hints->images[i].keyboard_text;
     for (size_t i = 0; i < HINT_COMPONENT_CAP; ++i) {
-        if (hint_images[i].component == component || (text && hint_images[i].keyboard_text == text))
-            hint_images[i] = (HintImageState){0};
-        if (hint_texts[i].component == component || hint_texts[i].owner == component)
-            hint_texts[i] = (HintTextState){0};
+        if (hints->images[i].component == component || (text && hints->images[i].keyboard_text == text))
+            hints->images[i] = (HintImageState){0};
+        if (hints->texts[i].component == component || hints->texts[i].owner == component)
+            hints->texts[i] = (HintTextState){0};
     }
 }
 
 RT_ON_RESET(reset_keyboard_hint_state) {
-    hint_text_type = hint_rect_type = hint_type_type = hint_layout_type = hint_image_type = 0;
-    hint_button_type = hint_horizontal_type = 0;
-    memset(hint_texts, 0, sizeof hint_texts);
-    memset(hint_images, 0, sizeof hint_images);
-    hint_images_used = 0;
+    free(hints);
+    hints = NULL;
+}
+
+// Call only before guest threads start (or after they have stopped). INI
+// experiments require a restart; guest UI objects are never hot-unhooked.
+static void reset_developer_state(void);
+void rt_hooks_configure(void) {
+    reset_keyboard_hint_state();
+    reset_developer_state();
+    rt_hook_features = g_settings.experimental_keyboard_prompts ? RT_HOOK_KEYBOARD_PROMPTS : 0;
 }
 
 // The Switch standard-stream getters return null. Corlib FileStream expects a
@@ -670,7 +689,24 @@ static int console_handle(Cpu *c) {
     return 1;
 }
 
-int rt_hook(Cpu *c, uint64_t site) {
+// PvpSettings.UpdateCharactersLock operates on the sparring roster, including
+// inlined save checks. Override only its transient PvpCharacter.isOpened flags;
+// leave MainSettings and the saved UnlockedCharacters list untouched.
+static int unlock_sparring_characters(Cpu *c) {
+    if (!g_settings.unlock_all_sparring_characters || !c->x[0]) return 0;
+    uint64_t characters = LD64(c->x[0] + 0x18);
+    if (!characters) return 0;
+    uint64_t count = LD64(characters + 0x18);
+    for (uint64_t i = 0; i < count; ++i) {
+        uint64_t character = LD64(characters + 0x20 + i * 8);
+        if (character) ST8(character + 0x58, 1);
+    }
+    return 1;
+}
+
+static int keyboard_hint_hook(Cpu *c, uint64_t site) {
+    if (!(rt_hook_features & RT_HOOK_KEYBOARD_PROMPTS)) return 0;
+    if (!ensure_keyboard_hint_state()) return 0;
     switch (site) {
     case 0x700011efb0ull:  // Image.OnPopulateMesh: only our generated outline Images
         return populate_hint_outline(c);
@@ -705,6 +741,57 @@ int rt_hook(Cpu *c, uint64_t site) {
     case 0x7000f9a060ull:  // SFToggle.RefreshControlHint
         apply_toggle_hint(c);
         return 0;
+    default:
+        return 0;
+    }
+}
+
+static bool guest_object_named(Cpu *c, uint64_t object, const char *expected) {
+    if (!object) return false;
+    uint64_t name = guest_invoke2(c, 0x700122e460ull, object, 0);
+    size_t length = strlen(expected);
+    if (!name || LD32(name + 0x10) != length) return false;
+    for (size_t i = 0; i < length; ++i)
+        if (LD16(name + 0x14 + i * 2) != (unsigned char)expected[i]) return false;
+    return true;
+}
+
+#include "developer_hooks.inc"
+
+// The shipped MainSection has a fully wired, localized Exit item. Reveal it
+// before GeneralMenuList.Awake collects active buttons and installs navigation.
+static void enable_desktop_exit(Cpu *c, uint64_t list) {
+    uint64_t root = guest_invoke2(c, 0x700121e6b0ull, list, 0);
+    if (!guest_object_named(c, root, "MainSection")) return;
+    int children = guest_invoke2(c, 0x70015d9e00ull, root, 0);
+    for (int i = 0; i < children; ++i) {
+        uint64_t content = guest_invoke2(c, 0x70015da1f0ull, root, i);
+        if (!guest_object_named(c, content, "ListContent")) continue;
+        int items = guest_invoke2(c, 0x70015d9e00ull, content, 0);
+        for (int j = 0; j < items; ++j) {
+            uint64_t item = guest_invoke2(c, 0x70015da1f0ull, content, j);
+            if (!guest_object_named(c, item, "MenuItemButton_exit")) continue;
+            uint64_t object = guest_invoke2(c, 0x700121e720ull, item, 0);
+            if (object) {
+                guest_invoke2(c, 0x7001226480ull, object, 1);
+                LOG("[menu] enabled desktop Exit item\n");
+            }
+            return;
+        }
+    }
+}
+
+int rt_hook(Cpu *c, uint64_t site) {
+    switch (site) {
+    case 0x7000fc9230ull:  // PvpSettings.UpdateCharactersLock
+        return unlock_sparring_characters(c);
+    case 0x7000e6b820ull:
+        enable_desktop_exit(c, c->x[0]);
+        dev_ensure_ui(c);
+        return 0;
+    case 0x7000e6ef20ull:  // GeneralMenuScene.ShowExit
+        menu_request_quit();
+        return 1;
     case 0x7001217700ull: {  // UnityEngine.Application.set_targetFrameRate(int)
         int requested = (int32_t)c->x[1];
         int configured = g_settings.target_fps;
@@ -724,6 +811,7 @@ int rt_hook(Cpu *c, uint64_t site) {
     case 0x7000386670ull:
         return console_handle(c);
     default:
-        return 0;
+        { int result = developer_hook(c, site); if (result >= 0) return result; }
+        return keyboard_hint_hook(c, site);
     }
 }

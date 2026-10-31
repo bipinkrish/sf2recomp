@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 from game_metadata import APP_ID, parse_nacp
 from setup_ffmpeg import ARCHIVE_NAME as FFMPEG_ARCHIVE_NAME, VERSION as FFMPEG_VERSION
+from setup_fonts import FONT_DIRECTORY, prepare as prepare_fonts
 
 
 def run(*command):
@@ -133,6 +134,7 @@ def package_game(game, output, executable, sdl_dir, ffmpeg_dir):
     if (not ffmpeg_executable.is_file() or not ffmpeg_build.is_file() or not ffmpeg_source.is_file()
             or not ffmpeg_license.is_dir() or not ffmpeg_libraries):
         raise ValueError("The bundled FFmpeg build is incomplete; run tools/setup_ffmpeg.py --build.")
+    prepare_fonts(FONT_DIRECTORY, check=True)
     output.mkdir(parents=True, exist_ok=True)
     exefs = output / "extracted/exefs"
     exefs.mkdir(parents=True, exist_ok=True)
@@ -205,6 +207,11 @@ def package_game(game, output, executable, sdl_dir, ffmpeg_dir):
     shutil.copytree(ffmpeg_license, ffmpeg_notices)
     shutil.copy2(ffmpeg_source, ffmpeg_notices / f"ffmpeg-{FFMPEG_VERSION}-source.tar.xz")
     shutil.copy2(ffmpeg_build, ffmpeg_notices / "BUILD.txt")
+    shutil.copytree(FONT_DIRECTORY, output / "lib/fonts", dirs_exist_ok=True)
+    font_notices = notices / "Noto"
+    font_notices.mkdir(exist_ok=True)
+    for name in ("NotoSans-LICENSE.txt", "NotoSansCJK-LICENSE.txt", "SOURCE.txt"):
+        shutil.copy2(FONT_DIRECTORY / name, font_notices / name)
     (output / "build.json").write_text(json.dumps({
         "target": "linux", "executable": "sf2", "source_build_ids": source_ids(game),
         "official_title": info["title"], "official_display_version": info["display_version"],
@@ -218,6 +225,7 @@ def package_game(game, output, executable, sdl_dir, ffmpeg_dir):
         "Edit sf2recomp.ini for language/audio/video/keyboard/gamepad mappings; restart to apply.\n"
         "Keep extracted/ beside the executable. This output contains your local game-derived files.\n"
         "Cutscene playback uses the FFmpeg decoder and source bundled in lib/ffmpeg and licenses/FFmpeg; no FFmpeg install is needed.\n"
+        "Keep lib/fonts/ alongside the executable for shared-font fallback (Noto, SIL OFL 1.1).\n"
         "System requirements: Linux x86-64, Vulkan loader/driver, shaderc and C/C++ runtime libraries.\n"
         "Software fallback: SDL_VIDEODRIVER=x11 LARECOMP_VK_NO_GMEM=1 "
         "VK_DRIVER_FILES=/usr/share/vulkan/icd.d/lvp_icd.json ./sf2\n"

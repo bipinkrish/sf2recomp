@@ -1,5 +1,6 @@
 """Conversion output must contain runtime inputs and preserve editable settings."""
 import importlib.util
+import hashlib
 import pathlib
 import json
 import os
@@ -48,6 +49,20 @@ class PackageTests(unittest.TestCase):
             path = self.ffmpeg / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b"fixture")
+        import setup_fonts
+        self.fonts = self.base / "fonts"
+        self.fonts.mkdir()
+        for name in (*setup_fonts.FILES, "SOURCE.txt"):
+            (self.fonts / name).write_bytes(b"font fixture")
+        self.font_directory_patch = patch.object(convert, "FONT_DIRECTORY", self.fonts)
+        self.font_directory_patch.start()
+        self.addCleanup(self.font_directory_patch.stop)
+        self.font_pin_patch = patch.object(setup_fonts, "FILES", {
+            name: (url, hashlib.sha256(b"font fixture").hexdigest())
+            for name, (url, _) in setup_fonts.FILES.items()
+        })
+        self.font_pin_patch.start()
+        self.addCleanup(self.font_pin_patch.stop)
 
     def tearDown(self):
         self.temp.cleanup()
@@ -57,6 +72,9 @@ class PackageTests(unittest.TestCase):
         self.assertTrue((self.output / "sf2").is_file())
         self.assertEqual((self.output / "lib/ffmpeg/bin/ffmpeg").read_bytes(), b"fixture")
         self.assertEqual((self.output / "lib/ffmpeg/lib/libavcodec.so.1").read_bytes(), b"fixture")
+        self.assertEqual((self.output / "lib/fonts/NotoSans-Regular.ttf").read_bytes(), b"font fixture")
+        self.assertEqual((self.output / "lib/fonts/NotoSansCJKsc-Regular.otf").read_bytes(), b"font fixture")
+        self.assertEqual((self.output / "licenses/Noto/NotoSans-LICENSE.txt").read_bytes(), b"font fixture")
         self.assertFalse((self.output / "sf2recomp").exists())
         self.assertEqual(json.loads((self.output / "build.json").read_text())["executable"], "sf2")
         config = self.output / "sf2recomp.ini"
@@ -115,6 +133,16 @@ class PackageTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Official control.nacp"):
             convert.package_game(self.game, self.output, self.exe, self.base / "sdl", self.ffmpeg)
         self.assertFalse(self.output.exists())
+
+    def test_missing_font_preserves_existing_output(self):
+        self.output.mkdir()
+        old_executable = self.output / "sf2"
+        old_executable.write_bytes(b"existing game")
+        (self.fonts / "NotoSans-Regular.ttf").unlink()
+        with self.assertRaisesRegex(ValueError, "Bundled fonts missing or changed"):
+            convert.package_game(self.game, self.output, self.exe, self.base / "sdl", self.ffmpeg)
+        self.assertEqual(old_executable.read_bytes(), b"existing game")
+        self.assertEqual(list(self.output.iterdir()), [old_executable])
 
     def test_desktop_special_characters_are_quoted_without_shell_execution(self):
         output = self.base / 'game % "quoted" $value \u005c folder'

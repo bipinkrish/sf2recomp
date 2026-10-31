@@ -419,12 +419,28 @@ static bool emit_half(Ctx *c, uint64_t w) {
         hstore(c, d, t, merge, sat);
         return true;
     }
-    // ---- HSETP2 / HSET2 (reg forms)
-    if ((op & 0xfff8) == 0x5d20 || (op & 0xfff8) == 0x5d18) {
-        bool setp = (op & 0xfff8) == 0x5d20;
+    // ---- HSETP2 / HSET2 (register, constant buffer, immediate)
+    // Constant/immediate forms move the comparison and H_AND/BF fields to
+    // bits 49 and 53; the constant operand is one f32 broadcast to both lanes.
+    // Encoding reference: envytools/envydis/gm107.c (7e80/7e00/7c80/7c00).
+    bool cmp_reg = (op & 0xfff8) == 0x5d20 || (op & 0xfff8) == 0x5d18;
+    bool cmp_cbuf = (op & 0xfe80) == 0x7e80 || (op & 0xfe80) == 0x7c80;
+    bool cmp_imm = (op & 0xfe80) == 0x7e00 || (op & 0xfe80) == 0x7c00;
+    if (cmp_reg || cmp_cbuf || cmp_imm) {
+        bool setp = cmp_reg ? (op & 0xfff8) == 0x5d20 : (op & 0x0200) != 0;
         const char *x = HS(R(a), (int)bits(w, 47, 2), bits(w, 43, 1), bits(w, 44, 1));
-        const char *y = HS(R((int)bits(w, 20, 8)), (int)bits(w, 28, 2), bits(w, 31, 1), bits(w, 30, 1));
-        int cop = (int)bits(w, 35, 4), bop = (int)bits(w, 45, 2);
+        const char *y;
+        if (cmp_reg) {
+            y = HS(R((int)bits(w, 20, 8)), (int)bits(w, 28, 2), bits(w, 31, 1), bits(w, 30, 1));
+        } else if (cmp_cbuf) {
+            const char *bv = cbuf_ref(c, (int)bits(w, 34, 5), bits(w, 20, 14) * 4, NULL, cb);
+            y = HS(bv, 1, bits(w, 56, 1), bits(w, 54, 1));
+        } else {
+            sprintf(ib, "0x%08xu", himm(w));
+            y = HS(ib, 0, false, false);
+        }
+        int cop = (int)bits(w, cmp_reg ? 35 : 49, 4), bop = (int)bits(w, 45, 2);
+        bool combine = bits(w, cmp_reg ? 49 : 53, 1);
         const char *pp = P((int)bits(w, 39, 3), bits(w, 42, 1));
         char lx[512], ly[512];
         sp(&c->body, "    { float2 hx_ = %s, hy_ = %s; bool pp = %s;\n", x, y, pp);
@@ -433,7 +449,7 @@ static bool emit_half(Ctx *c, uint64_t w) {
         sp(&c->body, "      bool l = %s, h = %s;\n", lx, ly);
         if (setp) {
             int pa = (int)bits(w, 3, 3), pb = (int)bits(w, 0, 3);
-            if (bits(w, 49, 1)) {  // .H_AND: each half is combined with the predicate first, then they're ANDed
+            if (combine) {  // .H_AND: each half is combined with the predicate first, then they're ANDed
                 sp(&c->body, "      l = (l %s pp) && (h %s pp); h = !l;\n", bool_op(bop), bool_op(bop));
                 if (pa != PT) { c->pred_used[pa] = 1; sp(&c->body, "      p%d = l;\n", pa); }
                 if (pb != PT) { c->pred_used[pb] = 1; sp(&c->body, "      p%d = h;\n", pb); }
@@ -442,7 +458,7 @@ static bool emit_half(Ctx *c, uint64_t w) {
                 if (pb != PT) { c->pred_used[pb] = 1; sp(&c->body, "      p%d = h %s pp;\n", pb, bool_op(bop)); }
             }
         } else {
-            bool bf = bits(w, 49, 1);
+            bool bf = combine;
             if (d != RZ) {
                 c->reg_used[d] = 1;
                 sp(&c->body, "      l = l %s pp; h = h %s pp;\n", bool_op(bop), bool_op(bop));
