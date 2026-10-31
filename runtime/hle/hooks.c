@@ -6,6 +6,7 @@
 #include "../input_bind.h"
 #include "../nvn/texture_color.h"
 #include "../ui/menu.h"
+#include "../ui/mouse.h"
 #include <SDL3/SDL_scancode.h>
 #include <math.h>
 
@@ -785,7 +786,52 @@ static void enable_desktop_exit(Cpu *c, uint64_t list) {
 
 #include "widescreen_hooks.inc"
 
+static MenuMouse menu_mouse;
+RT_ON_RESET(reset_menu_mouse_frame) { memset(&menu_mouse, 0, sizeof menu_mouse); }
+
+// Hook BaseInput rather than global UnityEngine.Input: this enables the existing
+// menu raycasters, pointer enter/exit, click and drag handlers without changing
+// the Switch controller input used by fights.
+static int menu_mouse_hook(Cpu *c, uint64_t site) {
+    switch (site) {
+    case 0x70000fd740ull: {  // current EventSystem.Update, before TickModules
+        unsigned width = guest_invoke2(c, 0x70015ccb90ull, 0, 0);
+        unsigned height = guest_invoke2(c, 0x70015ccc00ull, 0, 0);
+        MenuMouse previous = menu_mouse;
+        menu_mouse = menu_mouse_frame(width, height, developer_console_open());
+        if (ENV("LARECOMP_MOUSE_TRACE") &&
+            (previous.x != menu_mouse.x || previous.y != menu_mouse.y || menu_mouse.pressed || menu_mouse.released))
+            LOG("[mouse] screen %ux%u pointer %.1f/%.1f held=%x down=%x up=%x\n", width, height,
+                menu_mouse.x, menu_mouse.y, menu_mouse.held, menu_mouse.pressed, menu_mouse.released);
+        return 0;
+    }
+    case 0x70000fa8f0ull: c->x[0] = 1; return 1;  // mousePresent: enable StandaloneInputModule
+    // The Switch backend reports 16 touch slots even without contact. Unity's
+    // ProcessTouchEvents then suppresses ProcessMouseEvent on every update.
+    // Override only UI BaseInput; raw game/touch/controller APIs stay original.
+    case 0x70000fabe0ull: case 0x70000fac50ull: c->x[0] = 0; return 1;
+    case 0x70000fa960ull: case 0x70000fa9d0ull: case 0x70000faa40ull: {
+        unsigned button = (uint32_t)c->x[1];
+        unsigned bits = site == 0x70000fa960ull ? menu_mouse.pressed :
+                        site == 0x70000fa9d0ull ? menu_mouse.released : menu_mouse.held;
+        c->x[0] = button < 3 && (bits & (1u << button)) != 0;
+        return 1;
+    }
+    case 0x70000faab0ull: case 0x70000fab70ull: {
+        float x = site == 0x70000faab0ull ? menu_mouse.x : menu_mouse.scroll_x;
+        float y = site == 0x70000faab0ull ? menu_mouse.y : menu_mouse.scroll_y;
+        c->v[0] = c->v[1] = 0;
+        memcpy(&c->v[0], &x, sizeof x);
+        memcpy(&c->v[1], &y, sizeof y);
+        return 1;
+    }
+    default: return -1;
+    }
+}
+
 int rt_hook(Cpu *c, uint64_t site) {
+    int mouse_result = menu_mouse_hook(c, site);
+    if (mouse_result >= 0) return mouse_result;
     int wide_result = widescreen_hook(c, site);
     if (wide_result >= 0) return wide_result;
     if (network_hook(c, site)) return 1;

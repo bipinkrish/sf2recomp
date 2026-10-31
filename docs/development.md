@@ -48,7 +48,11 @@ an executable's original NSO identities without opening a graphical window.
 Tests cover corruption-free Vulkan page materialization, exact build identity,
 configuration and environment validation, runtime key/gamepad remapping, INI edits
 without rebuilding, portable paths, save journaling, extraction rollback and
-conversion output contents. Menu captures do not establish combat compatibility.
+conversion output contents. Mouse menu tests cover click edges, coordinate mapping,
+focus/capture resets and Unity's UI input ABI. Native Linux checks cover hover,
+Settings clicks and slider dragging, Controls and Sparring navigation, resizing
+with black bars, and switching from mouse to keyboard. Menu captures do not
+establish combat compatibility.
 
 [Working findings](findings.md) retain historical debugging context; removed
 experimental flags described in old entries are not current features.

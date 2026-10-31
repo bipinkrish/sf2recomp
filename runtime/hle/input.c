@@ -17,6 +17,7 @@
 #include "../input_bind.h"
 #include "../rumble.h"
 #include "../ui/menu.h"
+#include "../ui/mouse.h"
 #include "movie.h"
 
 enum {
@@ -230,6 +231,7 @@ static void reset_player_edges(int player) {
 
 // Forget held keys (the menu took focus); the gamepad is re-read on its next event.
 void input_reset(void) {
+    menu_mouse_reset();
     for (int player = 0; player < LOCAL_PLAYER_COUNT; player++) reset_player_edges(player);
     rumble_clear();
     memset(keys_down, 0, sizeof keys_down);
@@ -450,6 +452,7 @@ static void scan_connected_pads(void) {
 }
 
 void input_handle_event(const SDL_Event *e) {
+    menu_mouse_event(e);
     scan_connected_pads();  // pads present at startup may have emitted ADDED before this event loop
     switch (e->type) {
     case SDL_EVENT_KEY_DOWN: case SDL_EVENT_KEY_UP: {
@@ -510,7 +513,8 @@ static _Atomic int32_t script_lx, script_ly, script_rx, script_ry;
 //   entry first like a player's typing; "{Escape}" (any SDL key name) presses that key. No ',' or ':' in <text>.
 // "frame:sdlpad:<button>:frames" / "frame:sdlkey:<key>:frames" hold a controller button / key as real events (down
 //   at frame, up `frames` later): they reach menus and the on-screen keyboard first, as a player's would.
-// "frame:mouse:<dx>/<dy>" moves the mouse by that many points, "frame:mouse:click" clicks it (real events).
+// "frame:mouse:<dx>/<dy>" moves by points; "at/<x>/<y>" positions in window points.
+// "frame:mouse:click" taps; "down" / "up" hold/release left (real SDL events).
 // "frame:shot:<name>" saves the window (game + menus) to build/<name>.png.
 // "frame:resize:<W>x<H>" resizes the window to W x H points (menu_apply_window_requests: the main thread).
 // LARECOMP_BIND_TEST="frame:pad|key:<input>:<host>,..." starts a rebind capture of <input> (bind_* name: a, zl,
@@ -538,18 +542,28 @@ static void test_push(uint64_t frame, unsigned long start, unsigned long len, co
     }
     if (!strcmp(dev, "mouse")) {
         if (frame != start) return;
-        float mx, my, dx = 0, dy = 0;
-        SDL_GetMouseState(&mx, &my);
-        if (!strcmp(arg, "click")) {
-            e.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
-            e.button.which = TEST_DEVICE, e.button.button = SDL_BUTTON_LEFT, e.button.down = true, e.button.clicks = 1;
+        static bool positioned;
+        static float mx, my;
+        if (!positioned) SDL_GetMouseState(&mx, &my), positioned = true;
+        if (!strcmp(arg, "click") || !strcmp(arg, "down") || !strcmp(arg, "up")) {
+            bool down = strcmp(arg, "up") != 0;
+            e.type = down ? SDL_EVENT_MOUSE_BUTTON_DOWN : SDL_EVENT_MOUSE_BUTTON_UP;
+            e.button.which = TEST_DEVICE, e.button.button = SDL_BUTTON_LEFT, e.button.down = down, e.button.clicks = 1;
             e.button.x = mx, e.button.y = my;
-            SDL_PushEvent(&e);
-            e.type = SDL_EVENT_MOUSE_BUTTON_UP, e.button.down = false;
+            if (!strcmp(arg, "click")) {
+                SDL_PushEvent(&e);
+                e.type = SDL_EVENT_MOUSE_BUTTON_UP, e.button.down = false;
+            }
         } else {
-            sscanf(arg, "%f/%f", &dx, &dy);
+            float x, y;
+            if (sscanf(arg, "at/%f/%f", &x, &y) != 2) {
+                float dx, dy;
+                if (sscanf(arg, "%f/%f", &dx, &dy) != 2) return;
+                x = mx + dx, y = my + dy;
+            }
             e.type = SDL_EVENT_MOUSE_MOTION;
-            e.motion.which = TEST_DEVICE, e.motion.x = mx + dx, e.motion.y = my + dy, e.motion.xrel = dx, e.motion.yrel = dy;
+            e.motion.which = TEST_DEVICE, e.motion.x = x, e.motion.y = y, e.motion.xrel = x - mx, e.motion.yrel = y - my;
+            mx = x, my = y;
         }
         SDL_PushEvent(&e);
         return;

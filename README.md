@@ -77,6 +77,7 @@ restarting; no rebuild is needed.
 | **Configurable frame rate** | `[video] target_fps` accepts **30–360**, including targets above 60 FPS, and sets the game's target frame rate and presentation pacing. Achievable performance depends on hardware; set the host display refresh rate separately. |
 | **Desktop window modes** | A resizable window or fullscreen, selected with `[video] fullscreen`. |
 | **Remappable keyboard and controllers** | `[controls.keyboard]` and `[controls.gamepad]` map desktop inputs to Switch actions, including unbinding actions and sharing inputs. |
+| **Mouse menus** | Hover and left-click use the game's existing menu buttons. Pointer coordinates follow window resizing, black bars, HiDPI displays and configured aspect ratios; existing sliders and scroll views also receive mouse drag and wheel input. |
 | **Keyboard prompts (experimental)** | `[experimental] keyboard_prompts = true` replaces supported in-game button hints with your mapped keys. Automatic selection follows controller presence. Disabled by default; some screens may need layout adjustments. |
 | **Desktop Exit button** | The main menu's localized **Exit** option closes the game and returns to the desktop, including in fullscreen. |
 | **Game network blocking** | `[network] enabled = false` is the default and blocks game connections, DNS, uploads, online multiplayer, external web links and the remote developer listener. Offline Sparring remains available. Enabling networking does not implement missing online services. |
