@@ -44,6 +44,14 @@ static LocalPad pads[LOCAL_PLAYER_COUNT];
 static _Atomic int64_t sampling;
 static bool host_test;  // scripted runs must not vibrate the user's controller
 
+// Loaded before SDL starts; changing the INI requires a restart. Physical pads
+// occupy their guest player slot so buttons, short taps and rumble share routing.
+static bool keyboard_enabled(void) { return g_settings.player_setup != PLAYER_SETUP_TWO_CONTROLLERS; }
+static int first_pad_player(void) { return g_settings.player_setup == PLAYER_SETUP_KEYBOARD_VS_CONTROLLER ? 1 : 0; }
+static bool player_connected(int player) {
+    return (player == 0 && keyboard_enabled()) || atomic_load(&pads[player].connected);
+}
+
 // Guest IPC threads publish values; only the UI thread touches SDL's pad.
 // The lock also makes paired value snapshots consistent with permission/reset.
 static SDL_SpinLock rumble_lock;
@@ -142,6 +150,11 @@ static int held_key(int sc) { return sc > 0 && sc < SDL_SCANCODE_COUNT && (keys_
 // Through the bindings (runtime/hle/bindings.c: g_bind_key), read on every key event, so a rebind applies at once.
 static void recompute_keyboard(void) {
     uint64_t b = 0;
+    if (!keyboard_enabled()) {
+        key_buttons = 0;
+        key_lx = key_ly = key_rx = key_ry = 0;
+        return;
+    }
     for (int i = 0; i < BIND_PAD_COUNT; i++)
         if (held_key(g_bind_key[i])) b |= 1ull << i;
     key_buttons = b;
@@ -377,9 +390,9 @@ static int pad_slot_for_id(SDL_JoystickID id) {
 static void attach_pad(SDL_JoystickID id) {
     if (pad_slot_for_id(id) >= 0) return;
     int player;
-    for (player = 0; player < LOCAL_PLAYER_COUNT && pads[player].handle; player++) {}
+    for (player = first_pad_player(); player < LOCAL_PLAYER_COUNT && pads[player].handle; player++) {}
     if (player == LOCAL_PLAYER_COUNT) {
-        LOG("[input] ignoring gamepad %d: local play supports two controllers\n", id);
+        LOG("[input] ignoring gamepad %d: no free controller slot in this player setup\n", id);
         return;
     }
     SDL_Gamepad *pad = SDL_OpenGamepad(id);
@@ -428,7 +441,10 @@ static void scan_connected_pads(void) {
     int n = 0;
     SDL_JoystickID *ids = SDL_GetGamepads(&n);
     for (int i = 0; ids && i < n; i++) {
-        if (!pads[0].handle || !pads[1].handle) attach_pad(ids[i]);
+        bool free_slot = false;
+        for (int player = first_pad_player(); player < LOCAL_PLAYER_COUNT; player++)
+            if (!pads[player].handle) free_slot = true;
+        if (free_slot) attach_pad(ids[i]);
     }
     SDL_free(ids);
 }
@@ -738,7 +754,7 @@ static void fill_state(Cpu *c) {
         inject_until[player] = 0;
         seen_generation[player] = generation;
     }
-    if (player != 0 && !atomic_load(&pads[player].connected)) return;
+    if (!player_connected(player)) return;
 
     // Host video covers the guest's menu: discard presses instead of navigating it unseen.
     if (movie_overlay_active()) {
@@ -816,12 +832,12 @@ HLE_FUNC("_ZN2nn3hid12GetNpadStateEPNS0_16NpadJoyLeftStateERKj", hid_state_left)
 HLE_FUNC("_ZN2nn3hid12GetNpadStateEPNS0_17NpadHandheldStateERKj", hid_state_handheld) { fill_state(c); }
 HLE_FUNC("_ZN2nn3hid12GetNpadStateEPNS0_17NpadJoyRightStateERKj", hid_state_right) { fill_state(c); }
 
-// FullKey for the two local pads (the keyboard remains a virtual player 1).
+// FullKey for connected local players, including the virtual keyboard player.
 HLE_FUNC("_ZN2nn3hid15GetNpadStyleSetERKj", hid_style_set) {
     uint32_t id = *(uint32_t *)(uintptr_t)c->x[0];
     static int nlog;
     if (nlog++ < 4) LOG("[input] GetNpadStyleSet id %#x\n", id);
-    c->x[0] = id == 0 || (id == 1 && atomic_load(&pads[1].connected)) ? 1 : 0;
+    c->x[0] = id < LOCAL_PLAYER_COUNT && player_connected((int)id) ? 1 : 0;
 }
 
 // BindNpadStyleSetUpdateEvent(id, SystemEventType*, clear mode): signaled once so the game sees a

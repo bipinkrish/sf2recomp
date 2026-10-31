@@ -5,7 +5,7 @@
 typedef struct {
     double sx, sy;             // render scale relative to the selected native screen size
     double ax, ay;             // allocation scale: the render targets' size (Dynamic renders into a part of them)
-    double shape;              // extra renderer reshape factor; native SF2 21:9 keeps this at 1
+    double shape;              // extra renderer reshape factor; native SF2 aspect modes keep this at 1
     double vx, vy, vw, vh;     // where the image is drawn in the window (pixels)
 } OutScale;
 

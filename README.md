@@ -15,7 +15,8 @@ The Switch version was chosen because it includes **Sparring mode**, which offer
 
 [Status](#status) · [Features](#features) · [Requirements](#requirements) ·
 [Getting started](#getting-started) · [NSP extraction](#optional-extract-from-an-nsp) ·
-[Settings and controls](#settings-and-controls) · [Development](#development)
+[Settings and controls](#settings-and-controls) · [Development](#development) ·
+[Legal](#legal)
 
 ## Status
 
@@ -44,7 +45,7 @@ restarting; no rebuild is needed.
 
 | Feature | What it provides |
 | --- | --- |
-| **Ultrawide 21:9 (experimental)** | `[video] aspect_ratio = 21:9` widens the camera and layout with a native 2520×1080 base before scaling. Disabled by default; some artwork retains its original width and some stages expose background edges. Movies keep their original proportions. |
+| **Aspect ratios (experimental)** | `[video] aspect_ratio` accepts `16:10`, `21:9` or `32:9`, with native screen sizes of 1728×1080, 2520×1080 and 3840×1080 before uniform scaling. Restart after changing; `original` / `16:9` is the default. In 32:9, scenery is enlarged uniformly to cover the sides, cropping some background detail vertically. Fighter and HUD proportions are preserved. Movies keep their original proportions. |
 | **Native display resolution** | `[video] internal_resolution = auto` or `match` renders at the window's fitted drawable pixel size, following window resizing and fullscreen. Higher resolutions improve geometry edges; bitmap artwork and font atlases retain their original detail. |
 | **Resolution scaling** | Fixed internal-resolution presets of `0.25x`, `0.50x`, `0.75x`, `1x`, `2x`, `3x` and `4x` let you trade rendering detail for performance, within the GPU's texture-size limit. |
 | **Dynamic resolution** | `[video] internal_resolution = dynamic` adjusts render scale in response to GPU load to work toward the configured frame-rate target. |
@@ -203,7 +204,12 @@ section also default to offline. See the [offline networking settings](docs/runt
 | Plus / Minus | Return / Backspace |
 | Skip intro | K or J |
 
-Keyboard and gamepad bindings are editable in the INI. The main menu's **Exit**
+Keyboard and gamepad bindings are editable in the INI. For keyboard P1 versus
+controller P2 in Sparring, set `[input] player_setup = keyboard_vs_controller`
+and restart. `solo` preserves shared keyboard/first-controller P1 input;
+`two_controllers` assigns one controller per player and disables keyboard gameplay
+input. See [player assignment](docs/runtime-guide.md#player-assignment).
+The main menu's **Exit**
 option returns to the desktop, including in fullscreen.
 
 Saves default to `save/` inside the converted folder. Change
@@ -234,14 +240,25 @@ python3 -m unittest discover -s tests -v
 - [Generator guide](tools/recompr/README.md): translating the main and SDK modules.
 - [Working findings](docs/findings.md): historical investigation notes.
 
+## Legal
+
+Shadow Fight 2 Recomp is an independent fan project, with no affiliation,
+endorsement or sponsorship from Nekki or Nintendo. Shadow Fight 2, Nintendo
+Switch and related names, trademarks and game content belong to their respective
+rights holders.
+
+This repository contains recompilation tools and runtime source, with no original
+game code, game assets, game fonts, firmware, tickets or decryption keys. You must
+supply your own legally obtained game files to build and play.
+
+Conversion happens locally. The resulting executable contains translated original
+game code, and the converted folder includes your supplied game assets. Keep game
+files, generated code and converted output separate from public source
+distributions. The project's software licenses grant no rights to that game
+material.
+
 ## Licensing
 
 Project additions use the [MIT license](LICENSE). Imported runtime and generator
 code retains its original notices; see [third-party notices](THIRD_PARTY_NOTICES)
 and [license texts](licenses/).
-
-Game data and locally generated game-derived output are outside those software
-licenses. The locally built executable contains translated original game code;
-keep game files and generated output separate from public source distributions.
-Use inputs you have the rights to use. This project is not affiliated with Nekki
-or Nintendo.

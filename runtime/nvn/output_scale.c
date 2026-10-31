@@ -1,5 +1,5 @@
 // Output resolution, shared by the Metal and Vulkan backends (each calls output_scale() once per presented frame).
-// Screen targets (1920x1080 original, 2520x1080 in native 21:9 mode) are allocated at (sx, sy) times their size; the
+// Screen targets (selected native aspect at 1080 lines) are allocated at (sx, sy) times their size; the
 // image is then drawn into (vx, vy, vw, vh) of the window. Video tab "Internal resolution" (g_settings.res_mode):
 //   Match display  render at the window's own pixel size (default)
 //   1x .. 4x       N times the Switch's docked image: 1080 lines x N (wide windows keep their shape: 32:9 at 2x =
@@ -431,7 +431,7 @@ void output_fit(double dw, double dh, double sw, double sh, OutputRect *rect) {
 }
 
 void output_scale(double dw, double dh, bool reshape_allowed, double now, double game_ms, double win_ms, OutScale *o) {
-    double base_width = g_settings.aspect == ASPECT_21_9 ? 2520.0 : 1920.0;
+    double base_width = settings_screen_width(1080);
     double fit = fmin(dw / base_width, dh / 1080.0);
     static double forced = -1, wide_test = -1;
     if (forced < 0) forced = getenv("LARECOMP_SCALE") ? atof(getenv("LARECOMP_SCALE")) : 0;

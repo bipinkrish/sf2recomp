@@ -3,6 +3,62 @@
 Persistent store for cross-cycle findings that don't fit one commit message (or that
 arrived as instrument output after the instrument's commit). Newest first.
 
+## 2026-10-31 — 32:9 backdrop coverage
+
+- Fixed the large black side areas reported below by uniformly enlarging stage
+  scenery 2x in 32:9, covering twice the original 16:9 width with a vertical crop.
+  `LocationSelector.Type` 1 (background) and 3 (static scenery) opt in; type 2
+  (game layer, including fighters/effects) and other types retain original sizing.
+  Screen and HUD dimensions are unchanged. This is an artwork framing tradeoff,
+  not new scenery content, and only applies to `aspect_ratio = 32:9`.
+- Guarded hook `0x7000eabfe0` runs at the end of `Render.Init`, setting scenery
+  to an absolute authored scale through the original `LocationSelector.SetScale`.
+  Hook `0x7001033e70` applies 2x to scenery scale arguments, including subsequent
+  camera updates. Reinitialization does not accumulate enlargement. Caller CPU
+  state is restored after initialization; guest transforms handle the changes.
+- A first GPU probe filled the forest stage. The final implementation was tested
+  directly on the previously failing night mountain/lake stage by moving down
+  twice from Random in the stage selector. Wraith versus Fury, 5120x1440,
+  movement and attacks through frame 3400, normal exit and zero stop-on-error
+  Vulkan validation errors on the NVIDIA RTX 4070 Laptop GPU.
+- Inspected gameplay captures at 2500, 2800, 3000 and 3300: scenery fills both
+  sides. Outer 5% strips (excluding top/bottom sixths) went from 100% black in
+  the prior night-stage capture to 0% black in the fixed captures. This measures
+  those gaps, not every possible stage or camera state. Evidence/config/input:
+  `build/validation/backdrop-32-9/night-final`; metrics in `summary.json`.
+- All 93 tests pass, including a guest-call harness checking scenery selection,
+  repeated initialization, camera scaling, fighter exclusion, preservation of
+  caller registers and no effect on original/16:10/21:9 modes. Build has no
+  compiler warnings. Existing 21:9 art-edge limitations are unaffected.
+
+## 2026-10-31 — configurable native aspect ratios
+
+- `[video] aspect_ratio` now accepts `16:10`, `21:9` and `32:9`, with native
+  1080-line widths of 1728, 2520 and 3840 respectively. `original` / `16:9`
+  remains the default, and changing the option requires a restart.
+- A shared screen-width calculation supplies guest display modes, initial screen
+  dimensions, the graphics-device descriptors, NVN buffer storage and output
+  scaling. The UI border threshold uses the same ratio. Custom-aspect texture
+  scaling recognizes the selected native dimensions specifically so original
+  artwork and CPU texture copies keep their expected sizes.
+- The C regression harness exercises all three presets through the actual INI
+  parser, preserving guest registers and guarded output memory, checking both
+  720-line and 1080-line modes, uniform fitting, fractional resolution, texture
+  size limits and movie proportions. All 92 repository tests passed; the Linux
+  build completed without compiler warnings.
+- NVIDIA RTX 4070 Laptop GPU with stop-on-error Vulkan validation: all three
+  presets entered Sparring, exercised movement and attacks, captured frame 3400
+  and exited normally with zero validation errors. Output sizes were 1728x1080
+  (16:10), 2520x1080 (21:9) and 5120x1440 (32:9, scaled from 3840x1080).
+  Wraith fought Hurricane, Whaler and Pandemia respectively, on randomized stages.
+  Configurations, isolated saves, scripted input, captures and logs are under
+  `build/validation/aspect-ratios/{16-10,21-9,32-9-final}`; `summary.json` records
+  results. An earlier 32:9 process received SIGTERM before gameplay and was rerun.
+- Gameplay HUD and fighter proportions remain usable in all three modes. 32:9
+  exposed a major art limitation on the night mountain/lake stage: its finite
+  backdrop leaves large black areas at the sides. This preset is experimental,
+  not an all-stage visual fix. Existing 21:9 background-edge limitations remain.
+
 ## 2026-10-31 — optional native 21:9 screen mode
 
 - `[video] aspect_ratio = 21:9` opts into a 2520x1080 native Unity screen;

@@ -7,11 +7,12 @@
 extern "C" {
 #endif
 
-enum { ASPECT_UNLOCKED = 0, ASPECT_ORIGINAL = 1, ASPECT_21_9 = 2 };
+enum { ASPECT_UNLOCKED = 0, ASPECT_ORIGINAL = 1, ASPECT_21_9 = 2, ASPECT_16_10 = 3, ASPECT_32_9 = 4 };
 enum { RES_MATCH = 0, RES_DYNAMIC = 9, RES_Q75 = 10, RES_Q25 = 11, RES_Q50 = 12 };
 enum { UPSCALE_BILINEAR = 0, UPSCALE_METALFX = 1, UPSCALE_FSR1 = 2 };
 #define UPSCALE_SHARP UPSCALE_FSR1
 enum { AA_OFF = 0, AA_SMAA = 1 };
+enum { PLAYER_SETUP_SOLO = 0, PLAYER_SETUP_KEYBOARD_VS_CONTROLLER, PLAYER_SETUP_TWO_CONTROLLERS };
 enum {
     PROMPTS_AUTO = 0, PROMPTS_NINTENDO = 1, PROMPTS_XBOX = 2, PROMPTS_PLAYSTATION = 3,
     PROMPTS_KEYBOARD = 4
@@ -43,6 +44,7 @@ typedef struct Settings {
     int rumble_strength;
     bool bg_input;
     int prompts;
+    int player_setup;
     bool experimental_keyboard_prompts;
     bool network_enabled;
     bool unlock_all_sparring_characters;
@@ -64,6 +66,22 @@ typedef struct Settings {
 } Settings;
 
 extern Settings g_settings;
+
+// Native screen dimensions must agree across guest modes, buffers and presentation.
+// All supported ratios have exact integer widths at both 720 and 1080 lines.
+static inline unsigned settings_screen_width(unsigned height) {
+    switch (g_settings.aspect) {
+    case ASPECT_16_10: return height * 16 / 10;
+    case ASPECT_21_9: return height * 21 / 9;
+    case ASPECT_32_9: return height * 32 / 9;
+    default: return height * 16 / 9;
+    }
+}
+
+static inline bool settings_custom_aspect(void) {
+    return g_settings.aspect == ASPECT_16_10 || g_settings.aspect == ASPECT_21_9 ||
+           g_settings.aspect == ASPECT_32_9;
+}
 
 const char *settings_language(void);
 const char *settings_language_name(void);

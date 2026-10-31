@@ -24,6 +24,7 @@ antialiasing = off
 
 [input]
 prompts = auto
+player_setup = solo
 
 [experimental]
 keyboard_prompts = false
@@ -139,6 +140,32 @@ Set the individual `[developer]` options to `false` and restart to disable those
 features. Local shop checks are scoped to that panel; online/admin permissions
 and the remote developer server are not enabled.
 
+## Player assignment
+
+Set `[input] player_setup` in the INI beside the executable, then restart:
+
+| Value | P1 | P2 |
+| --- | --- | --- |
+| `solo` (default) | Keyboard and first controller | Second controller |
+| `keyboard_vs_controller` | Keyboard | First controller |
+| `two_controllers` | First controller | Second controller |
+
+For keyboard P1 versus one controller P2 in Sparring, use:
+
+```ini
+[input]
+player_setup = keyboard_vs_controller
+```
+
+`two_controllers` disables keyboard gameplay input; developer shortcuts still work.
+Controllers fill available slots in connection order. Disconnecting one clears its
+input and vibration without moving the other player; a new connection fills a free
+slot. In `keyboard_vs_controller`, P1 is reserved for the keyboard and additional
+controllers are ignored while P2 has a controller. Controllers must be recognized
+as SDL gamepads; custom mappings can be supplied in `gamecontrollerdb.txt`.
+Missing or invalid settings preserve the default or previously loaded value.
+Button remapping is independent of player assignment.
+
 ## Keyboard and controller bindings
 
 The [supplied INI](../sf2recomp.ini) lists every keyboard/button default. Defaults include K/J/L/I
@@ -185,16 +212,37 @@ skip work regardless of this display experiment.
 
 ## Graphics and frame rate
 
-Optional **21:9** support is experimental and disabled by default. Set
-`[video] aspect_ratio = 21:9`, then restart. `original` (or `16:9`) restores
-the original framing. This changes Unity's native screen modes, camera/layout
-dimensions and color/depth buffers together; it does not stretch the final image.
-The native wide size is 2520×1080 before resolution scaling. Other window sizes
-fit that exact 21:9 ratio: 3440×1440 has 40-pixel bars on each side. Movies retain
-their original proportions with black bars. Some menus and artwork may retain
-their original width. Wider framing can expose background edges: the garden
-stage showed small sky gaps near its top corners during testing. Coverage of
-every stage and campaign screen is unverified.
+Optional aspect ratios are experimental and disabled by default. Set the ratio
+under `[video]` in `sf2recomp.ini`, then restart:
+
+```ini
+[video]
+aspect_ratio = 21:9
+```
+
+| Setting | Native screen before resolution scaling |
+| --- | --- |
+| `original` or `16:9` (default) | 1920×1080 |
+| `16:10` | 1728×1080 |
+| `21:9` | 2520×1080 |
+| `32:9` | 3840×1080 |
+
+This changes Unity's native screen modes, camera/layout dimensions and
+color/depth buffers together. Presentation scales uniformly to fit the selected
+ratio into the window; it does not stretch the final image. For example, 1920×1200
+fills the window in 16:10 mode, 5120×1440 fills it in 32:9 mode, and 3440×1440
+has 40-pixel bars on each side in exact 21:9 mode. Movies retain their original
+proportions with black bars. Invalid settings keep the previous valid value.
+
+Some menus and artwork may retain their original width. Wider framing can
+expose background edges: the garden stage showed sky gaps near its top corners
+at 21:9. In 32:9, stage scenery uses uniform 2× cover scaling to fill the wider
+view, cropping background detail vertically. This applies only to backdrop and
+static scenery layers; fighter, gameplay-effect and HUD sizing stays unchanged.
+The night mountain/lake stage's former black side gaps were retested at
+5120×1440 during movement and attacks and no longer appeared. Sparring was
+tested in all three modes with zero Vulkan validation errors. Coverage of every
+stage and campaign screen is unverified.
 
 NVN presentation enforces the configured frame limit, including when a mailbox
 swapchain or disabled vsync would otherwise run uncapped. A positive game
