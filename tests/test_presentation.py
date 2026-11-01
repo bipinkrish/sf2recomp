@@ -27,6 +27,7 @@ uint32_t g_window_resize_request;
 static uint64_t now=1000000000ull, presented_at;
 static unsigned presents, sleeps, resizes;
 static int window_w,window_h;
+void lan_menu_update_capture(void) {}
 void developer_update_text_input(void *window) { assert(window == (void *)1); }
 uint64_t plat_now_ns(void) { return now; }
 void plat_sleep_until_ns(uint64_t deadline) { assert(deadline > now); now=deadline; sleeps++; }

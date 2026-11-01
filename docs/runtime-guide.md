@@ -34,6 +34,7 @@ save_directory = save
 
 [gameplay]
 unlock_all_sparring_characters = true
+allow_sparring_lan_multiplayer = true
 
 [controls.keyboard]
 a = Space
@@ -47,8 +48,8 @@ b = south
 
 ## Offline networking
 
-Networking is disabled by default, including when an older INI has no network
-section. To keep the game offline, use:
+The original publisher/server networking is disabled by default, including when
+an older INI has no network section. To keep those paths disabled, use:
 
 ```ini
 [network]
@@ -57,9 +58,10 @@ enabled = false
 
 The translated game reports no internet connection. Socket creation, connections,
 sends, DNS lookups, external web links and the CUDLR network listener are blocked.
-The runtime also denies network IPC services and host network overrides, so adding
-a transport implementation later does not enable it by default. Local assets,
-cinematics and save files remain available.
+The runtime also denies network IPC services and host network overrides. Local
+assets, cinematics and save files remain available. The native LAN Sparring
+transport is separate: it opens local sockets only after choosing Host or Join
+and is controlled by `[gameplay] allow_sparring_lan_multiplayer`.
 
 Setting `enabled = true` and restarting restores the original network paths; it
 does not implement missing online services. This option covers game networking;
@@ -295,3 +297,10 @@ SDL_VIDEODRIVER=x11 LARECOMP_VK_NO_GMEM=1 \
 
 This selects Mesa lavapipe for diagnostics. Use hardware Vulkan for normal
 hardware tests; see [GPU diagnostics](development.md#local-launcher-and-gpu-diagnostics).
+
+## Native LAN Sparring
+
+Sparring offers Normal or LAN Multiplayer, followed by Host/Join and automatic
+local host discovery. No Python or launcher is required in the converted game.
+The default-on `[gameplay] allow_sparring_lan_multiplayer` option controls this
+entry; false restores the direct Normal path. See [LAN Sparring](lan-sparring.md).

@@ -63,7 +63,7 @@ RTFLAGS += $(OSFLAGS)
 CXXFLAGS += $(OSFLAGS)
 SHADERC := $(shell pkg-config --libs shaderc 2>/dev/null || echo -lshaderc_shared)
 LDFLAGS := -fuse-ld=lld -Wl,--stack,16777216 $(SDL_LIBS) -lvulkan-1 $(SHADERC) \
-           -pthread -lm -lwinmm -lshell32 -lole32 -ladvapi32 -luser32
+           -pthread -lm -lws2_32 -lwinmm -lshell32 -lole32 -ladvapi32 -luser32
 EXE := $(B)/sf2.exe
 WINDRES ?= windres
 endif

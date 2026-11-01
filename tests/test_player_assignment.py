@@ -35,6 +35,7 @@ static SDL_JoystickID make_pad(int *number) {
     SDL_VirtualJoystickDesc desc;
     SDL_INIT_INTERFACE(&desc);
     desc.type = SDL_JOYSTICK_TYPE_GAMEPAD;
+    desc.vendor_id = 0xfeed; desc.product_id = 0xbeef;
     desc.naxes = 6; desc.nbuttons = 16;
     desc.name = "SF2 test controller";
     desc.userdata = number; desc.Rumble = rumble;
@@ -68,7 +69,8 @@ int main(int argc, char **argv) {
     assert(g_settings.player_setup == mode);
     assert(settings_load_file(argv[2]) && g_settings.player_setup == mode);
     SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
-    // Exclude physical devices connected to the machine running these tests.
+    // Admit only our virtual VID/PID, including when a real pad is plugged in.
+    SDL_SetHint(SDL_HINT_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT, "0xfeed/0xbeef");
     SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI, "0");
     assert(SDL_Init(SDL_INIT_GAMEPAD));
     bind_reset(BIND_DEV_KEY); bind_reset(BIND_DEV_PAD);
@@ -154,7 +156,8 @@ class PlayerAssignmentTests(unittest.TestCase):
             compile_harness(root / "test.c", root / "test")
             invalid = root / "invalid.ini"
             invalid.write_text("[input]\nplayer_setup = typo\n")
-            env = {**os.environ, "SDL_JOYSTICK_DEVICE": "/nonexistent/sf2-test-device"}
+            env = {**os.environ, "SDL_JOYSTICK_DEVICE": "/nonexistent/sf2-test-device",
+                   "SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT": "0xfeed/0xbeef"}
             for mode, value in enumerate(("solo", "keyboard_vs_controller", "two_controllers")):
                 with self.subTest(mode=value):
                     config = root / "players.ini"

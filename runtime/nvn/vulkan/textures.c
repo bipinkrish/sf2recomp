@@ -200,11 +200,10 @@ static bool tex_scalable(const NvnTexture *t) {
     if (off < 0) off = getenv("LARECOMP_NO_SCALE") != NULL;
     if (off) return false;
     if (t->target != 1 || t->samples > 1 || !(t->flags & 8) || t->width < 32 || t->height < 16) return false;
-    // The custom screen buffers have an exact native size. Do not classify 16:9
-    // artwork as a screen target: CPU texture copies retain their original size.
-    if (settings_custom_aspect()) return t->width == settings_screen_width(1080) && t->height == 1080;
-    float a = (float)t->width / (float)t->height;
-    return a > 1.74f && a < 1.81f;
+    // Screen buffers have an exact native size in every aspect mode. Artwork
+    // can also be 16:9 (including 2048x1152 uploads), but its CPU copies and
+    // texture coordinates use native texels and must not be resolution-scaled.
+    return t->width == settings_screen_width(1080) && t->height == 1080;
 }
 
 bool renderer_texture_first_write(NvnTexture *t) {
@@ -407,6 +406,9 @@ static void create_image(NvnTexture *t, TexBackend *b) {
         VK_CHECK(vmaCreateImage(g_vk.vma, &ci, &ai, &b->image, &b->mem, NULL));
         depthfmt = false;
     }
+    if (getenv("LARECOMP_VK_DEVLOST_TRACE") && tw <= 16 && th <= 16)
+        LOG("[vk] small image %p %ux%ux%u type %d layers %u samples %u fmt %d allocation flags %#x\n",
+            (void *)b->image, tw, th, depth, type, layers, samples, vf, ai.flags);
     b->format = vf;
     b->width = tw; b->height = th; b->depth = depth; b->layers = layers; b->levels = levels; b->samples = samples;
     b->aspect = depthfmt ? aspect_of(t->format) : VK_IMAGE_ASPECT_COLOR_BIT;

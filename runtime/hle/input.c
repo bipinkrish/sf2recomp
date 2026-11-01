@@ -532,6 +532,10 @@ uint32_t g_window_resize_request;  // (W << 16 | H: menu_apply_window_requests a
 static void test_push(uint64_t frame, unsigned long start, unsigned long len, const char *dev, const char *arg) {
     SDL_Event e;
     memset(&e, 0, sizeof e);
+    if (!strcmp(dev, "quit")) {
+        if(frame==start) { e.type=SDL_EVENT_QUIT;SDL_PushEvent(&e); }
+        return;
+    }
     if (!strcmp(dev, "resize")) {
         unsigned w = 0, h = 0;
         if (frame == start && sscanf(arg, "%ux%u", &w, &h) == 2 && w && h && w < 65536 && h < 65536) {
@@ -610,6 +614,22 @@ static void host_test_frame(uint64_t frame) {
     static const char *hspec, *bspec;
     static int init;
     if (!init) { init = 1; hspec = getenv("LARECOMP_HOST_INPUT"); bspec = getenv("LARECOMP_BIND_TEST"); host_test = hspec; }
+    // Developer UI automation can append future SDL events while a real match
+    // is running. The converted game never needs this file or an interpreter.
+    static const char *script_file;
+    static bool file_checked;
+    static char *file_script;
+    if(!file_checked) { file_checked=true;script_file=getenv("LARECOMP_HOST_INPUT_FILE"); }
+    if(script_file) {
+        if(!file_script)file_script=malloc(65537);
+        FILE *file=fopen(script_file,"rb");
+        if(file && file_script) {
+            size_t n=fread(file_script,1,65536,file);file_script[n]=0;
+            if(!ferror(file))hspec=file_script;
+        }
+        if(file)fclose(file);
+        host_test=hspec;
+    }
     static char *buf;  // (a copy to cut up; as long as the longest spec: a long scripted run is thousands of steps)
     static size_t cap;
     size_t need = 2048;
@@ -626,7 +646,7 @@ static void host_test_frame(uint64_t frame) {
             unsigned long start = 0, len = 10;
             char dev[8] = "", name[400] = "";
             if (sscanf(tok, "%lu:%7[a-z]:%399[^:]:%lu", &start, dev, name, &len) < 3) continue;
-            if (!strcmp(dev, "type") || !strcmp(dev, "sdlpad") || !strcmp(dev, "sdlkey") || !strcmp(dev, "shot") ||
+            if (!strcmp(dev, "quit") || !strcmp(dev, "type") || !strcmp(dev, "sdlpad") || !strcmp(dev, "sdlkey") || !strcmp(dev, "shot") ||
                 !strcmp(dev, "resize") || !strcmp(dev, "mouse")) {
                 test_push(frame, start, len, dev, name);
                 continue;

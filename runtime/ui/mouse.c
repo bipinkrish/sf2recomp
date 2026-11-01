@@ -53,6 +53,15 @@ void menu_mouse_event(const SDL_Event *e) {
     }
     SDL_Window *window = SDL_GetWindowFromEvent(e);
     if (!window) window = SDL_GetKeyboardFocus();  // scripted events have no window ID
+    bool scripted_mouse = (e->type == SDL_EVENT_MOUSE_MOTION && e->motion.which == 0x7E57u) ||
+        ((e->type == SDL_EVENT_MOUSE_BUTTON_DOWN || e->type == SDL_EVENT_MOUSE_BUTTON_UP) && e->button.which == 0x7E57u);
+    // Hidden diagnostic windows have no focus. Resolve only our synthetic
+    // mouse to the sole game window, on SDL's event/window thread.
+    if (!window && scripted_mouse) {
+        int count=0;SDL_Window **windows=SDL_GetWindows(&count);
+        if(windows && count==1)window=windows[0];
+        SDL_free(windows);
+    }
     int width = 0, height = 0;
     if (!window || !SDL_GetWindowSize(window, &width, &height) || width <= 0 || height <= 0) return;
     float x, y;

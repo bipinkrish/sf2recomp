@@ -88,6 +88,7 @@ restarting; no rebuild is needed.
 | **Fight trainer and shop cheats** | Optional `[developer] trainer` and `shop_cheats` expose the original fight controls and local shop actions through the console. Disabled by default; currency, items, levels and fight results can be saved by the game. |
 | **Debug overlays** | Opt in with `[developer] overlays = true`, then use **F2** to toggle the original FPS, memory, build and model/animation displays in supported scenes. |
 | **Configurable save location and imports** | `[storage] save_directory` selects a portable or custom save folder. Existing `userdata/` backups can be imported under its `save_0/` directory. |
+| **LAN Sparring (experimental)** | Native Normal/LAN and Host/Join menus, local host discovery and persistent two-player sessions. No Python launcher required. See the [LAN guide](docs/lan-sparring.md). |
 | **Desktop configuration** | The INI also provides language selection (including system-locale detection), master volume and reverb controls. Alternate configuration and writable data locations can be selected at launch. |
 
 See the [settings and controls guide](docs/runtime-guide.md) for setup, commands

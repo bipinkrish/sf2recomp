@@ -71,9 +71,20 @@ int main(void) {
                             str(root / "test.c"), "-o", str(root / "test")], check=True)
             subprocess.run([str(root / "test")], check=True)
 
-    def test_only_keyboard_sites_are_optional(self):
-        optional = {site for site, hook in patches.HOOKS.items() if len(hook) == 4}
+    def test_keyboard_and_replay_sites_have_separate_optional_groups(self):
+        optional = {site for site, hook in patches.HOOKS.items() if len(hook) == 4 and hook[3] == "RT_HOOK_KEYBOARD_PROMPTS"}
         self.assertEqual(optional, {0x700011efb0, 0x7000114f90, 0x7000cd7130, 0x7000cdb690,
                                    0x7000ce0dd0, 0x7000d9aec0, 0x7000ce0f40, 0x7000ce0de0,
                                    0x7000ce10a0, 0x7000f9a060})
         self.assertTrue(all(patches.HOOKS[site][3] == "RT_HOOK_KEYBOARD_PROMPTS" for site in optional))
+        replay_sites = {site for site, hook in patches.HOOKS.items() if len(hook) == 4 and hook[3] in ("2u", "6u")}
+        self.assertEqual(replay_sites, {
+            0x7000ca7e80, 0x7000ca6df0, 0x7000c99e30, 0x7000c9dd50,
+            0x7000ca7c00, 0x7001177d10, 0x7001177d20, 0x7001237b50,
+            0x7001237bc0, 0x70010ed6a0, 0x70010f1450, 0x70010f1550,
+            0x70010f1600, 0x70010f1710, 0x70010f17d0, 0x70010f18e0,
+            0x70010f19a0, 0x70010f1ab0, 0x70010f1b80, 0x70010f1c50,
+            0x70010f1d60, 0x70010f1e80, 0x70010f1f90, 0x70010f2de0,
+            0x7000d961f0, 0x7000c9de18, 0x7000c9de40, 0x7000ff7af0,
+            0x7000ff7c40,
+        })

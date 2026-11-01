@@ -3,6 +3,7 @@
 #include "hle.h"
 #include "../settings.h"
 #include "../network.h"
+#include "../replay.h"
 #include "../input_bind.h"
 #include "../nvn/texture_color.h"
 #include "../ui/menu.h"
@@ -676,11 +677,16 @@ RT_ON_RESET(reset_keyboard_hint_state) {
 // Call only before guest threads start (or after they have stopped). INI
 // experiments require a restart; guest UI objects are never hot-unhooked.
 static void reset_developer_state(void);
+static void reset_lan_ui(void);
 void rt_hooks_configure(void) {
     LOG("[network] %s\n", g_settings.network_enabled ? "original network paths enabled" : "disabled (offline policy)");
     reset_keyboard_hint_state();
     reset_developer_state();
-    rt_hook_features = g_settings.experimental_keyboard_prompts ? RT_HOOK_KEYBOARD_PROMPTS : 0;
+    reset_lan_ui();
+    replay_init();
+    rt_hook_features = (g_settings.experimental_keyboard_prompts ? RT_HOOK_KEYBOARD_PROMPTS : 0) |
+                       (replay_enabled() ? RT_HOOK_REPLAY : 0) |
+                       (g_settings.allow_sparring_lan_multiplayer ? 4u : 0);
 }
 
 // The Switch standard-stream getters return null. Corlib FileStream expects a
@@ -760,6 +766,7 @@ static bool guest_object_named(Cpu *c, uint64_t object, const char *expected) {
 }
 
 #include "developer_hooks.inc"
+#include "lan_ui_hooks.inc"
 
 // The shipped MainSection has a fully wired, localized Exit item. Reveal it
 // before GeneralMenuList.Awake collects active buttons and installs navigation.
@@ -795,6 +802,7 @@ RT_ON_RESET(reset_menu_mouse_frame) { memset(&menu_mouse, 0, sizeof menu_mouse);
 static int menu_mouse_hook(Cpu *c, uint64_t site) {
     switch (site) {
     case 0x70000fd740ull: {  // current EventSystem.Update, before TickModules
+        lan_ui_pump(c);
         unsigned width = guest_invoke2(c, 0x70015ccb90ull, 0, 0);
         unsigned height = guest_invoke2(c, 0x70015ccc00ull, 0, 0);
         MenuMouse previous = menu_mouse;
@@ -830,12 +838,44 @@ static int menu_mouse_hook(Cpu *c, uint64_t site) {
 }
 
 int rt_hook(Cpu *c, uint64_t site) {
+    int lan_result = lan_ui_hook(c,site);
+    if(lan_result>=0)return lan_result;
     int mouse_result = menu_mouse_hook(c, site);
     if (mouse_result >= 0) return mouse_result;
     int wide_result = widescreen_hook(c, site);
     if (wide_result >= 0) return wide_result;
     if (network_hook(c, site)) return 1;
     switch (site) {
+    case 0x7000c99e30ull:
+    case 0x7000c9dd50ull:
+    case 0x7000ca7c00ull:
+    case 0x7001177d10ull:
+    case 0x7001177d20ull:
+    case 0x7001237b50ull:
+    case 0x7001237bc0ull:
+    case 0x70010ed6a0ull:
+    case 0x70010f1450ull:
+    case 0x70010f1550ull:
+    case 0x70010f1600ull:
+    case 0x70010f1710ull:
+    case 0x70010f17d0ull:
+    case 0x70010f18e0ull:
+    case 0x70010f19a0ull:
+    case 0x70010f1ab0ull:
+    case 0x70010f1b80ull:
+    case 0x70010f1c50ull:
+    case 0x70010f1d60ull:
+    case 0x70010f1e80ull:
+    case 0x70010f1f90ull:
+    case 0x70010f2de0ull:
+    case 0x7000ca7e80ull:
+    case 0x7000ca6df0ull:
+    case 0x7000d961f0ull:
+    case 0x7000c9de18ull:
+    case 0x7000c9de40ull:
+    case 0x7000ff7af0ull:
+    case 0x7000ff7c40ull:
+        return replay_hook(c, site);
     case 0x7000fc9230ull:  // PvpSettings.UpdateCharactersLock
         return unlock_sparring_characters(c);
     case 0x7000e6b820ull:

@@ -16,6 +16,47 @@ def function(source, signature):
 
 
 class VulkanSyncTests(unittest.TestCase):
+    def test_resolution_scaling_preserves_cpu_artwork_dimensions(self):
+        textures = (ROOT / "runtime/nvn/vulkan/textures.c").read_text()
+        harness = r'''
+#include <assert.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
+typedef struct { uint32_t target, samples, flags, width, height; } NvnTexture;
+static uint32_t screen_width = 1920;
+static uint32_t settings_screen_width(uint32_t height) { assert(height == 1080); return screen_width; }
+'''
+        harness += function(textures, "static bool tex_scalable(")
+        harness += r'''
+int main(void) {
+    unsetenv("LARECOMP_NO_SCALE");
+    NvnTexture t = {.target=1, .samples=1, .flags=8, .width=1920, .height=1080};
+    assert(tex_scalable(&t));
+    // These CPU-uploaded 16:9 images used to shrink to a quarter of their
+    // dimensions in a 960x540 window at half resolution, overrunning uploads.
+    const uint32_t artwork[][2] = {{2048,1152}, {512,288}, {484,274}, {192,108}};
+    for (unsigned i=0; i<sizeof artwork/sizeof artwork[0]; ++i) {
+        t.width=artwork[i][0]; t.height=artwork[i][1]; assert(!tex_scalable(&t));
+    }
+    const uint32_t widths[] = {1728,2520,3840};
+    for (unsigned i=0; i<sizeof widths/sizeof widths[0]; ++i) {
+        screen_width=t.width=widths[i]; t.height=1080; assert(tex_scalable(&t));
+        t.width=1920; assert(!tex_scalable(&t));
+    }
+    screen_width=t.width=1920;
+    t.samples=4; assert(!tex_scalable(&t));
+    t.samples=1; t.target=2; assert(!tex_scalable(&t));
+    t.target=1; t.flags=0; assert(!tex_scalable(&t));
+}
+'''
+        with tempfile.TemporaryDirectory(prefix="sf2-screen-textures-") as directory:
+            root = Path(directory)
+            (root / "test.c").write_text(harness)
+            subprocess.run(["clang", "-O2", "-Wall", str(root / "test.c"),
+                            "-o", str(root / "test")], check=True)
+            subprocess.run([str(root / "test")], check=True)
+
     def test_gpu_timeout_reports_progress_and_never_returns_completion(self):
         execute = (ROOT / "runtime/nvn/vulkan/exec.c").read_text()
         harness = r'''

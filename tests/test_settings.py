@@ -34,9 +34,10 @@ def compile_harness(source, output):
     subprocess.run(["clang", "-O2", "-Wno-format", "-ffunction-sections", "-fdata-sections",
                     "-I", str(ROOT / "runtime"), *cflags,
                     str(ROOT / "runtime/settings.c"), str(ROOT / "runtime/network.c"),
+                    str(ROOT / "runtime/replay.c"), str(ROOT / "runtime/lan.c"),
                     str(ROOT / "runtime/hle/bindings.c"),
                     str(ROOT / "runtime/ui/developer.c"),
-                    str(ROOT / "runtime/ui/mouse.c"),
+                    str(ROOT / "runtime/ui/mouse.c"), str(ROOT / "runtime/ui/lan_menu.c"),
                     str(source), "-Wl,--gc-sections", *libs,
                     "-lm", "-ldl", "-pthread", "-o", str(output)], check=True)
 

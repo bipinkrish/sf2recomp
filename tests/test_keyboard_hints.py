@@ -15,6 +15,8 @@ class KeyboardHintTests(unittest.TestCase):
 #include "hle/hooks.c"
 #include "ui/menu_stubs.c"
 static Cpu *active_cpu;
+uint64_t plat_now_ns(void) { return 0; }
+uint64_t renderer_present_count(void) { return 0; }
 void *hle_alloc(size_t size) { return calloc(1, size); }
 bool rt_probe_u64(uint64_t a, uint64_t *v) { *v = 0x9000; return true; }
 bool nvn_texture_region_color(const NvnTexture *t, uint32_t x, uint32_t y,
@@ -33,6 +35,8 @@ static char displayed[128];
 static float label_color[4];
 static uint64_t fake_game_object[1] = {0x8000}, fake_types[5];
 bool input_any_gamepad_connected(void) { return false; }
+int input_pad_family(void) { return 1; }
+int input_family_of_type(int type) { return 1; }
 void guest_call(Cpu *c, uint64_t pc) {
     assert(c == active_cpu); // nested calls retain the kernel's current CPU
     switch (pc) {
@@ -124,7 +128,7 @@ int main(void) {
     assert(image_enabled && !text_enabled && hints == NULL);
     g_settings.experimental_keyboard_prompts = true;
     rt_hooks_configure();
-    assert(rt_hook_features == RT_HOOK_KEYBOARD_PROMPTS && !hints);
+    assert((rt_hook_features & ~4u) == RT_HOOK_KEYBOARD_PROMPTS && !hints);
     assert(ensure_keyboard_hint_state());
     g_bind_key[BIND_A] = SDL_SCANCODE_SPACE;
     missing_font = true;
@@ -226,7 +230,7 @@ int main(void) {
     assert(hint_key_label(HINT_A, label, sizeof label) && !strcmp(label, "Bksp"));
     g_settings.experimental_keyboard_prompts = false;
     rt_hooks_configure();
-    assert(!rt_hook_features && !hints);
+    assert(!(rt_hook_features & ~4u) && !hints);
     Cpu before;
     memset(&cpu, 0xa5, sizeof cpu); before = cpu;
     const uint64_t sites[] = {0x700011efb0, 0x7000114f90, 0x7000cd7130, 0x7000cdb690,
@@ -239,7 +243,7 @@ int main(void) {
     assert(rt_hook(&cpu, 0x7001217700ull) == 0 && cpu.x[1] == 60 && !hints);
     g_settings.experimental_keyboard_prompts = true;
     rt_hooks_configure();
-    assert(rt_hook_features == RT_HOOK_KEYBOARD_PROMPTS && !hints);
+    assert((rt_hook_features & ~4u) == RT_HOOK_KEYBOARD_PROMPTS && !hints);
     assert(ensure_keyboard_hint_state());
     reset_keyboard_hint_state();
     assert(!hints); // reboot frees cache storage while retaining the configured hook group

@@ -21,6 +21,8 @@ bool menu_input_captured(void) { return developer_console_open(); }
 bool movie_overlay_active(void) { return false; }
 void movie_request_skip(void) {}
 void menu_request_quit(void) {}
+bool menu_quit_requested(void) { return false; }
+uint64_t plat_now_ns(void) { return 1000000; }
 uint64_t renderer_present_count(void) { return 1; }
 volatile int g_inject_plus;
 void *hle_alloc(uint64_t size) { return calloc(1, size); }

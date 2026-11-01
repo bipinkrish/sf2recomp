@@ -57,6 +57,21 @@ establish combat compatibility.
 [Working findings](findings.md) retain historical debugging context; removed
 experimental flags described in old entries are not current features.
 
+## Combat replay investigation
+
+The opt-in [combat replay harness](combat-replay.md) records logical fighter inputs
+and compares combat-step traces across FPS and graphics settings. It is a
+diagnostic experiment and is not a complete state serializer.
+The [LAN Sparring implementation](lan-sparring.md) reuses its controlled setup
+and observer to synchronize separate local game instances.
+The [replay results](combat-replay-results.md) retain the original fixed-settings
+divergence and the subsequent controlled initialization/RNG experiment. Use
+`--seed` to opt into fixed-step native round/stance setup and scoped random streams.
+The [PvP framing fix](combat-arena-framing-results.md) keeps combat geometry at its
+original reference aspect while the viewport honors the selected display aspect.
+The [half-resolution GPU investigation](combat-half-resolution-results.md) records
+the artwork upload fix and subsequent graphics-setting replay coverage.
+
 ## Conversion output and packaging
 
 The converter's output includes:

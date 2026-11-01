@@ -8,6 +8,68 @@ from test_settings import compile_harness
 
 
 class WidescreenTests(unittest.TestCase):
+    def test_combat_framing_preserves_native_units_and_other_fight_modes(self):
+        source = r'''
+#include <assert.h>
+#include "hle.h"
+#include "settings.h"
+#include "hle/widescreen_hooks.inc"
+static unsigned height, calls;
+static uint64_t current_fight;
+void guest_call(Cpu *c, uint64_t pc) {
+    assert(c->x[0]==0 && c->x[1]==0);
+    assert(pc==0x70000ad270ull || pc==0x7000c91c70ull);
+    memset(c,0x17,sizeof *c);
+    c->x[0]=pc==0x70000ad270ull ? height : current_fight;++calls;
+}
+int main(void) {
+    Cpu c, before;
+    memset(&c,0xa5,sizeof c);before=c; // native aspect must not dereference anything
+    g_settings.aspect=ASPECT_ORIGINAL;
+    assert(widescreen_hook(&c,0x7000eabf0cull)==0);
+    assert(!memcmp(&c,&before,sizeof c) && !calls);
+    unsigned char fight[0x80]={0},list[0x20]={0},render[0xb0]={0};
+    current_fight=(uintptr_t)fight;
+    ST64(fight+0x30,(uintptr_t)list);ST32(list+0x18,18);
+    const int aspects[]={ASPECT_16_10,ASPECT_21_9,ASPECT_32_9};
+    // Different native pixel heights and authored location heights: division
+    // must have the same rounding as native Render.Init at the original aspect.
+    const unsigned heights[]={720,1080};
+    const float authored[]={512,800,1080,1234.5f};
+    for(unsigned h=0;h<2;++h)for(unsigned a=0;a<3;++a)for(unsigned l=0;l<4;++l) {
+        height=heights[h];g_settings.aspect=aspects[a];
+        float scale=(float)height/authored[l];
+        memcpy(render+0x78,&scale,4);
+        float visible_width=9876.5f;memcpy(render+0x84,&visible_width,4);
+        unsigned char unchanged[sizeof render];memcpy(unchanged,render,sizeof render);
+        memset(&c,0xa5,sizeof c);c.x[19]=(uintptr_t)render;before=c;
+        float native=(float)(height==720?1280:1920)/scale;
+        uint32_t bits;memcpy(&bits,&native,4);before.v[0]=bits;
+        assert(widescreen_hook(&c,0x7000eabf0cull)==0);
+        assert(!memcmp(&c,&before,sizeof c));
+        assert(!memcmp(render,unchanged,sizeof render));
+    }
+    // Main's end-of-init zoom fix must not rescale the PvP reference again.
+    unsigned char location[0x80]={0}, layers[0x20]={0};
+    ST64(render+0xa0,(uintptr_t)location);ST64(location+0x70,(uintptr_t)layers);
+    float width=600,minimum=.8f;
+    memcpy(render+0x84,&width,4);memcpy(render+0x88,&minimum,4);
+    assert(widescreen_hook(&c,0x7000eabfe0ull)==0);
+    float after;memcpy(&after,render+0x84,4);assert(after==width);
+    memcpy(&after,render+0x88,4);assert(after==minimum);
+    assert(calls==48);
+    ST32(list+0x18,17);before=c;
+    assert(widescreen_hook(&c,0x7000eabf0cull)==0);
+    assert(!memcmp(&c,&before,sizeof c) && calls==49);
+    return 0;
+}
+'''
+        with tempfile.TemporaryDirectory(prefix="sf2-combat-width-") as directory:
+            root = Path(directory)
+            (root / 'test.c').write_text(source)
+            compile_harness(root / 'test.c', root / 'test')
+            subprocess.run([str(root / 'test')], check=True)
+
     def test_background_cover_preserves_fighters_and_caller_state(self):
         source = r'''
 #include <assert.h>

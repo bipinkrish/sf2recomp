@@ -83,10 +83,14 @@ void fnprof_hit(uint64_t addr, uint64_t lr, uint64_t x0);
 #define ST32(a, v) (*(u32u *)(uintptr_t)(a) = (uint32_t)(v))
 #define ST64(a, v) (*(u64u *)(uintptr_t)(a) = (uint64_t)(v))
 
+// ARM LDAR/LDAXR and STLR provide RCsc ordering, including store-release ->
+// later acquire-load to a different address. C acquire/release alone loses that
+// store/load edge on x86 (and can select RCpc LDAPR on ARM hosts). Use host SC
+// atomics conservatively so guest queue publications cannot miss wakeups.
 // ---- exclusive monitor (emulated with compare-and-swap)
 #define EXCL(N, T)                                                                         \
     static inline uint64_t ldx##N(Cpu *c, uint64_t a) {                                    \
-        T v = __atomic_load_n((T *)(uintptr_t)a, __ATOMIC_ACQUIRE);                        \
+        T v = __atomic_load_n((T *)(uintptr_t)a, __ATOMIC_SEQ_CST);                        \
         c->excl_addr = a;                                                                  \
         c->excl_val = v;                                                                   \
         return v;                                                                          \
@@ -99,10 +103,10 @@ void fnprof_hit(uint64_t addr, uint64_t lr, uint64_t x0);
                                             __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);           \
     }                                                                                      \
     static inline uint64_t lda##N(uint64_t a) {                                            \
-        return __atomic_load_n((T *)(uintptr_t)a, __ATOMIC_ACQUIRE);                       \
+        return __atomic_load_n((T *)(uintptr_t)a, __ATOMIC_SEQ_CST);                       \
     }                                                                                      \
     static inline void stl##N(uint64_t a, uint64_t v) {                                    \
-        __atomic_store_n((T *)(uintptr_t)a, (T)v, __ATOMIC_RELEASE);                       \
+        __atomic_store_n((T *)(uintptr_t)a, (T)v, __ATOMIC_SEQ_CST);                       \
     }
 EXCL(8, uint8_t)
 EXCL(16, uint16_t)
@@ -112,7 +116,7 @@ EXCL(64, uint64_t)
 static inline void ldxp64(Cpu *c, uint64_t a, uint64_t *lo, uint64_t *hi) {
     c->excl_addr = a;
     __uint128_t val = 0;
-    __atomic_load((__uint128_t *)(uintptr_t)a, &val, __ATOMIC_ACQUIRE);
+    __atomic_load((__uint128_t *)(uintptr_t)a, &val, __ATOMIC_SEQ_CST);
     c->excl_val128 = val;
     *lo = (uint64_t)val;
     *hi = (uint64_t)(val >> 64);
@@ -127,7 +131,7 @@ static inline uint32_t stxp64(Cpu *c, uint64_t a, uint64_t lo, uint64_t hi) {
 }
 static inline void ldxp32(Cpu *c, uint64_t a, uint64_t *lo, uint64_t *hi) {
     c->excl_addr = a;
-    uint64_t val = __atomic_load_n((uint64_t *)(uintptr_t)a, __ATOMIC_ACQUIRE);
+    uint64_t val = __atomic_load_n((uint64_t *)(uintptr_t)a, __ATOMIC_SEQ_CST);
     *lo = (uint32_t)val;
     *hi = (uint32_t)(val >> 32);
 }

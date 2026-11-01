@@ -48,6 +48,7 @@ typedef struct Settings {
     bool experimental_keyboard_prompts;
     bool network_enabled;
     bool unlock_all_sparring_characters;
+    bool allow_sparring_lan_multiplayer;
     bool unlock_all_videos;
     bool show_intro;
     bool ai_enabled;

@@ -1,6 +1,38 @@
 // Switch screen modes, graphics-device descriptors and NVN backing storage must
 // agree before Unity creates cameras/canvases. Every site checks its original
 // instruction in patches.py. Disabled mode preserves all guest state.
+// Render's reference width drives PvP camera scale/center and combat margins.
+// Keep that entire framing calculation at the authored 16:9 aspect. Native
+// display dimensions and the actual viewport still use the selected aspect.
+static uint64_t widescreen_pvp_render;
+static void widescreen_combat_framing(Cpu *c) {
+    widescreen_pvp_render = 0;
+    if (!settings_custom_aspect()) return;
+    Cpu saved = *c;
+    c->x[0] = 0; c->x[1] = 0;
+    guest_call(c, 0x7000c91c70ull); // Fight.CurrentFight (also used later in Render.Init)
+    uint64_t fight = c->x[0];
+    uint64_t list = fight ? LD64(fight + 0x30) : 0;
+    bool pvp = list && LD32(list + 0x18) == 18;
+    *c = saved;
+    if (!pvp) return;
+    widescreen_pvp_render = c->x[19];
+    float location_scale;
+    uint32_t scale_bits = LD32(c->x[19] + 0x78);
+    memcpy(&location_scale, &scale_bits, sizeof location_scale);
+    c->x[0] = 0; c->x[1] = 0;
+    guest_call(c, 0x70000ad270ull); // SystemProperties.ScreenHeight, as above in Render.Init
+    uint32_t height = (uint32_t)c->x[0];
+    *c = saved;
+    // Match native integer-pixel -> float -> location-scale division order.
+    // The original next instructions store ScreenWidth and derive MinScale;
+    // subsequent scale, center, facing-sensitive margins and clamps stay native.
+    float width = (float)(height * 16u / 9u) / location_scale;
+    uint32_t bits;
+    memcpy(&bits, &width, sizeof bits);
+    c->v[0] = bits;
+}
+
 static bool widescreen_backdrop(uint64_t layer) {
     if (g_settings.aspect != ASPECT_32_9 || !layer) return false;
     uint32_t type = LD32(layer + 0x34);
@@ -59,12 +91,16 @@ static int widescreen_hook(Cpu *c, uint64_t site) {
             widescreen_floor(c, c->x[0], LD64(c->x[19] + 0xa0), scale);
         return 0;
     }
+    case 0x7000eabf0cull:
+        widescreen_combat_framing(c);
+        return 0;
     case 0x7000eabfe0ull:
         // Render uses screen width to choose its fight zoom and minimum scale.
         // Expanding that reference also zooms the fighters vertically, pushing
         // their feet and ground markers below the viewport. Keep the authored
         // 16:9 fight framing while the actual camera/output reveal more sides.
-        if (g_settings.aspect == ASPECT_21_9 || g_settings.aspect == ASPECT_32_9) {
+        if ((g_settings.aspect == ASPECT_21_9 || g_settings.aspect == ASPECT_32_9) &&
+            c->x[19] != widescreen_pvp_render) {
             float factor = 1920.0f / settings_screen_width(1080);
             float width, minimum;
             memcpy(&width, (void *)(uintptr_t)(c->x[19] + 0x84), sizeof width);

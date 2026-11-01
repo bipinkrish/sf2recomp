@@ -256,6 +256,13 @@ def package_game(game, output, executable, sdl_dir, ffmpeg_dir, target="linux"):
             "Software fallback: SDL_VIDEODRIVER=x11 LARECOMP_VK_NO_GMEM=1 "
             "VK_DRIVER_FILES=/usr/share/vulkan/icd.d/lvp_icd.json ./sf2\n"
             "Combat and hardware-driver compatibility remain incomplete.\n")
+    with (output / "RUN.txt").open("a") as instructions:
+        instructions.write(
+            "LAN Sparring: start the same build on both computers on the same local network.\n"
+            "Choose Sparring > LAN Multiplayer > Host on one and Join on the other; select the discovered host.\n"
+            "Each player uses their normal local player-1 controls. Restart keeps the connection; leaving Sparring closes it.\n"
+            "No Python or pip packages are required to play LAN. Native LAN is enabled by default; "
+            "[gameplay] allow_sparring_lan_multiplayer=false restores direct Normal Sparring.\n")
     print(f"Native game folder: {output}")
 
 
