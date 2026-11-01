@@ -14,6 +14,65 @@ SDL = ROOT / "build/dependencies/SDL3-3.4.16/include"
 
 @unittest.skipUnless(shutil.which("javac") and shutil.which("java"), "Java JDK required")
 class AndroidImportTests(unittest.TestCase):
+    def test_bundled_game_installs_once_and_rejects_invalid_replacements(self):
+        source = r'''
+package org.sf2recomp.app;
+import java.io.*;
+import java.nio.file.*;
+import java.util.*;
+import java.util.zip.*;
+public class GameBundleTest {
+    static byte[] archive(boolean invalidPath, boolean invalidBuild) throws Exception {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try (ZipOutputStream zip = new ZipOutputStream(bytes)) {
+            for (String module : new String[]{"main", "sdk"}) {
+                byte[] header = new byte[0x104];
+                System.arraycopy("NSO0".getBytes("US-ASCII"),0,header,0,4);
+                header[0x11]=1; header[0x18]=4;
+                Arrays.fill(header,0x40,0x60,(byte)(module.equals("main") ? 0xab : 0xcd));
+                if (invalidBuild) header[0x40]^=1;
+                zip.putNextEntry(new ZipEntry("exefs/"+module)); zip.write(header); zip.closeEntry();
+            }
+            zip.putNextEntry(new ZipEntry(invalidPath ? "../outside" : "romfs/Data/content"));
+            zip.write(new byte[]{1,2,3}); zip.closeEntry();
+        }
+        return bytes.toByteArray();
+    }
+    public static void main(String[] args) throws Exception {
+        File root=new File(args[0]), target=new File(root,"game");root.mkdirs();
+        Properties builds=new Properties();builds.setProperty("main","ab".repeat(32));builds.setProperty("sdk","cd".repeat(32));
+        assert !GameBundle.isInstalled(target,"version1",builds);
+        GameBundle.install(new ByteArrayInputStream(archive(false,false)),target,"version1",builds);
+        assert GameBundle.isInstalled(target,"version1",builds);
+        assert !GameBundle.isInstalled(target,"version2",builds);
+        for (int i=0;i<3;i++) {
+            byte[] data=i==2 ? new byte[]{1,2,3} : archive(i==0,i==1);
+            try { GameBundle.install(new ByteArrayInputStream(data),target,"version2",builds);
+                  throw new AssertionError("invalid bundle accepted"); }
+            catch (IOException expected) {}
+            assert GameBundle.isInstalled(target,"version1",builds);
+            assert !new File(root,"outside").exists() && !new File(root,"game.install").exists();
+        }
+        GameBundle.install(new ByteArrayInputStream(archive(false,false)),target,"version2",builds);
+        assert GameBundle.isInstalled(target,"version2",builds);
+        assert target.renameTo(new File(root,"game.previous"));
+        assert GameBundle.isInstalled(target,"version2",builds); // interrupted update recovery
+        Files.delete(new File(target,"exefs/main").toPath());
+        assert !GameBundle.isInstalled(target,"version2",builds); // marker alone is insufficient
+        System.out.println("Bundled game installation, reuse, validation and recovery PASS");
+    }
+}
+'''
+        with tempfile.TemporaryDirectory(prefix="sf2-game-bundle-") as temporary:
+            directory = Path(temporary)
+            harness = directory / "GameBundleTest.java"
+            harness.write_text(source)
+            implementation = ROOT / "android/app/src/main/java/org/sf2recomp/app"
+            subprocess.run(["javac", "-d", str(directory), str(implementation / "GameImport.java"),
+                            str(implementation / "GameBundle.java"), str(harness)], check=True)
+            subprocess.run(["java", "-ea", "-cp", str(directory), "org.sf2recomp.app.GameBundleTest",
+                            str(directory / "data")], check=True)
+
     def test_invalid_import_preserves_game_and_failed_swap_recovers(self):
         source = r'''
 package org.sf2recomp.app;

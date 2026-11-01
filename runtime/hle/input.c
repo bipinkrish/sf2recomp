@@ -18,6 +18,7 @@
 #include "../rumble.h"
 #include "../ui/menu.h"
 #include "../ui/mouse.h"
+#include "../ui/touch.h"
 #include "movie.h"
 
 enum {
@@ -457,6 +458,9 @@ static void scan_connected_pads(void) {
 }
 
 void input_handle_event(const SDL_Event *e) {
+#ifdef __ANDROID__
+    menu_touch_event(e);
+#endif
     // Consume the whole skip click, including its release after the overlay goes
     // away, so it cannot activate a menu item while the next scene is loading.
     static uint32_t movie_mouse_consumed;

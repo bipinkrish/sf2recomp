@@ -1329,6 +1329,11 @@ void ui_window_init(void) {
     // SDL's resizable window otherwise overrides the Activity's landscape
     // request and permits portrait on phones.
     SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
+    // Unity receives real contacts. A synthesized mouse would duplicate taps
+    // and collapse simultaneous joystick/action-button fingers into one pointer.
+    SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
+    SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
+    SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
 #endif
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) FATAL("SDL_Init: %s\n", SDL_GetError());
     movie_preload_intro();
@@ -1411,6 +1416,14 @@ int ui_run(void) {
             if (e.type == SDL_EVENT_QUIT || menu_quit_requested()) ui_quit();
             extern bool input_user_blocked(const SDL_Event *e);
             if (input_user_blocked(&e)) continue;  // scripted test runs: the real keyboard / mouse / pads do nothing (as metal.m)
+#ifdef __ANDROID__
+            // Android Back follows the existing Escape policy: back in menus,
+            // pause during combat. Process it before native modal UI capture.
+            if ((e.type == SDL_EVENT_KEY_DOWN || e.type == SDL_EVENT_KEY_UP) && e.key.scancode == SDL_SCANCODE_AC_BACK) {
+                e.key.scancode = SDL_SCANCODE_ESCAPE;
+                e.key.key = SDLK_ESCAPE;
+            }
+#endif
             input_cursor_event(&e);
             if (menu_handle_event(&e)) continue;
             input_handle_event(&e);

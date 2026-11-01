@@ -13,6 +13,15 @@ PATCHES = {}
 # Replay's feature bit is 2u (runtime/replay.h). Keep the literal in generated
 # C so adding diagnostic hooks does not change the shared CPU ABI header.
 HOOKS = {
+    0x7000cdc110: (0xa9bd57f6, (), "hide menu footers while retaining dialog and combat hints"),
+    0x7000c95bf0: (0xa9be4ff4, (), "Android: hide duplicate Switch combat controls"),
+    0x7000e1a610: (0xf81e0ff3, (), "Android: show the retained mobile controller"),
+    0x7000c8f80c: (0x94165b1d, (), "Android: enable the mobile joystick container"),
+    0x7000c8f830: (0xa8c567fa, (), "Android: enable the mobile action buttons"),
+    0x7000c970b0: (0x2a1f03e0, (), "Android: route touch actions to the local player"),
+    0x70012283e0: (0xf81e0ff3, (), "Android: actual Unity touch count"),
+    0x7001228450: (0xd10203ff, (), "Android: Unity touch with stable finger IDs"),
+    0x70012285c0: (0xf81e0ff3, (), "Android: enable Unity multitouch"),
     0x7000e6fca0: (0xa9be4ff4, (), "LAN main-menu item click"),
     0x7000e6fd00: (0xf9402800, (), "LAN main-menu item pointer down"),
     0x7000e6fd10: (0xf9402c00, (), "LAN main-menu item pointer up"),

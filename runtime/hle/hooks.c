@@ -8,6 +8,7 @@
 #include "../nvn/texture_color.h"
 #include "../ui/menu.h"
 #include "../ui/mouse.h"
+#include "../ui/touch.h"
 #include <SDL3/SDL_scancode.h>
 #include <math.h>
 
@@ -767,6 +768,7 @@ static bool guest_object_named(Cpu *c, uint64_t object, const char *expected) {
 
 #include "developer_hooks.inc"
 #include "lan_ui_hooks.inc"
+#include "platform_ui_hooks.inc"
 
 // The shipped MainSection has a fully wired, localized Exit item. Reveal it
 // before GeneralMenuList.Awake collects active buttons and installs navigation.
@@ -808,7 +810,24 @@ static int menu_mouse_hook(Cpu *c, uint64_t site) {
         unsigned height = guest_invoke2(c, 0x70015ccc00ull, 0, 0);
         MenuMouse previous = menu_mouse;
         menu_mouse = menu_mouse_frame(width, height, developer_console_open());
+#ifdef __ANDROID__
+        android_touch_count = menu_touch_frame(width, height, developer_console_open(), android_touches);
+        // The Sparring roster uses a custom cell hit-test rather than Unity
+        // Buttons. Feed only that helper the first real contact; the actual
+        // EventSystem receives all contacts through UnityEngine.Input below.
+        MenuMouse touch_mouse = {.x = -10000, .y = -10000};
+        for (unsigned i = 0; i < android_touch_count; ++i) {
+            MenuTouch *t = &android_touches[i];
+            if (t->finger != 0) continue;
+            touch_mouse.x = t->x; touch_mouse.y = t->y;
+            touch_mouse.pressed = t->phase == TOUCH_BEGAN;
+            touch_mouse.released = t->phase == TOUCH_ENDED;
+            touch_mouse.held = t->phase < TOUCH_ENDED;
+        }
+        sparring_mouse_frame(c, android_touch_count ? &touch_mouse : &menu_mouse);
+#else
         sparring_mouse_frame(c,&menu_mouse);
+#endif
         if (ENV("LARECOMP_MOUSE_TRACE") &&
             (previous.x != menu_mouse.x || previous.y != menu_mouse.y || menu_mouse.pressed || menu_mouse.released))
             LOG("[mouse] screen %ux%u pointer %.1f/%.1f held=%x down=%x up=%x\n", width, height,
@@ -819,7 +838,13 @@ static int menu_mouse_hook(Cpu *c, uint64_t site) {
     // The Switch backend reports 16 touch slots even without contact. Unity's
     // ProcessTouchEvents then suppresses ProcessMouseEvent on every update.
     // Override only UI BaseInput; raw game/touch/controller APIs stay original.
-    case 0x70000fabe0ull: case 0x70000fac50ull: c->x[0] = 0; return 1;
+    case 0x70000fabe0ull: case 0x70000fac50ull:
+#ifdef __ANDROID__
+        c->x[0] = site == 0x70000fabe0ull ? 1 : android_touch_count;
+#else
+        c->x[0] = 0;
+#endif
+        return 1;
     case 0x70000fa960ull: case 0x70000fa9d0ull: case 0x70000faa40ull: {
         unsigned button = (uint32_t)c->x[1];
         unsigned bits = site == 0x70000fa960ull ? menu_mouse.pressed :
@@ -840,6 +865,8 @@ static int menu_mouse_hook(Cpu *c, uint64_t site) {
 }
 
 int rt_hook(Cpu *c, uint64_t site) {
+    int platform_result = platform_ui_hook(c, site);
+    if (platform_result >= 0) return platform_result;
     int lan_result = lan_ui_hook(c,site);
     if(lan_result>=0)return lan_result;
     int mouse_result = menu_mouse_hook(c, site);

@@ -30,12 +30,12 @@ see the [graphics guide](docs/runtime-guide.md#graphics-and-frame-rate).*
 | Desktop main menu | Sparring combat |
 | :---: | :---: |
 | [![The main menu framed by autumn trees and an open dojo gate](docs/screenshots/main-menu.png)](docs/screenshots/main-menu.png) | [![Wraith and Hurricane fighting against a sunlit mountain village backdrop](docs/screenshots/sparring.png)](docs/screenshots/sparring.png) |
-| 16:10 · 1728×1080 | 16:10 · 1728×1080 |
+| Original 16:9 · 1920×1080 | 16:10 · 1728×1080 |
 
 | Sparring character selection | Sunset arena |
 | :---: | :---: |
-| [![The Sparring character roster with Wraith selected](docs/screenshots/character-select.png)](docs/screenshots/character-select.png) | [![Wraith and May facing off between glowing stone pillars at sunset](docs/screenshots/sunset-arena.png)](docs/screenshots/sunset-arena.png) |
-| 16:10 · 1728×1080 | Original 16:9 · 1920×1080 |
+| [![The Sparring character roster with Fury ready and the footer hidden](docs/screenshots/character-select.png)](docs/screenshots/character-select.png) | [![Wraith and May facing off between glowing stone pillars at sunset](docs/screenshots/sunset-arena.png)](docs/screenshots/sunset-arena.png) |
+| Original 16:9 · 1920×1080 | Original 16:9 · 1920×1080 |
 
 [![Wraith and Puma fighting beneath giant forest branches in 32:9](docs/screenshots/ultrawide-forest.png)](docs/screenshots/ultrawide-forest.png)
 
@@ -79,6 +79,7 @@ restarting; no rebuild is needed.
 | **Desktop window modes** | A resizable window or fullscreen, selected with `[video] fullscreen`. |
 | **Remappable keyboard and controllers** | `[controls.keyboard]` and `[controls.gamepad]` map desktop inputs to Switch actions, including unbinding actions and sharing inputs. |
 | **Mouse menus** | Hover and left-click use the game's existing menu buttons. Pointer coordinates follow window resizing, black bars, HiDPI displays and configured aspect ratios; existing sliders and scroll views also receive mouse drag and wheel input. |
+| **Menu layout** | The bottom controller-hint strips are hidden on desktop and Android. Centered dialog prompts, combat hints and the gameplay HUD remain visible. |
 | **Keyboard prompts (experimental)** | `[experimental] keyboard_prompts = true` replaces supported in-game button hints with your mapped keys. Automatic selection follows controller presence. Disabled by default; some screens may need layout adjustments. |
 | **Desktop Exit button** | The main menu's localized **Exit** option closes the game and returns to the desktop, including in fullscreen. |
 | **Game network blocking** | `[network] enabled = false` is the default and blocks game connections, DNS, uploads, online multiplayer, external web links and the remote developer listener. Offline Sparring remains available. Enabling networking does not implement missing online services. |
@@ -252,9 +253,12 @@ The [supplied INI](sf2recomp.ini) lists the shipped settings and bindings.
 The Android target builds a native SDL/Vulkan APK from the same generated game
 code and runtime. It requires **Android 13/API 33 or newer**, a 64-bit device and
 the renderer's Vulkan 1.3 features; the Vulkan version alone does not guarantee
-GPU compatibility. Connect a controller for combat. SDL's touch-to-mouse path
-feeds the existing menu bridge; the game's original combat touch controls still
-need a multi-finger input bridge and mobile UI activation.
+GPU compatibility. Android uses the retained mobile joystick and action-button
+UI, with independent fingers passed to Unity's touch input. Keyboard and
+controller input remain available. No original Android APK is required.
+Menu footer strips and the duplicate Switch combat indicators are hidden.
+In Sparring selection, tap the selected fighter again to confirm; Android's
+Back button/gesture goes back in menus or pauses during combat.
 
 Use Python 3.12+, Java 17, Gradle 8.11.1, SDK platform 35, SDK CMake 3.22.1 and
 NDK **28.2.13676358 (r28c)**. Set `ANDROID_HOME` to your SDK. The Gradle wrapper
@@ -278,16 +282,21 @@ python3 tools/build_android.py --abi=arm64-v8a --install
 Each ABI is built separately; the helper preserves its APK at
 `build/android/sf2-recomp-<ABI>-debug.apk`. The Gradle output at
 `android/app/build/outputs/apk/debug/app-debug.apk` contains the last ABI built.
-The APK includes translated
-game code generated from your local files. Keep it private like other converted
-output. The helper never bundles original extracted assets into the APK.
+The APK includes translated game code and the game files from your local
+`game/extracted/update` directory. `--game /path/to/extracted/update` selects a
+different source directory when using the Python helper. Keep the resulting APK
+private like other converted output.
 
-Open **SF2 Recomp**, select **Import extracted game folder**, and choose the
-directory containing `exefs/main`, `exefs/sdk` and `romfs`. Import copies the
-files into app-specific external storage. It validates both NSO build IDs before
-replacing an existing import; an incompatible or incomplete NSO leaves the old
-game intact. An interrupted directory swap is recovered at launcher startup.
-Configuration, fonts, logs, caches and saves live in
+The launcher icon, title and display version come from the extracted official
+game metadata (currently **Shadow Fight 2 · 1.1.0**). The manifest also records
+the original publisher and the source NSO build ID.
+
+Install and open **Shadow Fight 2** to start the game directly. The computer does
+all conversion and packaging; the Android app has no importer or tool launcher.
+On its first launch it unpacks the bundled data into private app storage, then
+starts the game. Subsequent launches reuse that data. Bundled updates validate
+both NSO build IDs and replace files transactionally; interrupted swaps recover
+on the next launch. Configuration, fonts, logs, caches and saves also live in
 internal app storage. For a debug installation, inspect them with:
 
 ```sh
@@ -297,7 +306,7 @@ adb shell run-as org.sf2recomp.app cat files/sf2recomp.ini
 
 Development limitations: movies are skipped until a native Android decoder is
 implemented. Backgrounding closes the game session until guest suspension and
-surface recreation are implemented; return to the launcher to start again.
+surface recreation are implemented; reopen the game to start a new session.
 The LAN protocol and in-game Sparring flow are shared with desktop, with Android
 network permissions and a foreground Wi-Fi discovery lock. ARM64-to-desktop
 combat determinism, physical-phone GPU/memory compatibility and sustained play
@@ -324,8 +333,13 @@ greeting/configuration exchange through a temporary ADB tunnel; this does not
 test Wi-Fi broadcast discovery or multiplayer combat synchronization. Import
 tests covered malformed/truncated NSOs, wrong build IDs, rollback and interrupted
 swaps. A real folder-picker rejection preserved both installed NSOs byte-for-byte.
-Home-button testing confirmed that only the dedicated game process exits; the
-launcher survives and can start a fresh session that reaches the main menu.
+Those import-screen tests describe the earlier development wrapper, which has
+been replaced by direct game startup with bundled local assets.
+Subsequent emulator checks verified bundled first-launch startup, footer-free
+menu and Sparring selection, Android Back navigation, and simultaneous joystick
+movement and attack fingers using the retained mobile controls. The duplicate
+Switch combat indicators are hidden on Android. A footer-free desktop roster
+capture is included in the README; physical ARM64 phone testing remains pending.
 Evidence is kept locally under `build/validation/android` and `build/android-*.log`.
 
 ## Development

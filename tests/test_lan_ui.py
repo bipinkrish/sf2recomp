@@ -154,6 +154,9 @@ int main(void) {
     cpu=saved;assert(sparring_select_cell(&cpu,module,0,1,26));assert(!memcmp(&cpu,&saved,sizeof cpu));
     uint64_t selector=LD64(selection_table+0x20);
     assert(moved_player==1 && confirmed_id==9 && LD32(selector+0x38)==2 && LD32(selector+0x3c)==3);
+    moved_player=99;confirmed_id=0;
+    assert(sparring_select_cell(&cpu,module,0,1,26));
+    assert(moved_player==99 && confirmed_id==9); // second tap confirms without resetting selection
     assert(!sparring_select_cell(&cpu,module,0,1,32));ST8(module+0x59,1);
     assert(!sparring_select_cell(&cpu,module,0,1,0));
     selected_rect=456;MenuMouse mouse={.x=480,.y=270};
@@ -161,8 +164,8 @@ int main(void) {
     sparring_module=module;sparring_kind=0;ST64(selection_table+0x28,789);selected_rect=926;
     mouse.pressed=mouse.released=1;sparring_mouse_frame(&cpu,&mouse);
     assert(moved_player==0 && confirmed_id==7 && !memcmp(&cpu,&saved,sizeof cpu));
-    ST8(module+0x58,1);ST8(module+0x59,0);sparring_mouse_frame(&cpu,&mouse);
-    assert(moved_player==1 && confirmed_id==9); // shared Normal mouse advances to player 2
+    ST8(module+0x58,1);ST8(module+0x59,0);moved_player=99;sparring_mouse_frame(&cpu,&mouse);
+    assert(moved_player==99 && confirmed_id==9); // shared mouse confirms player 2's already selected cell
     moved_player=99;dialog_blocks=true;sparring_mouse_frame(&cpu,&mouse);assert(moved_player==99);
     dialog_blocks=false;mouse.pressed=0;mouse.released=1;sparring_pressed=-1;
     sparring_mouse_frame(&cpu,&mouse);assert(moved_player==99); // release without a matching press

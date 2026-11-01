@@ -2,6 +2,7 @@
 """Prepare pinned Android dependencies and build the locally generated game APK."""
 import argparse
 import hashlib
+import json
 import os
 import re
 from pathlib import Path
@@ -10,6 +11,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 WORK = ROOT / "build/dependencies"
@@ -97,6 +99,60 @@ def game_identity(required=True):
             return
         identities.append(f"{module}={''.join(values).lower()}")
     (ROOT / "build/android-assets/game-builds.properties").write_text("\n".join(identities) + "\n")
+    return dict(line.split("=", 1) for line in identities)
+
+
+def package_game(game, identities):
+    """Package the user's local data, ready to play without an Android importer."""
+    # The runtime checks the generated code's exact build IDs again at launch.
+    # Check before touching the last good asset package as well.
+    for module, expected in identities.items():
+        path = game / "exefs" / module
+        with path.open("rb") as stream:
+            header = stream.read(0x100)
+        if len(header) != 0x100 or header[:4] != b"NSO0" or header[0x40:0x60].hex() != expected:
+            raise ValueError(f"{path} does not match the generated game code")
+    if not (game / "romfs/Data/globalgamemanagers").is_file():
+        raise ValueError(f"Missing extracted game assets: {game / 'romfs'}")
+    paths = [game / "exefs" / name for name in ("main", "sdk")]
+    paths += sorted(p for p in (game / "romfs").rglob("*") if p.is_file())
+    paths += [game / name for name in ("control.nacp", "game-info.json", "icon.png") if (game / name).is_file()]
+    signature = [[str(p.resolve()), p.stat().st_size, p.stat().st_mtime_ns] for p in paths]
+    assets = ROOT / "build/android-assets"
+    archive, cache = assets / "game.zip", ROOT / "build/android/game-package.json"
+    previous = json.loads(cache.read_text()) if cache.is_file() else {}
+    if not archive.is_file() or previous.get("files") != signature:
+        temporary = archive.with_suffix(".zip.tmp")
+        try:
+            with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=1) as output:
+                for path in paths:
+                    output.write(path, path.relative_to(game).as_posix())
+            with temporary.open("rb") as stream:
+                identity = hashlib.file_digest(stream, "sha256").hexdigest()
+            temporary.replace(archive)
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            cache.write_text(json.dumps({"files": signature, "identity": identity}))
+        finally:
+            temporary.unlink(missing_ok=True)
+    else:
+        identity = previous["identity"]
+    (assets / "game-package-id.txt").write_text(identity + "\n")
+    icon = ROOT / "build/android-res/drawable-nodpi/game_icon.png"
+    if (game / "icon.png").is_file():
+        icon.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(game / "icon.png", icon)
+    else:
+        icon.unlink(missing_ok=True)
+    from game_metadata import parse_nacp
+    metadata = {"title": "Shadow Fight 2", "publisher": "Nekki Limited", "display_version": "1.1.0"}
+    if (game / "control.nacp").is_file():
+        metadata.update(parse_nacp((game / "control.nacp").read_bytes()))
+    elif (game / "game-info.json").is_file():
+        info = json.loads((game / "game-info.json").read_text())
+        metadata.update({key: info[key] for key in metadata if info.get(key)})
+    metadata.update(source_platform="Nintendo Switch", source_build_id=identities["main"])
+    (ROOT / "build/android/game-metadata.json").write_text(json.dumps(metadata, ensure_ascii=False) + "\n")
+    print(f"Bundled local game: {archive.stat().st_size / 1024**2:.0f} MiB", flush=True)
 
 
 def gradle_command():
@@ -109,10 +165,13 @@ def main():
     parser.add_argument("--abi", choices=("arm64-v8a", "x86_64"), default="arm64-v8a")
     parser.add_argument("--prepare", action="store_true", help="only prepare source dependencies/assets")
     parser.add_argument("--install", action="store_true", help="also install on the ADB-selected device")
+    parser.add_argument("--game", type=Path, default=ROOT / "game/extracted/update",
+                        help="extracted game files to bundle in the private game APK")
     args = parser.parse_args()
     prepare()
-    game_identity(required=not args.prepare)
+    identities = game_identity(required=not args.prepare)
     if args.prepare: return
+    package_game(args.game.resolve(), identities)
     sdk = Path(os.environ.get("ANDROID_HOME", Path.home() / "Android/Sdk"))
     for relative in ("platforms/android-35/android.jar", "ndk/28.2.13676358/build/cmake/android.toolchain.cmake"):
         if not (sdk / relative).exists(): raise ValueError(f"Missing Android SDK component: {sdk / relative}")

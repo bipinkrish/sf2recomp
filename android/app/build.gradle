@@ -2,6 +2,8 @@ plugins { id 'com.android.application' }
 
 def sf2Root = rootProject.projectDir.parentFile
 def sdlSource = new File(sf2Root, 'build/dependencies/SDL3-3.4.16')
+def gameMetadataFile = new File(sf2Root, 'build/android/game-metadata.json')
+def gameMetadata = gameMetadataFile.isFile() ? new groovy.json.JsonSlurper().parse(gameMetadataFile) : [:]
 
 android {
     namespace 'org.sf2recomp.app'
@@ -11,8 +13,13 @@ android {
         applicationId 'org.sf2recomp.app'
         minSdk 33
         targetSdk 35
-        versionCode 1
-        versionName '0.1-dev'
+        versionCode 2
+        versionName(gameMetadata.display_version ?: '1.1.0')
+        resValue 'string', 'app_name', (gameMetadata.title ?: 'Shadow Fight 2').toString()
+        manifestPlaceholders.gamePublisher = gameMetadata.publisher ?: 'Nekki Limited'
+        manifestPlaceholders.gameVersion = gameMetadata.display_version ?: '1.1.0'
+        manifestPlaceholders.gameSourceBuild = gameMetadata.source_build_id ?: 'unprepared'
+        manifestPlaceholders.gameIcon = new File(sf2Root, 'build/android-res/drawable-nodpi/game_icon.png').isFile() ? '@drawable/game_icon' : '@android:drawable/sym_def_app_icon'
         // Build one ABI per invocation; x86_64 is useful for the emulator.
         ndk { abiFilters((project.findProperty('sf2Abi') ?: 'arm64-v8a').toString()) }
         externalNativeBuild {
@@ -28,6 +35,7 @@ android {
     sourceSets.main {
         java.srcDir new File(sdlSource, 'android-project/app/src/main/java')
         assets.srcDir new File(sf2Root, 'build/android-assets')
+        res.srcDir new File(sf2Root, 'build/android-res')
     }
     buildTypes {
         debug { jniDebuggable true }
@@ -36,4 +44,5 @@ android {
     // Generated C has hundreds of thousands of functions; keep symbols in the
     // local .cxx build, without embedding that debug information in the APK.
     packaging { jniLibs { useLegacyPackaging false } }
+    androidResources { noCompress 'zip' }
 }

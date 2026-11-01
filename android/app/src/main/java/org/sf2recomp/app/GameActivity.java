@@ -2,16 +2,33 @@ package org.sf2recomp.app;
 
 import android.content.Context;
 import android.net.wifi.WifiManager;
+import android.widget.Toast;
+import java.io.File;
+import java.io.IOException;
 import org.libsdl.app.SDLActivity;
 
 /** SDL owns the game thread, surface, controller, audio and touch event bridge. */
 public final class GameActivity extends SDLActivity {
     private WifiManager.MulticastLock discoveryLock;
+    private File game;
 
     @Override protected String[] getLibraries() { return new String[]{"SDL3", "main"}; }
 
     @Override protected String[] getArguments() {
-        return new String[]{LauncherActivity.gameDirectory(this).getAbsolutePath()};
+        return new String[]{game.getAbsolutePath()};
+    }
+
+    @Override protected void main() {
+        // This runs on SDLThread, so initial asset extraction cannot block the
+        // Activity's event/surface thread. Later launches reuse the installation.
+        try {
+            game = GameAssets.prepare(this);
+            super.main();
+        } catch (IOException error) {
+            android.util.Log.e("ShadowFight2", "Cannot prepare bundled game", error);
+            runOnUiThread(() -> Toast.makeText(this, "Could not open the bundled game: "
+                + error.getMessage(), Toast.LENGTH_LONG).show());
+        }
     }
 
     @Override protected void onResume() {

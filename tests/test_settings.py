@@ -37,7 +37,8 @@ def compile_harness(source, output):
                     str(ROOT / "runtime/replay.c"), str(ROOT / "runtime/lan.c"),
                     str(ROOT / "runtime/hle/bindings.c"),
                     str(ROOT / "runtime/ui/developer.c"),
-                    str(ROOT / "runtime/ui/mouse.c"), str(ROOT / "runtime/ui/lan_menu.c"),
+                    str(ROOT / "runtime/ui/mouse.c"), str(ROOT / "runtime/ui/touch.c"),
+                    str(ROOT / "runtime/ui/lan_menu.c"),
                     str(source), "-Wl,--gc-sections", *libs,
                     "-lm", "-ldl", "-pthread", "-o", str(output)], check=True)
 

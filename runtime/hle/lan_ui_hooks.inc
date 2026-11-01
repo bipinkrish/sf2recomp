@@ -306,13 +306,17 @@ static bool sparring_select_cell(Cpu *c,uint64_t module,unsigned kind,unsigned p
     uint64_t table=LD64(module+0x20),array=LD64(module+(kind?0x90:0x98));
     unsigned columns=LD32(module+0x5c),count=array?LD64(array+0x18):0;
     if(!table || !columns || index>=count || player>1)return false;
-    // A selected character is already in its equipment/confirmation phase.
-    if(LD8(module+0x58+player))return false;
+    if(LD8(module+0x58+player))return false; // already Ready
     uint64_t selector=LD64(table+0x18+player*8);if(!selector)return false;
     int dx=(int)(index%columns)-(int)LD32(selector+0x38);
     int dy=(int)(index/columns)-(int)LD32(selector+0x3c);
-    Cpu saved=*c;c->x[0]=module;c->x[1]=player;c->x[2]=(uint32_t)dx;c->x[3]=(uint32_t)dy;c->x[4]=1;c->x[5]=0;
-    guest_call(c,kind?0x7000e46120ull:0x7000e43da0ull);*c=saved;
+    // With footer legends hidden, tapping/clicking the selected cell again is
+    // the same confirmation as A. A zero-distance MoveSelection would reset
+    // the native equipment/confirmation phase instead of advancing it.
+    if(dx || dy) {
+        Cpu saved=*c;c->x[0]=module;c->x[1]=player;c->x[2]=(uint32_t)dx;c->x[3]=(uint32_t)dy;c->x[4]=1;c->x[5]=0;
+        guest_call(c,kind?0x7000e46120ull:0x7000e43da0ull);*c=saved;
+    }
     uint64_t input=guest_invoke2(c,player?0x7000d94e40ull:0x7000d94dd0ull,0,0);
     if(!input)return false;
     bool previous=lan_native_call;lan_native_call=true;

@@ -220,7 +220,8 @@ These overrides do not move the default executable-side INI.
 
 `[input] prompts` accepts `auto`, `keyboard`, `nintendo`, `xbox`, or `playstation`.
 Replacing in-game icons/text with keyboard labels is experimental and **off by
-default**. Opt in with `[experimental] keyboard_prompts = true`; `prompts = keyboard`
+default**. Menu footer strips are hidden on desktop and Android; centered dialogs and combat
+prompts remain visible. Opt in with `[experimental] keyboard_prompts = true`; `prompts = keyboard`
 alone does not enable it. With this experiment enabled, labels use current INI
 bindings and `prompts = keyboard` forces them even with a controller connected.
 When disabled, its hook group bypasses callbacks and runs the original game
