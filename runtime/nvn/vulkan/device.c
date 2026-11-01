@@ -1096,6 +1096,7 @@ void backend_present_now(NvnTexture *t, uint64_t frame, bool advance) {
         if (win_shot < 0) win_shot = getenv("LARECOMP_WINDOW_SHOT") ? atol(getenv("LARECOMP_WINDOW_SHOT")) : 0;
         bool shot = advance && win_shot && (long)frame + 1 == win_shot;
         vk_frame_end(shot ? "build/window.png" : NULL);
+        if (movie_guest_ready()) vk_guest_heap_preload();
         if (first_movie_frame) {
             // Let the recorder hand frame zero to the swapchain before starting its audio clock.
             rec_wait_presents(rec_presents_queued());
@@ -1287,6 +1288,7 @@ void backend_quit(void) {
     if (trace) LOG("[vk] quit: stopping the recorder\n");
     rec_quit();  // (what it still had is dropped, not run: no submission or present after this; the queue idle for the wait)
     if (!g_vk.dev) return;
+    vk_guest_heap_preload_end();
     if (trace) LOG("[vk] quit: waiting for the GPU\n");
     vkDeviceWaitIdle(g_vk.dev);
     if (trace) LOG("[vk] quit: saving the pipeline cache\n");
@@ -1313,6 +1315,7 @@ void ui_window_init(void) {
         LOG("[desktop] SDL app metadata: %s\n", SDL_GetError());
     input_apply_background();  // controllers in the background: "Allow background inputs" (Controls tab)
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) FATAL("SDL_Init: %s\n", SDL_GetError());
+    movie_preload_intro();
     input_load_user_mappings();
     int win_w = 1280, win_h = 720;
     if (getenv("LARECOMP_WINDOW")) sscanf(getenv("LARECOMP_WINDOW"), "%dx%d", &win_w, &win_h);

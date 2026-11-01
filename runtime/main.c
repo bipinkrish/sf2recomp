@@ -62,11 +62,9 @@ __attribute__((constructor(101))) static void reserve_guest_space(void) {
 }
 
 static KThread *boot(const char *root) {
-    char exefs[1024], romfs[1024], npdm_path[1024];
+    char exefs[1024], npdm_path[1024];
     snprintf(exefs, sizeof exefs, "%s/exefs", root);
-    snprintf(romfs, sizeof romfs, "%s/romfs", root);
     snprintf(npdm_path, sizeof npdm_path, "%s/main.npdm", exefs);
-    if (!g_romfs_dir) g_romfs_dir = strdup(romfs);
 
     loader_load(exefs);
     kernel_init();
@@ -93,6 +91,11 @@ static KThread *boot(const char *root) {
     KThread *t = kernel_create_main_thread(start, stack_size, prio);
     kernel_run_main(t, t->handle, 0, init_fn, fini_fn);  // nn::init::Start(thread_handle, args_region, init, fini)
     return t;
+}
+
+static void *boot_worker(void *arg) {
+    boot((const char *)arg);
+    return NULL;
 }
 
 static void log_startup_info(void) {
@@ -150,14 +153,26 @@ int main(int argc, char **argv) {
     }
     game_info_load(root);
     rt_paths_init();
+    char romfs[sizeof resolved_root + sizeof "/romfs"];
+    snprintf(romfs, sizeof romfs, "%s/romfs", root);
+    g_romfs_dir = strdup(romfs);
+    if (!g_romfs_dir) return 1;
     // The guest's first SetHeapSize must be able to establish the GPU-backed heap
     // before the SDK starts allocating in it. The old boot order raced this setup.
     extern void ui_window_init(void);
     ui_window_init();
     rt_hooks_configure();
-    boot(root);
+    // Module loading and kernel setup do not use SDL. Keep them off the window
+    // thread so the prepared intro can present while the engine starts.
+    pthread_t startup_thread;
+    int startup_error = pthread_create(&startup_thread, NULL, boot_worker, (void *)root);
+    if (startup_error) {
+        LOG("[boot] cannot start background initialization: %s; loading on the main thread\n", strerror(startup_error));
+        boot(root);
+    }
     extern int ui_run(void);
     ui_run();
+    if (!startup_error) pthread_join(startup_thread, NULL);
     LOG("[boot] ui_run returned\n");
     return 0;
 }

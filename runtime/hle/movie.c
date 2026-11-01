@@ -70,6 +70,9 @@ static pthread_mutex_t g_movie_frames_lock = PTHREAD_MUTEX_INITIALIZER;
 static MovieFrame g_movie_frames[MOVIE_FRAME_COUNT];
 static atomic_bool g_movie_visible;
 static atomic_bool g_movie_skip_requested;
+static atomic_bool g_intro_prestarted;
+static atomic_bool g_movie_guest_ready;
+static char g_intro_path[PATH_MAX];
 static atomic_uint_fast64_t g_movie_displayed_frame = UINT64_MAX;
 static uint64_t movie_now_ns(void) {
     struct timespec t;
@@ -424,6 +427,15 @@ static void *movie_video_reader(void *arg) {
         for (uint64_t index = 1; n == MOVIE_FRAME_BYTES && !atomic_load(&p->stop);) {
             n = movie_read_frame(p->video_fd, scratch, MOVIE_FRAME_BYTES, p);
             if (n != MOVIE_FRAME_BYTES) break;
+            // FFmpeg catches up to its input clock after a slow graphics boot.
+            // Keep the early frames intact until the presenter consumes them,
+            // rather than overwriting the queue and jumping ahead of the audio.
+            while (!atomic_load(&p->stop)) {
+                uint64_t displayed = atomic_load(&g_movie_displayed_frame);
+                if (displayed == UINT64_MAX || index - displayed < MOVIE_FRAME_COUNT) break;
+                movie_sleep_ns(1000000ull);
+            }
+            if (atomic_load(&p->stop)) break;
             pthread_mutex_lock(&g_movie_frames_lock);
             MovieFrame *frame = &g_movie_frames[index % MOVIE_FRAME_COUNT];
             memcpy(frame->pixels, scratch, MOVIE_FRAME_BYTES);
@@ -565,6 +577,20 @@ static void movie_stop_locked(void) {
 
 static bool movie_start(const char *guest_path) {
     pthread_mutex_lock(&g_movie_lock);
+    if (atomic_exchange(&g_intro_prestarted, false)) {
+        char resolved[PATH_MAX];
+        bool same = movie_resolve_path(guest_path, resolved, sizeof resolved) && !strcmp(resolved, g_intro_path);
+        g_intro_path[0] = 0;
+        if (same) {
+            // Also acknowledge an intro already skipped during boot. Reopening it
+            // here would replay the movie and lose the player's early skip.
+            atomic_store(&g_movie.source_ready, true);
+            atomic_store(&g_movie_guest_ready, true);
+            LOG("[movie] guest adopted the intro prepared during boot%s\n", movie_overlay_active() ? "" : " (already finished/skipped)");
+            pthread_mutex_unlock(&g_movie_lock);
+            return true;
+        }
+    }
     movie_stop_locked();
 
     char path[PATH_MAX];
@@ -640,10 +666,27 @@ static bool movie_start(const char *guest_path) {
     }
     g_movie.monitor_started = true;
     atomic_store(&g_movie.source_ready, true);
+    atomic_store(&g_movie_guest_ready, true);
     LOG("[movie] ready %s (%dx%d at %d fps); audio waits for frame zero to reach the window\n", path,
         RENDERER_MOVIE_WIDTH, RENDERER_MOVIE_HEIGHT, MOVIE_FPS);
     pthread_mutex_unlock(&g_movie_lock);
     return true;
+}
+
+void movie_preload_intro(void) {
+    if (!g_settings.show_intro || atomic_load(&g_intro_prestarted)) return;
+    char path[PATH_MAX];
+    if (!movie_resolve_path("intro.mp4", path, sizeof path) || !movie_start("intro.mp4")) return;
+    pthread_mutex_lock(&g_movie_lock);
+    snprintf(g_intro_path, sizeof g_intro_path, "%s", path);
+    atomic_store(&g_intro_prestarted, true);
+    atomic_store(&g_movie_guest_ready, false);
+    pthread_mutex_unlock(&g_movie_lock);
+    LOG("[movie] intro decoding overlaps graphics and engine startup\n");
+}
+
+bool movie_guest_ready(void) {
+    return atomic_load(&g_movie_guest_ready);
 }
 
 bool movie_overlay_active(void) {
@@ -724,6 +767,7 @@ void movie_presented(void) {
         atomic_load(&p->first_frame_submitted)) {
         p->start_ns = movie_now_ns();
         atomic_store(&p->playback_started, true);
+        LOG("[movie] frame zero presented; playback started\n");
     }
     pthread_mutex_unlock(&g_movie_lock);
 }
@@ -742,6 +786,9 @@ static void movie_stop_from_guest(void) {
 
 RT_ON_RESET(movie_reset) {
     pthread_mutex_lock(&g_movie_lock);
+    atomic_store(&g_intro_prestarted, false);
+    atomic_store(&g_movie_guest_ready, false);
+    g_intro_path[0] = 0;
     movie_stop_locked();
     pthread_mutex_unlock(&g_movie_lock);
 }

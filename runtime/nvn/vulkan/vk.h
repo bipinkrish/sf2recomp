@@ -7,6 +7,7 @@
 // render passes, copies and dispatches (Metal tracks these hazards itself). Submissions are numbered; a timeline
 // semaphore signals each number, which is what NVN fences (renderer_fence_seq / renderer_wait_seq) wait for.
 #pragma once
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <vulkan/vulkan.h>
@@ -148,3 +149,5 @@ VkShaderModule vk_builtin_shader(const char *name);  // internal shaders (clear,
 
 // ---- device / window (device.c)
 void vk_save_png(const char *path, const uint8_t *rgba, uint32_t w, uint32_t h);
+void vk_guest_heap_preload(void);      // render thread, while presenting a movie
+void vk_guest_heap_preload_end(void);  // renderer stopped/idle; join and discard unused preparation

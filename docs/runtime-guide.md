@@ -231,7 +231,16 @@ game's directional shorthand. Long key names shrink to a bounded width.
 Keys inside visible action buttons have matching outline badges: circles for single characters and rounded
 rectangles for longer names. Standalone hints stay plain. During the intro, either
 mapped A or B skips playback (**K** or **J** with the shipped bindings). The skip
-press is consumed so it cannot also activate the menu behind the movie.
+press is consumed so it cannot also activate the menu behind the movie. Mouse
+clicks also skip playback and are consumed through release.
+
+The intro decoder starts before graphics and engine initialization finish. Module
+loading runs off the window thread so it can present the opening frames sooner;
+the game reuses that playback, and a skip during boot does not replay the intro.
+Startup data loads while the intro plays. On GPUs that import the guest heap,
+the runtime also prepares that memory in a background worker from the first
+movie presentation, reducing the first-menu pause after skipping. Skipping very
+early can still require time for startup data parsing to finish.
 
 With the experiment enabled, auto displays mapped keyboard labels when no gamepad
 is connected and controller glyphs when one is connected. Input mappings and intro

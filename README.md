@@ -83,7 +83,7 @@ restarting; no rebuild is needed.
 | **Game network blocking** | `[network] enabled = false` is the default and blocks game connections, DNS, uploads, online multiplayer, external web links and the remote developer listener. Offline Sparring remains available. Enabling networking does not implement missing online services. |
 | **Unlocked Sparring roster** | `[gameplay] unlock_all_sparring_characters = true` makes every Sparring character available without campaign progression. Enabled by default; does not change saved Story unlocks. |
 | **Unlocked Extras movies** | `[gameplay] unlock_all_videos = true` enables gallery movie playback without changing watched-video save flags. Enabled in the supplied INI. |
-| **Intro and gameplay toggles** | Skip the intro with either mapped A or B, or disable it with `[gameplay] show_intro = false`. `ai_enabled` and `show_time_results` expose the original AI and timing-display controls. |
+| **Intro and gameplay toggles** | Skip the intro with mapped A/B, Space, or a mouse click, or disable it with `[gameplay] show_intro = false`. Startup data and GPU heap preparation run during playback to reduce the wait after skipping. `ai_enabled` and `show_time_results` expose the original AI and timing-display controls. |
 | **Desktop developer console** | Opt in with `[developer] console = true`; **F1** or **backtick** opens the original console with desktop text input, command history and scrolling. |
 | **Fight trainer and shop cheats** | Optional `[developer] trainer` and `shop_cheats` expose the original fight controls and local shop actions through the console. Disabled by default; currency, items, levels and fight results can be saved by the game. |
 | **Debug overlays** | Opt in with `[developer] overlays = true`, then use **F2** to toggle the original FPS, memory, build and model/animation displays in supported scenes. |
@@ -227,7 +227,7 @@ section also default to offline. See the [offline networking settings](docs/runt
 | Left stick | W / A / S / D |
 | D-pad | Arrow keys |
 | Plus / Minus | Return / Backspace |
-| Skip intro | K or J |
+| Skip intro | K, J, Space, or mouse click |
 
 Keyboard and gamepad bindings are editable in the INI. For keyboard P1 versus
 controller P2 in Sparring, set `[input] player_setup = keyboard_vs_controller`

@@ -3470,15 +3470,81 @@ static bool whole_import_probe_oom(void) {
     return oom;
 }
 
+// Preparing the first shader heap can fault in/pin several GB. Start it after
+// the first movie present is queued, alongside the guest's startup parsing. Only this
+// worker's private handles are written off-thread; the render thread adopts them
+// at first use, and reset joins before any guest pages can be replaced.
+static struct {
+    pthread_t thread;
+    bool started, attempted;
+    uint64_t size;
+    VkBuffer buf;
+    VkDeviceMemory mem;
+    bool ok;
+} gmem_preload;
+
+static void *gmem_preload_worker(void *arg) {
+    (void)arg;
+    uint64_t start = plat_now_ns();
+    gmem_preload.ok = host_import(0, gmem_preload.size, &gmem_preload.buf, &gmem_preload.mem, false);
+    LOG("[vk] background guest heap preparation %s (%llu MB, %llu ms)\n",
+        gmem_preload.ok ? "finished" : "unavailable",
+        (unsigned long long)(gmem_preload.size >> 20),
+        (unsigned long long)((plat_now_ns() - start) / 1000000));
+    return NULL;
+}
+
+void vk_guest_heap_preload_end(void) {
+    if (gmem_preload.started) pthread_join(gmem_preload.thread, NULL);
+    if (gmem_preload.buf) vkDestroyBuffer(g_vk.dev, gmem_preload.buf, NULL);
+    if (gmem_preload.mem) vkFreeMemory(g_vk.dev, gmem_preload.mem, NULL);
+    memset(&gmem_preload, 0, sizeof gmem_preload);
+}
+
+static bool gmem_preload_take(uint64_t size, VkBuffer *buf, VkDeviceMemory *mem) {
+    if (!gmem_preload.started) return false;
+    pthread_join(gmem_preload.thread, NULL);
+    gmem_preload.started = false;
+    bool ready = gmem_preload.ok && gmem_preload.size == size;
+    if (ready) {
+        *buf = gmem_preload.buf;
+        *mem = gmem_preload.mem;
+        gmem_preload.buf = VK_NULL_HANDLE;
+        gmem_preload.mem = VK_NULL_HANDLE;
+    } else {
+        // Heap growth or a failed preload keeps the existing first-use path.
+        vk_guest_heap_preload_end();
+        gmem_preload.attempted = true;
+    }
+    return ready;
+}
+
+void vk_guest_heap_preload(void) {
+    if (gmem_preload.attempted || gmem_buf || !g_vk.host_import ||
+        g_vk.managed_heap || getenv("LARECOMP_VK_NO_GMEM")) return;
+    gmem_chunk_shift();
+    if (gc_lazy) return;  // lazy chunks retain their demand-based memory policy
+    uint64_t size = gmem_heap_size();
+    if (!size) return;
+    gmem_preload.attempted = true;
+    gmem_preload.size = size;
+    int error = pthread_create(&gmem_preload.thread, NULL, gmem_preload_worker, NULL);
+    gmem_preload.started = error == 0;
+    if (error) LOG("[vk] cannot start background guest heap preparation: %s\n", strerror(error));
+    else LOG("[vk] preparing guest heap during startup (%llu MB)\n", (unsigned long long)(size >> 20));
+}
+
 static bool gmem_import(uint64_t size) {
     VkBuffer buf;
     VkDeviceMemory mem;
-    if (!host_import(0, size, &buf, &mem, false)) return false;
+    bool preloaded = gmem_preload_take(size, &buf, &mem);
+    if (!preloaded && !host_import(0, size, &buf, &mem, false)) return false;
     if (gmem_buf) vk_defer_buffer(gmem_buf, gmem_mem);  // the heap grew: the pending submission may still use the old import
     gmem_buf = buf;
     gmem_mem = mem;
     gmem_size = size;
-    LOG("[vk] guest heap imported for shader global memory: %llu MB\n", (unsigned long long)(size >> 20));
+    LOG("[vk] guest heap imported for shader global memory: %llu MB%s\n",
+        (unsigned long long)(size >> 20), preloaded ? " (prepared in background)" : "");
     return true;
 }
 
@@ -4556,6 +4622,7 @@ static int g_cs_n;  // (compute program table below)
 // address (the old Prog / Pipe objects are leaked, so pipeline keys holding their pointers can't collide), compute
 // programs, shared copies - and the heap import: its pages are replaced (re-imported on first use).
 void vk_exec_reset(void) {
+    vk_guest_heap_preload_end();
     memset(prog_tab, 0, sizeof prog_tab);
     memset(pipe_tab, 0, sizeof pipe_tab);
     key_gen++;  // (the key memo: the tables' answers are gone)
