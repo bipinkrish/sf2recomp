@@ -45,3 +45,11 @@ tools/il2cpp/.sf2-build.json
 /third_party/
 /tools/third_party/
 *.so.*
+
+# Android local SDK paths, Gradle/CMake state and APK outputs
+/android/.gradle/
+/android/.kotlin/
+/android/local.properties
+/android/app/.cxx/
+/android/app/build/
+/android/build/

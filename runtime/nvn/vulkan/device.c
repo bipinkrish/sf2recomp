@@ -642,11 +642,22 @@ static void create_swapchain(void) {
     if (caps.maxImageCount && count > caps.maxImageCount) count = caps.maxImageCount;
     if (count > 8) count = 8;
     VkSwapchainKHR old = g_vk.swapchain;
+#ifdef __ANDROID__
+    // The final pass renders in SDL window coordinates; it does not pre-rotate
+    // its vertices for the device's natural display orientation.
+    VkSurfaceTransformFlagBitsKHR transform = (caps.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR)
+        ? VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR : caps.currentTransform;
+    g_vk.compositor_rotation = transform != caps.currentTransform;
+    LOG("[android] surface window %dx%d, extent %ux%u, transforms %#x/current %#x/selected %#x\n",
+        w, h, ext.width, ext.height, caps.supportedTransforms, caps.currentTransform, transform);
+#else
+    VkSurfaceTransformFlagBitsKHR transform = caps.currentTransform;
+#endif
     VkSwapchainCreateInfoKHR ci = {
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR, .surface = g_vk.surface, .minImageCount = count,
         .imageFormat = sf.format, .imageColorSpace = sf.colorSpace, .imageExtent = ext, .imageArrayLayers = 1,
         .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-        .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE, .preTransform = caps.currentTransform,
+        .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE, .preTransform = transform,
         .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR, .presentMode = present_mode(), .clipped = VK_TRUE,
         .oldSwapchain = old};
     VK_CHECK(vkCreateSwapchainKHR(g_vk.dev, &ci, NULL, &g_vk.swapchain));
@@ -1314,6 +1325,11 @@ void ui_window_init(void) {
     if (!SDL_SetAppMetadata(SF2_APP_NAME, game_display_version()[0] ? game_display_version() : NULL, SF2_APP_ID))
         LOG("[desktop] SDL app metadata: %s\n", SDL_GetError());
     input_apply_background();  // controllers in the background: "Allow background inputs" (Controls tab)
+#ifdef __ANDROID__
+    // SDL's resizable window otherwise overrides the Activity's landscape
+    // request and permits portrait on phones.
+    SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
+#endif
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) FATAL("SDL_Init: %s\n", SDL_GetError());
     movie_preload_intro();
     input_load_user_mappings();

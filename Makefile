@@ -16,6 +16,7 @@ B       ?= $(if $(filter linux,$(TARGET)),build,build/$(TARGET))
 GEN     ?= game/gen
 GAME    ?= game/extracted/update
 PYTHON  ?= python3
+SIMD    ?= $(if $(filter arm64 aarch64,$(shell uname -m)),asm,c)
 SDL_DIR ?= $(if $(filter windows,$(TARGET)),$(or $(MINGW_PREFIX),$(CURDIR)/deps/windows),$(if $(filter macos,$(TARGET)),$(CURDIR)/deps/macos,$(CURDIR)/deps))
 # Default to the local prefix that runtime-deps can prepare. Prefer a suitable
 # system SDL only when there is no complete local installation.
@@ -107,8 +108,8 @@ all: $(EXE) $(B)/sf2recomp.ini
 gen:
 	@test -f "$(GAME)/exefs/main" -a -f "$(GAME)/exefs/sdk" || { echo "Extract the supported game first: tools/extract.sh NSP KEYS" >&2; exit 1; }
 	@test -f game/il2cpp/sym_main.txt || { echo "Generate the symbol map first: tools/il2cpp_run.sh $(GAME)" >&2; exit 1; }
-	$(PYTHON) tools/recompr/gen.py main "$(GAME)/exefs/main" 0x7000000000 "$(GEN)/main" --symbols game/il2cpp/sym_main.txt
-	$(PYTHON) tools/recompr/gen.py sdk "$(GAME)/exefs/sdk" 0x7004000000 "$(GEN)/sdk"
+	$(PYTHON) tools/recompr/gen.py main "$(GAME)/exefs/main" 0x7000000000 "$(GEN)/main" --symbols game/il2cpp/sym_main.txt --simd=$(SIMD)
+	$(PYTHON) tools/recompr/gen.py sdk "$(GAME)/exefs/sdk" 0x7004000000 "$(GEN)/sdk" --simd=$(SIMD)
 
 check-generated:
 	@grep -q main_nso_build_id "$(GEN)/main/main_table.c" 2>/dev/null && grep -q sdk_nso_build_id "$(GEN)/sdk/sdk_table.c" 2>/dev/null || { echo "Generated code is missing/outdated. Run make gen or tools/convert.py first." >&2; exit 1; }
@@ -150,6 +151,13 @@ $(B)/rt/%.o: runtime/%.cpp
 -include $(DEPS)
 
 runtime-objs: $(RT_OBJ)
+
+.PHONY: android android-prepare
+ANDROID_ABI ?= arm64-v8a
+android:
+	$(PYTHON) tools/build_android.py --abi=$(ANDROID_ABI)
+android-prepare:
+	$(PYTHON) tools/build_android.py --prepare
 
 clean:
 	rm -rf $(B)

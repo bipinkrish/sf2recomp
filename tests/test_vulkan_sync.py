@@ -16,6 +16,64 @@ def function(source, signature):
 
 
 class VulkanSyncTests(unittest.TestCase):
+    def test_compositor_rotation_does_not_recreate_every_present(self):
+        record = (ROOT / "runtime/nvn/vulkan/record.c").read_text()
+        harness = r'''
+#include <assert.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdatomic.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <vulkan/vulkan.h>
+static struct { VkQueue queue; bool compositor_rotation; } g_vk;
+static uint64_t g_vk_frame_waits[4];
+static atomic_int present_recreate;
+static atomic_uint_fast64_t presents_done;
+static pthread_mutex_t mu = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t cv_done = PTHREAD_COND_INITIALIZER;
+static int on;
+static VkResult result;
+static uint64_t now(void) { static uint64_t n; return ++n; }
+#define NOW() now()
+#define LOG(...) ((void)0)
+#define FATAL(...) abort()
+static void rq_watch(const char *what, uint64_t value) { (void)what; (void)value; }
+static void vk_device_fault_report(void) {}
+VkResult vkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *info) {
+    (void)queue;
+    assert(info->swapchainCount == 1 && info->waitSemaphoreCount == 1);
+    return result;
+}
+typedef struct { VkSemaphore wait; VkSwapchainKHR swapchain; uint32_t image; } PresentArgs;
+''' + function(record, "static void present_run(") + r'''
+int main(void) {
+    PresentArgs args = {0};
+    g_vk.compositor_rotation = true;
+    result = VK_SUBOPTIMAL_KHR;
+    for (int i = 0; i < 120; ++i) present_run(&args);
+    assert(!atomic_load(&present_recreate) && atomic_load(&presents_done) == 120);
+    // A real invalidated surface must still rebuild, even in this mode.
+    result = VK_ERROR_OUT_OF_DATE_KHR;
+    present_run(&args);
+    assert(atomic_exchange(&present_recreate, 0));
+    // Ordinary desktop surfaces retain their suboptimal-recreation policy.
+    g_vk.compositor_rotation = false;
+    result = VK_SUBOPTIMAL_KHR;
+    present_run(&args);
+    assert(atomic_exchange(&present_recreate, 0));
+    result = VK_SUCCESS;
+    present_run(&args);
+    assert(!atomic_load(&present_recreate) && atomic_load(&presents_done) == 123);
+}
+'''
+        with tempfile.TemporaryDirectory(prefix="sf2-present-rotation-") as directory:
+            root = Path(directory)
+            (root / "test.c").write_text(harness)
+            subprocess.run(["clang", "-O2", str(root / "test.c"), "-pthread",
+                            "-o", str(root / "test")], check=True)
+            subprocess.run([str(root / "test")], check=True)
+
     def test_resolution_scaling_preserves_cpu_artwork_dimensions(self):
         textures = (ROOT / "runtime/nvn/vulkan/textures.c").read_text()
         harness = r'''

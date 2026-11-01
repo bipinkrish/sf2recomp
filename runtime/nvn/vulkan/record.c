@@ -612,8 +612,13 @@ static void present_run(const void *p) {
         if (n++ < 20) LOG("[vk] vkQueuePresentKHR took %llu ms\n", (unsigned long long)(dt / 1000000));
     }
     __atomic_fetch_add(&g_vk_frame_waits[3], 1, __ATOMIC_RELAXED);
-    if (r == VK_ERROR_OUT_OF_DATE_KHR || r == VK_SUBOPTIMAL_KHR) atomic_store_explicit(&present_recreate, 1, memory_order_release);
-    else if (r != VK_SUCCESS) {
+    // Android can report SUBOPTIMAL on every present because compositor rotation
+    // was selected intentionally. Resizing still recreates from SDL's drawable
+    // size, and OUT_OF_DATE always recreates; repeating the same transform here
+    // would otherwise drain the GPU and rebuild every frame.
+    if (r == VK_ERROR_OUT_OF_DATE_KHR || (r == VK_SUBOPTIMAL_KHR && !g_vk.compositor_rotation))
+        atomic_store_explicit(&present_recreate, 1, memory_order_release);
+    else if (r != VK_SUCCESS && r != VK_SUBOPTIMAL_KHR) {
         static int n;
         if (n++ < 10) LOG("[vk] present failed: %d\n", r);
         if (r == VK_ERROR_DEVICE_LOST) { vk_device_fault_report(); FATAL("vkQueuePresentKHR: device lost\n"); }

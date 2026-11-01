@@ -999,9 +999,25 @@ static void spy_handler(int sig, siginfo_t *si, void *uctx) {
     if (!uc) return;
     KThread *t = t_cur;  // thread-local: the guest thread this host thread runs
     if (spy_armed && t && !t->spy_done) {
+#if defined(__APPLE__) && defined(__aarch64__)
+        t->spy_rip = uc->uc_mcontext->__ss.__pc;
+        t->spy_rsp = uc->uc_mcontext->__ss.__sp;
+        t->spy_rbp = uc->uc_mcontext->__ss.__fp;
+#elif defined(__APPLE__) && defined(__x86_64__)
+        t->spy_rip = uc->uc_mcontext->__ss.__rip;
+        t->spy_rsp = uc->uc_mcontext->__ss.__rsp;
+        t->spy_rbp = uc->uc_mcontext->__ss.__rbp;
+#elif defined(__aarch64__)
+        t->spy_rip = uc->uc_mcontext.pc;
+        t->spy_rsp = uc->uc_mcontext.sp;
+        t->spy_rbp = uc->uc_mcontext.regs[29];
+#elif defined(__x86_64__)
         t->spy_rip = (uint64_t)uc->uc_mcontext.gregs[REG_RIP];
         t->spy_rsp = (uint64_t)uc->uc_mcontext.gregs[REG_RSP];
         t->spy_rbp = (uint64_t)uc->uc_mcontext.gregs[REG_RBP];
+#else
+#error Unsupported host register context
+#endif
         t->spy_done = 1;
     }
 }

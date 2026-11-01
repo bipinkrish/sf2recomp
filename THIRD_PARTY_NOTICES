@@ -30,6 +30,15 @@ Runtime and generator
   Vulkan loader: Apache-2.0, https://github.com/KhronosGroup/Vulkan-Loader/blob/main/LICENSE.txt
   These and C/C++ system libraries normally remain system-provided shared libraries.
   Preserve package license notices when bundling any such libraries separately.
+- Android builds cross-compile SDL3, shaderc v2025.4, glslang, SPIRV-Tools,
+  SPIRV-Headers and Vulkan Memory Allocator v3.2.1 from the revisions and archive
+  checksums in tools/build_android.py. glslang uses its upstream mixed permissive
+  license; SPIRV-Tools uses Apache-2.0 and SPIRV-Headers uses its upstream
+  Khronos/MIT notices. Their complete top-level LICENSE/COPYING/NOTICE files
+  and source records are packaged under assets/licenses in the APK.
+- Gradle wrapper: Gradle Inc., Apache-2.0. Used only for Android builds;
+  the wrapper downloads the checksum-pinned Gradle 8.11.1 distribution.
+  https://github.com/gradle/gradle/blob/v8.11.1/LICENSE
 
 Local extraction and analysis (not linked into the game)
 - hactool: licenses/hactool.txt (ISC); bundled mbedTLS:

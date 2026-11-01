@@ -576,6 +576,16 @@ static void movie_stop_locked(void) {
 }
 
 static bool movie_start(const char *guest_path) {
+#ifdef __ANDROID__
+    // No external executable can be launched from app data on modern Android.
+    // A native movie decoder is still required. Keep the guest extractor's
+    // empty track list successful so it can finish the movie lifecycle.
+    (void)guest_path;
+    atomic_store(&g_movie.source_ready, true);
+    atomic_store(&g_movie_guest_ready, true);
+    LOG("[movie] playback skipped: Android decoder not implemented\n");
+    return true;
+#endif
     pthread_mutex_lock(&g_movie_lock);
     if (atomic_exchange(&g_intro_prestarted, false)) {
         char resolved[PATH_MAX];
@@ -674,6 +684,9 @@ static bool movie_start(const char *guest_path) {
 }
 
 void movie_preload_intro(void) {
+#ifdef __ANDROID__
+    return;
+#endif
     if (!g_settings.show_intro || atomic_load(&g_intro_prestarted)) return;
     char path[PATH_MAX];
     if (!movie_resolve_path("intro.mp4", path, sizeof path) || !movie_start("intro.mp4")) return;

@@ -1,4 +1,4 @@
-// Host OS layer: Linux/Windows x86-64 and macOS arm64/x86-64.
+// Host OS layer: desktop platforms and 64-bit Android.
 #pragma once
 #include <stdbool.h>
 #include <stddef.h>
@@ -10,7 +10,7 @@
 
 #ifdef _WIN32
 #include "platform/win_compat.h"
-#elif defined(__linux__)
+#elif defined(__linux__) && !defined(__ANDROID__)
 #include "platform/linux_compat.h"
 #endif
 

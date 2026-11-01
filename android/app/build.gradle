@@ -1,0 +1,39 @@
+plugins { id 'com.android.application' }
+
+def sf2Root = rootProject.projectDir.parentFile
+def sdlSource = new File(sf2Root, 'build/dependencies/SDL3-3.4.16')
+
+android {
+    namespace 'org.sf2recomp.app'
+    compileSdk 35
+    ndkVersion '28.2.13676358'
+    defaultConfig {
+        applicationId 'org.sf2recomp.app'
+        minSdk 33
+        targetSdk 35
+        versionCode 1
+        versionName '0.1-dev'
+        // Build one ABI per invocation; x86_64 is useful for the emulator.
+        ndk { abiFilters((project.findProperty('sf2Abi') ?: 'arm64-v8a').toString()) }
+        externalNativeBuild {
+            cmake {
+                arguments '-DANDROID_STL=c++_shared'
+                targets 'main', 'SDL3-shared'
+            }
+        }
+    }
+    externalNativeBuild {
+        cmake { path '../CMakeLists.txt'; version '3.22.1' }
+    }
+    sourceSets.main {
+        java.srcDir new File(sdlSource, 'android-project/app/src/main/java')
+        assets.srcDir new File(sf2Root, 'build/android-assets')
+    }
+    buildTypes {
+        debug { jniDebuggable true }
+        release { minifyEnabled false }
+    }
+    // Generated C has hundreds of thousands of functions; keep symbols in the
+    // local .cxx build, without embedding that debug information in the APK.
+    packaging { jniLibs { useLegacyPackaging false } }
+}

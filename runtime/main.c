@@ -12,6 +12,10 @@
 #include "hle.h"
 #include "kernel.h"
 #include "rt.h"
+#ifdef __ANDROID__
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h>
+#endif
 
 const char *g_romfs_dir;
 
@@ -41,6 +45,7 @@ static void rtld_init_main(Cpu *c) { module_init(c, &g_modules[0]); }
 // LARECOMP_REEXEC_FORCE=1 (test): the first process skips the reservation once and starts again, as when the range is
 // taken (the new process has LARECOMP_REEXEC set and reserves normally).
 #define REEXEC_FORCED "forced by LARECOMP_REEXEC_FORCE"
+#ifndef __ANDROID__
 __attribute__((constructor(101))) static void reserve_guest_space(void) {
     const char *force = getenv("LARECOMP_REEXEC_FORCE");
     bool forced = force && *force && strcmp(force, "0") && !getenv("LARECOMP_REEXEC");
@@ -60,6 +65,7 @@ __attribute__((constructor(101))) static void reserve_guest_space(void) {
     perror("re-exec");
     exit(1);
 }
+#endif
 
 static KThread *boot(const char *root) {
     char exefs[1024], npdm_path[1024];
@@ -107,6 +113,17 @@ static void log_startup_info(void) {
 }
 
 int main(int argc, char **argv) {
+#ifdef __ANDROID__
+    const char *data = SDL_GetAndroidInternalStoragePath();
+    if (!data || setenv("LARECOMP_DATA_ROOT", data, 1)) return 1;
+    // The library is loaded into an existing Activity process; never re-exec
+    // Android's app_process when its address layout conflicts with the guest.
+    if (!plat_reserve_guest(GUEST_LO, GUEST_HI)) {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "SF2 Recomp",
+            "Cannot reserve the guest address range. Close the game and launch it again.", NULL);
+        return 1;
+    }
+#endif
     plat_init();
     log_startup_info();
 #ifdef _WIN32
@@ -139,12 +156,18 @@ int main(int argc, char **argv) {
     }
     if (!realpath(argument, resolved_root)) {
         fprintf(stderr, "Cannot open game directory %s: %s\n", argument, strerror(errno));
+#ifdef __ANDROID__
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "SF2 Recomp", "Cannot open the imported game directory.", NULL);
+#endif
         return 2;
     }
     const char *root = resolved_root;
     char why[512];
     if (!game_version_select(root, why, sizeof why) || !gamelib_load(root, why, sizeof why)) {
         fprintf(stderr, "Cannot run these game files: %s\n", why);
+#ifdef __ANDROID__
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "SF2 Recomp", why, NULL);
+#endif
         return 2;
     }
     if (check_only) {

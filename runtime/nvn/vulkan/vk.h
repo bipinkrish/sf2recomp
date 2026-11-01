@@ -55,6 +55,7 @@ typedef struct {
     bool no_frame_clear;  // scene targets not cleared at their first use in each frame (textures.c renderer_texture_frame_fresh)
     // window
     VkSurfaceKHR surface;
+    bool compositor_rotation;  // Android deliberately presents upright images for the compositor to rotate
     VkSwapchainKHR swapchain;
     VkFormat sc_format;
     VkExtent2D sc_extent;

@@ -22,6 +22,11 @@
 #include <sys/utsname.h>
 #include <time.h>
 #include <unistd.h>
+#ifdef __ANDROID__
+#include <SDL3/SDL_system.h>
+#include <SDL3/SDL_messagebox.h>
+#include <sys/system_properties.h>
+#endif
 
 #include "../paths.h"
 #include "../platform.h"
@@ -75,6 +80,11 @@ static bool wt_register(uint64_t lo, uint64_t hi) {
 }
 
 static void wt_init(uint64_t lo, uint64_t hi) {
+#ifdef __ANDROID__
+    // Android's app sandbox does not permit userfaultfd/pagemap tracking.
+    (void)lo; (void)hi;
+    return;
+#endif
     const char *e = getenv("LARECOMP_WRITE_TRACKING");
     if (e && !atoi(e)) return;
     // user-mode faults only: allowed without privileges (vm.unprivileged_userfaultfd=0); the asynchronous protection
@@ -208,7 +218,7 @@ static void log_to_file_without_terminal(void) {
     session_log_open(dir, g_log_path, sizeof g_log_path);
 }
 
-#if defined(__x86_64__)
+#if defined(__x86_64__) && !defined(__ANDROID__)
 // The recompiled game code is built for x86-64-v3 (Makefile GENARCH: AVX2, FMA, BMI2): say so instead of crashing
 // with an illegal instruction on an older CPU.
 static void require_cpu(void) {
@@ -250,7 +260,7 @@ void plat_system_info(PlatSysInfo *si) {
     if (pretty[0] && (!ver[0] || strstr(pretty, ver))) snprintf(os, sizeof os, "%s", pretty);
     else if (pretty[0] || name[0]) snprintf(os, sizeof os, "%s %s", pretty[0] ? pretty : name, ver);
     else snprintf(os, sizeof os, "Linux");
-    struct utsname u;
+    struct utsname u = {0};
     if (uname(&u) == 0) snprintf(si->os, sizeof si->os, "%.80s (%s, kernel %.32s)", os, u.machine, u.release);
     else snprintf(si->os, sizeof si->os, "%.80s", os);
     // the CPU: x86 "model name"; ARM boards often have none - the device tree's model then (e.g. "Raspberry Pi 5")
@@ -278,7 +288,14 @@ void plat_system_info(PlatSysInfo *si) {
     }
     struct sysinfo s;
     if (sysinfo(&s) == 0) si->ram = (uint64_t)s.totalram * s.mem_unit;
+#ifdef __ANDROID__
+    char release[PROP_VALUE_MAX] = "";
+    __system_property_get("ro.build.version.release", release);
+    snprintf(si->os, sizeof si->os, "Android %s (%s)", release, u.machine);
+    si->package = "APK";
+#else
     si->package = getenv("APPIMAGE") ? "AppImage" : NULL;  // (set by the AppImage runtime; its value is a path: not logged)
+#endif
 }
 
 void plat_init(void) {
@@ -289,10 +306,17 @@ void plat_init(void) {
 
 // (inside an AppImage: the binary in its mount, which stays mounted while this process lives - re-exec included)
 bool plat_exe_path(char *buf, size_t size) {
+#ifdef __ANDROID__
+    // Android loads libmain.so from the APK. Resource/config users need our
+    // writable resource directory, rather than /proc/self/exe (app_process).
+    const char *dir = SDL_GetAndroidInternalStoragePath();
+    return dir && snprintf(buf, size, "%s/sf2", dir) < (int)size;
+#else
     ssize_t n = readlink("/proc/self/exe", buf, size - 1);
     if (n <= 0) return false;
     buf[n] = 0;
     return true;
+#endif
 }
 
 static int probe_fd = -1;
@@ -323,10 +347,16 @@ static char **self_argv(void) {
 }
 
 void plat_exec(char *const argv[]) {
+#ifdef __ANDROID__
+    // An Activity cannot re-exec app_process. Restart through the launcher.
+    (void)argv;
+    errno = ENOTSUP;
+#else
     if (argv) { execv(argv[0], argv); return; }
     char path[4096];
     char **av = self_argv();
     if (av && plat_exe_path(path, sizeof path)) execv(path, av);
+#endif
 }
 
 // ---- diagnostics
@@ -344,6 +374,10 @@ const char *plat_symbol(uint64_t pc, uint64_t *offset) {
 // (SF2 fork: no SDL yet, and LAS's crash_explain.c is LA-specific — a plain line until a UI exists.)
 void plat_fatal_notice(void) {
     fprintf(stderr, "[fatal] a fatal error ended the process (the log has the details)\n");
+#ifdef __ANDROID__
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "SF2 Recomp",
+        "The game stopped. Details are in lasrecomp.log in the app's files directory.", NULL);
+#endif
 }
 
 void plat_notice(const char *text) {

@@ -52,6 +52,7 @@ also passed; full combat stability and campaign completion remain unverified.
 | Linux x86-64 | Current development target; tested with AMD Radeon 680M, NVIDIA RTX 4070 Laptop GPU and Mesa lavapipe software Vulkan |
 | Windows x86-64 | Experimental host/build/package support implemented; no verified native build. See the [Windows guide](docs/windows.md). |
 | macOS arm64 / x86-64 | Experimental host/build/conversion support implemented; native build and GPU validation pending. See the [macOS guide](docs/macos.md). |
+| Android arm64 / x86-64 | Development APKs build; API 35 x86-64 emulator verified through a completed local Sparring match, touch menus and a desktop LAN protocol connection. Physical ARM64 phone validation pending. See [Android development](#android-development). |
 
 The CPU game code runs natively, with a Vulkan renderer and SDL for windowing,
 input and audio. Keyboard/controller remapping, resolution scaling, FSR 1, SMAA
@@ -245,6 +246,87 @@ to restore save-based unlocks.
 See the [settings and controls guide](docs/runtime-guide.md) for graphics,
 language, save imports, controller prompts and optional developer tools.
 The [supplied INI](sf2recomp.ini) lists the shipped settings and bindings.
+
+## Android development
+
+The Android target builds a native SDL/Vulkan APK from the same generated game
+code and runtime. It requires **Android 13/API 33 or newer**, a 64-bit device and
+the renderer's Vulkan 1.3 features; the Vulkan version alone does not guarantee
+GPU compatibility. Connect a controller for combat. SDL's touch-to-mouse path
+feeds the existing menu bridge; the game's original combat touch controls still
+need a multi-finger input bridge and mobile UI activation.
+
+Use Python 3.12+, Java 17, Gradle 8.11.1, SDK platform 35, SDK CMake 3.22.1 and
+NDK **28.2.13676358 (r28c)**. Set `ANDROID_HOME` to your SDK. The Gradle wrapper
+downloads/reuses the pinned distribution, or `GRADLE` can select an installed
+executable. Android Studio can also open the `android` project after
+dependency preparation. No Android runtime libraries come from the desktop
+`deps/lib` folder: SDL, shaderc and its SPIR-V dependencies are cross-compiled
+from checksum-pinned sources, and the NDK supplies Vulkan headers/loader stubs.
+
+After extracting the supported game and preparing its symbol map:
+
+```sh
+make gen SIMD=c
+make android-prepare
+make android                              # arm64-v8a phone build
+make android ANDROID_ABI=x86_64            # emulator build
+# Or build and install on the selected ADB device:
+python3 tools/build_android.py --abi=arm64-v8a --install
+```
+
+Each ABI is built separately; the helper preserves its APK at
+`build/android/sf2-recomp-<ABI>-debug.apk`. The Gradle output at
+`android/app/build/outputs/apk/debug/app-debug.apk` contains the last ABI built.
+The APK includes translated
+game code generated from your local files. Keep it private like other converted
+output. The helper never bundles original extracted assets into the APK.
+
+Open **SF2 Recomp**, select **Import extracted game folder**, and choose the
+directory containing `exefs/main`, `exefs/sdk` and `romfs`. Import copies the
+files into app-specific external storage. It validates both NSO build IDs before
+replacing an existing import; an incompatible or incomplete NSO leaves the old
+game intact. An interrupted directory swap is recovered at launcher startup.
+Configuration, fonts, logs, caches and saves live in
+internal app storage. For a debug installation, inspect them with:
+
+```sh
+adb shell run-as org.sf2recomp.app cat files/lasrecomp.log
+adb shell run-as org.sf2recomp.app cat files/sf2recomp.ini
+```
+
+Development limitations: movies are skipped until a native Android decoder is
+implemented. Backgrounding closes the game session until guest suspension and
+surface recreation are implemented; return to the launcher to start again.
+The LAN protocol and in-game Sparring flow are shared with desktop, with Android
+network permissions and a foreground Wi-Fi discovery lock. ARM64-to-desktop
+combat determinism, physical-phone GPU/memory compatibility and sustained play
+still require validation. No original Android APK or mobile assets are required
+by this target.
+
+Source-only Android platform link checks (both ABIs):
+
+```sh
+python3 -m unittest discover -s tests -p test_android.py -v
+```
+
+`tests/android_platform.c` can also be cross-compiled with the NDK and run via
+ADB. It checks the actual guest address reservation, collision protection,
+reset/protection, thread access, 128-bit atomics, tail calls, timing and paths.
+The native libraries are linked for 16 KB page alignment; a 16 KB Android
+device still needs its own runtime test.
+
+Android validation (2026-11-01): an API 35 x86-64 emulator using software Vulkan
+completed a local Guru-versus-Corsair Sparring match and displayed its results.
+Menu taps covered Normal/LAN, Host/Join, roster selection and LAN disconnect
+recovery. A desktop peer using the same native transport completed the TCP
+greeting/configuration exchange through a temporary ADB tunnel; this does not
+test Wi-Fi broadcast discovery or multiplayer combat synchronization. Import
+tests covered malformed/truncated NSOs, wrong build IDs, rollback and interrupted
+swaps. A real folder-picker rejection preserved both installed NSOs byte-for-byte.
+Home-button testing confirmed that only the dedicated game process exits; the
+launcher survives and can start a fresh session that reaches the main menu.
+Evidence is kept locally under `build/validation/android` and `build/android-*.log`.
 
 ## Development
 
