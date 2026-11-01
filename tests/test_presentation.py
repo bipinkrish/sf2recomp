@@ -9,6 +9,67 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class PresentationTests(unittest.TestCase):
+    def test_movie_dismissal_refreshes_without_another_guest_frame(self):
+        # Compile the actual UI scheduling helper without initializing Vulkan.
+        device = (ROOT / "runtime/nvn/vulkan/device.c").read_text()
+        start = device.index("static void backend_movie_present(bool dismissed)")
+        end = device.index("// ================================================================== UI thread", start)
+        source = r'''
+#include <assert.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdatomic.h>
+typedef struct { int unused; } NvnTexture;
+static _Atomic uint64_t total_frames = 11, last_game_present_ns;
+static _Atomic(NvnTexture *) g_last_presented;
+static bool active, queue_on = true, busy;
+static unsigned attempts, presents;
+static NvnTexture *shown;
+bool movie_overlay_active(void) { return active; }
+bool rq_on(void) { return queue_on; }
+uint64_t SDL_GetTicksNS(void) { return 1000000000; }
+bool rq_try_present(NvnTexture *t, uint64_t frame) {
+    assert(frame == 11); // UI presents never advance the guest's frame counter
+    attempts++;
+    if (busy) return false;
+    presents++; shown = t; return true;
+}
+''' + device[start:end] + r'''
+int main(void) {
+    NvnTexture menu;
+    atomic_store(&g_last_presented, &menu);
+    active = true;
+    backend_movie_present(false);
+    assert(presents == 1 && !shown); // movie-only present during loading
+    active = false; busy = true;
+    backend_movie_present(true);
+    assert(attempts == 2 && presents == 1);
+    busy = false;
+    backend_movie_present(false);
+    assert(presents == 2 && shown == &menu); // retry without any guest progress
+    backend_movie_present(false);
+    assert(presents == 2); // refresh only once
+    // Skip before the UI's first movie tick must also trigger a refresh.
+    backend_movie_present(true);
+    assert(presents == 3 && shown == &menu);
+    // Recent guest presents already carry the movie; avoid competing with them.
+    active = true; atomic_store(&last_game_present_ns, SDL_GetTicksNS());
+    backend_movie_present(false);
+    assert(presents == 3);
+    active = false;
+    backend_movie_present(false); // natural movie completion also reveals the game
+    assert(presents == 4 && shown == &menu);
+    queue_on = false;
+    backend_movie_present(true);
+    assert(presents == 4); // Vulkan stays on its owner thread without the queue
+}
+'''
+        with tempfile.TemporaryDirectory(prefix="sf2-movie-present-") as folder:
+            root = Path(folder)
+            (root / "test.c").write_text(source)
+            subprocess.run(["clang", "-O2", str(root / "test.c"), "-o", str(root / "test")], check=True)
+            subprocess.run([str(root / "test")], check=True)
+
     def test_present_cap_intervals_resize_and_match_display(self):
         source = r'''
 #include <assert.h>

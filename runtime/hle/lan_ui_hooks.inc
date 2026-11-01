@@ -16,10 +16,17 @@ static LanHost lan_visible_hosts[12];
 static unsigned lan_visible_count,lan_choice_count,lan_choice,lan_commands[14];
 static uint64_t lan_back_owner,lan_selection_state;
 static char lan_back_prompt[96];
+static uint64_t lan_menu_prototype,lan_menu_template,lan_menu_buttons[14];
+static uint64_t sparring_module;
+static unsigned sparring_kind;
+static int sparring_pressed=-1;
+
 
 static void reset_lan_ui(void) {
     if(lan_gui_active()) { replay_gui_stop();lan_gui_leave(); }
-    lan_menu_publish(false);lan_selection_state=0;
+    lan_menu_publish(false);lan_selection_state=0;lan_menu_prototype=lan_menu_template=sparring_module=0;
+    memset(lan_menu_buttons,0,sizeof lan_menu_buttons);sparring_pressed=-1;
+    input_menu_navigation(true);
     lan_dialog=lan_menu_scene=lan_pvp_scene=lan_active_module=lan_end_screen=0;
     lan_phase=lan_module_kind=lan_action=lan_visible_count=0;
     lan_allow_entry=lan_native_call=lan_dialog_closing=lan_ui_pumping=lan_match_starting=lan_entered=false;
@@ -45,6 +52,50 @@ static uint64_t lan_new(Cpu *c,const char *name) {
     uint64_t type=lan_type(c,name);
     return type?guest_invoke2(c,0x700039cb10ull,0,type):0;
 }
+// Clone the real main-menu item, including its kunai selection artwork and
+// authored typography. Pointer callbacks are intercepted only for these clones,
+// so none of the original main-menu listeners can run inside a LAN dialog.
+static void lan_capture_menu_item(Cpu *c,uint64_t transform) {
+    (void)c;lan_menu_prototype=transform;
+}
+static void lan_menu_row(Cpu *c,unsigned index,uint64_t row,const char *text,int size) {
+    if(!lan_menu_prototype || !row)return;
+    uint64_t type=lan_type(c,"Nekki.SF2.GUI.GeneralMenu.MenuItemButton, Assembly-CSharp");
+    if(!lan_menu_template) {
+        uint64_t source=type?guest_invoke2(c,0x700121e790ull,lan_menu_prototype,type):0;
+        if(!source)return;
+        // The main-menu scene is destroyed when Sparring loads. Keep one
+        // inactive template so errors/reconnect dialogs can still use its art.
+        lan_menu_template=guest_invoke4(c,0x70012333a0ull,0,source,0,0);
+        if(!lan_menu_template)return;
+        uint64_t object=guest_invoke2(c,0x700121e720ull,lan_menu_template,0);
+        guest_invoke2(c,0x7001226480ull,object,0);
+        guest_invoke2(c,0x70012339d0ull,0,object);
+    }
+    uint64_t prototype=lan_menu_template;
+    uint64_t parent=guest_invoke2(c,0x700121e6b0ull,row,0);
+    uint64_t item=guest_invoke4(c,0x70012333a0ull,0,prototype,parent,0);
+    if(!item)return;
+    lan_menu_buttons[index]=item;
+    uint64_t empty=lan_new(c,"UnityEngine.Events.UnityEvent, UnityEngine");
+    if(empty)for(unsigned offset=0x48;offset<=0x68;offset+=8)ST64(item+offset,empty);
+    uint64_t rect=guest_invoke2(c,0x700121e6b0ull,item,0);
+    guest_set_vec2(c,0x700123a050ull,rect,0,0);
+    guest_set_vec2(c,0x700123a250ull,rect,1,1);
+    guest_set_vec2(c,0x700123a550ull,rect,0,0);
+    guest_set_vec2(c,0x700123a7d0ull,rect,0,0);
+    uint64_t label=LD64(item+0x28),old_label=LD64(row+0x18),button=LD64(row+0x20),line=LD64(row+0x28);
+    guest_invoke2(c,0x7000e73b90ull,label,1);
+    guest_invoke2(c,0x7000e72180ull,label,size);
+    guest_invoke2(c,0x7000e71230ull,label,guest_string(c,text));
+    guest_invoke2(c,0x7000e70080ull,item,0);
+    guest_invoke2(c,0x7000e6c080ull,item,0);
+    if(old_label)guest_invoke2(c,GUEST_BEHAVIOUR_SET_ENABLED,old_label,0);
+    if(button)guest_invoke2(c,GUEST_BEHAVIOUR_SET_ENABLED,button,0);
+    if(line)guest_invoke2(c,GUEST_BEHAVIOUR_SET_ENABLED,line,0);
+    uint64_t object=guest_invoke2(c,0x700121e720ull,item,0);
+    guest_invoke2(c,0x7001226480ull,object,1);
+}
 static uint64_t lan_line(Cpu *c,const char *label,unsigned command) {
     uint64_t line=lan_new(c,"Nekki.SF2.Core.Utils.StoryDialogContent, Assembly-CSharp");
     if(!line)return 0;
@@ -62,6 +113,7 @@ static uint64_t lan_line(Cpu *c,const char *label,unsigned command) {
 }
 static void lan_close_dialog(Cpu *c) {
     uint64_t dialog=lan_dialog;lan_dialog=0;lan_menu_publish(false);
+    memset(lan_menu_buttons,0,sizeof lan_menu_buttons);
     if(dialog) {
         lan_dialog_closing=true;guest_invoke2(c,0x7000cee250ull,dialog,0);lan_dialog_closing=false;
     }
@@ -115,7 +167,9 @@ static bool lan_show(Cpu *c,unsigned phase,const char *title,const char *const l
         unsigned n=rows?LD32(rows+0x18):0;
         for(unsigned i=0;items && i<n && i<count;++i) {
             uint64_t row=LD64(items+0x20+i*8),label=row?LD64(row+0x18):0;
-            if(label) {
+            if(commands[i] && lan_menu_prototype) {
+                lan_menu_row(c,i,row,labels[i],commands[i]>=LAN_CHOICE_HOST_BASE?48:80);
+            } else if(label) {
                 // ScrollDialog rows normally treat Text as a localization key.
                 // These dynamic host names and choices are literal UI strings.
                 guest_invoke2(c,0x7000e73b90ull,label,1);
@@ -221,6 +275,9 @@ static void lan_begin_native_match(Cpu *c) {
 }
 static void lan_focus_choice(Cpu *c) {
     if(!lan_dialog)return;
+    for(unsigned i=0;i<lan_choice_count;++i)if(lan_menu_buttons[i])
+        guest_invoke2(c,0x7000e6c080ull,lan_menu_buttons[i],i==lan_choice);
+    if(lan_choice<lan_choice_count && lan_menu_buttons[lan_choice])return;
     uint64_t button=0;
     if(lan_choice==lan_choice_count)button=LD64(lan_dialog+0x50);
     else {
@@ -241,6 +298,64 @@ static void lan_dialog_input(Cpu *c) {
         lan_focus_choice(c);
     }
     if(requests&LAN_MENU_CONFIRM)lan_action=lan_choice<lan_choice_count?lan_commands[lan_choice]:LAN_CHOICE_BACK;
+}
+// Native table geometry (not hard-coded screen coordinates) maps a click to
+// the same selection/confirmation methods used by the controller. LAN queues
+// the absolute cell index; each peer applies it for the owning player.
+static bool sparring_select_cell(Cpu *c,uint64_t module,unsigned kind,unsigned player,unsigned index) {
+    uint64_t table=LD64(module+0x20),array=LD64(module+(kind?0x90:0x98));
+    unsigned columns=LD32(module+0x5c),count=array?LD64(array+0x18):0;
+    if(!table || !columns || index>=count || player>1)return false;
+    // A selected character is already in its equipment/confirmation phase.
+    if(LD8(module+0x58+player))return false;
+    uint64_t selector=LD64(table+0x18+player*8);if(!selector)return false;
+    int dx=(int)(index%columns)-(int)LD32(selector+0x38);
+    int dy=(int)(index/columns)-(int)LD32(selector+0x3c);
+    Cpu saved=*c;c->x[0]=module;c->x[1]=player;c->x[2]=(uint32_t)dx;c->x[3]=(uint32_t)dy;c->x[4]=1;c->x[5]=0;
+    guest_call(c,kind?0x7000e46120ull:0x7000e43da0ull);*c=saved;
+    uint64_t input=guest_invoke2(c,player?0x7000d94e40ull:0x7000d94dd0ull,0,0);
+    if(!input)return false;
+    bool previous=lan_native_call;lan_native_call=true;
+    guest_invoke4(c,kind?0x7000d98de0ull:0x7000e44df0ull,module,0,LD32(input+0x18),0);
+    lan_native_call=previous;
+    LOG("[mouse] Sparring %s player %u selected cell %u\n",kind?"arena":"character",player+1,index);
+    return true;
+}
+static bool sparring_contains(Cpu *c,uint64_t rect,uint64_t camera,const MenuMouse *mouse) {
+    Cpu saved=*c;c->x[0]=0;c->x[1]=rect;c->x[2]=camera;c->x[3]=0;
+    memcpy(&c->v[0],&mouse->x,4);memcpy(&c->v[1],&mouse->y,4);
+    guest_call(c,0x7000af9300ull);bool inside=c->x[0]!=0;*c=saved;return inside;
+}
+static void sparring_mouse_frame(Cpu *c,const MenuMouse *mouse) {
+    if(!sparring_module || lan_dialog || developer_console_open()) { sparring_pressed=-1;return; }
+    if(mouse->x<0 || mouse->y<0) { sparring_pressed=-1;return; }
+    if(!(mouse->pressed&1) && !(mouse->released&1))return;
+    uint64_t manager=guest_invoke2(c,0x7000cede90ull,0,0);
+    if(manager && LD64(manager+0x40)) { sparring_pressed=-1;return; }
+    uint64_t module=sparring_module,table=LD64(module+0x20),container=table?LD64(table+0x28):0;
+    uint64_t array=LD64(module+(sparring_kind?0x90:0x98));unsigned count=array?LD64(array+0x18):0;
+    if(!container || count>256)return;
+    uint64_t type=lan_type(c,"UnityEngine.Canvas, UnityEngine");
+    uint64_t canvas=type?guest_invoke2(c,0x700121ead0ull,container,type):0;
+    uint64_t camera=canvas?guest_invoke2(c,0x7000af7250ull,canvas,0):0;
+    unsigned children=guest_invoke2(c,0x70015d9e00ull,container,0);
+    int hit=-1;
+    for(unsigned i=0;i<count && i<children;++i) {
+        uint64_t cell=guest_invoke2(c,0x70015da1f0ull,container,i);
+        if(cell && sparring_contains(c,cell,camera,mouse)) { hit=i;break; }
+    }
+    if(mouse->pressed&1)sparring_pressed=hit;
+    if(mouse->released&1) {
+        int pressed=sparring_pressed;sparring_pressed=-1;
+        if(hit<0 || pressed!=hit)return;
+        if(lan_gui_active()) {
+            if(lan_gui_status()==LAN_GUI_CONNECTED)lan_gui_send_menu(sparring_kind,1,hit,3);
+        } else {
+            unsigned player=sparring_kind?0:LD32(module+0xa0);
+            if(guest_invoke2(c,0x7000d982c0ull,module,0))player=LD8(module+0x58)?1:0;
+            sparring_select_cell(c,module,sparring_kind,player,hit);
+        }
+    }
 }
 static void lan_ui_pump(Cpu *c) {
     if(lan_ui_pumping)return;
@@ -289,6 +404,7 @@ static void lan_ui_pump(Cpu *c) {
             unsigned kind=lan_end_screen?2:lan_module_kind;
             if((lan_active_module || lan_end_screen) && !lan_match_starting)while(lan_gui_pop_menu(&event,kind)) {
                 if(kind==2) { lan_end_screen=0;lan_active_module=0;lan_go(c,8);break; }
+                if(event.input_type==3) { sparring_select_cell(c,lan_active_module,kind,event.player,event.event);continue; }
                 uint64_t input=guest_invoke2(c,event.player?0x7000d94e40ull:0x7000d94dd0ull,0,0);
                 uint32_t id=input?LD32(input+0x18):event.player;
                 uint64_t method=kind? (event.down?0x7000d98c30ull:0x7000d98de0ull) :
@@ -304,6 +420,26 @@ static void lan_ui_pump(Cpu *c) {
     lan_ui_pumping=false;
 }
 static int lan_ui_hook(Cpu *c,uint64_t site) {
+    if(site==0x7000f48ef0ull) {
+        sparring_module=0;sparring_pressed=-1;input_menu_navigation(c->x[1]!=5);
+    }
+    if(site==0x7000e5b660ull || site==0x7000e5b9d0ull) { input_menu_navigation(true);return -1; }
+    if(site==0x7000e5b8f0ull) { input_menu_navigation(false);return -1; }
+    if(site==0x7000e43000ull || site==0x7000e45ea0ull) {
+        sparring_module=c->x[0];sparring_kind=site==0x7000e45ea0ull;sparring_pressed=-1;
+    }
+    if(site==0x7000d985a0ull || site==0x7000d985b0ull) {
+        if(c->x[0]==sparring_module)sparring_module=0;
+        return -1;
+    }
+    if(lan_dialog && (site==0x7000e6fca0ull || (site>=0x7000e6fd00ull && site<=0x7000e6fd30ull))) {
+        for(unsigned i=0;i<lan_choice_count;++i)if(lan_menu_buttons[i]==c->x[0]) {
+            if(site==0x7000e6fd20ull) { lan_choice=i;lan_focus_choice(c); }
+            else if(site==0x7000e6fd30ull)guest_invoke2(c,0x7000e6c080ull,c->x[0],0);
+            else if(site==0x7000e6fca0ull && c->x[1] && LD32(c->x[1]+0x12c)==0)lan_action=lan_commands[i];
+            return 1;
+        }
+    }
     if(site==0x7000e6ed90ull) {
         if(!g_settings.allow_sparring_lan_multiplayer || lan_allow_entry || (replay_enabled() && !lan_gui_active()))return -1;
         lan_menu_scene=c->x[0];lan_mode_dialog(c);return 1;

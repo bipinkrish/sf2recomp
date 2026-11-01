@@ -1211,15 +1211,25 @@ void backend_present(NvnTexture *t) {
 
 // The guest runs on its own thread. Keep the intro visible while that thread loads game assets
 // and has not issued a game present yet (or is temporarily stalled between presents).
-static void backend_movie_present(void) {
-    if (!movie_overlay_active()) return;
-    uint64_t now = SDL_GetTicksNS();
-    uint64_t last = atomic_load(&last_game_present_ns);
-    if (last && now - last < 50000000ull) return;
+static void backend_movie_present(bool dismissed) {
+    static bool was_active, reveal_pending;
+    bool active = movie_overlay_active();
+    if ((was_active && !active) || dismissed) reveal_pending = true;
+    was_active = active;
     // With the render queue disabled, backend calls belong to the guest's graphics thread.
     // Its normal presents still show the movie and keep the frame-zero audio gate intact.
     if (!rq_on()) return;
     uint64_t frame = atomic_load(&total_frames);
+    if (!active) {
+        // Loading can leave the guest several seconds between presents. Replace
+        // the last movie frame now, retrying if a present is already queued.
+        if (reveal_pending && rq_try_present(atomic_load(&g_last_presented), frame)) reveal_pending = false;
+        return;
+    }
+    reveal_pending = false;
+    uint64_t now = SDL_GetTicksNS();
+    uint64_t last = atomic_load(&last_game_present_ns);
+    if (last && now - last < 50000000ull) return;
     (void)rq_try_present(NULL, frame);
 }
 
@@ -1389,7 +1399,6 @@ int ui_run(void) {
         if (menu_quit_requested()) ui_quit();
         menu_apply_window_requests(window);
         input_rumble_poll();
-        movie_poll();
-        backend_movie_present();
+        backend_movie_present(movie_poll());
     }
 }

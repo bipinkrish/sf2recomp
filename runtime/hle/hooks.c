@@ -783,6 +783,7 @@ static void enable_desktop_exit(Cpu *c, uint64_t list) {
             if (!guest_object_named(c, item, "MenuItemButton_exit")) continue;
             uint64_t object = guest_invoke2(c, 0x700121e720ull, item, 0);
             if (object) {
+                lan_capture_menu_item(c,item);
                 guest_invoke2(c, 0x7001226480ull, object, 1);
                 LOG("[menu] enabled desktop Exit item\n");
             }
@@ -807,6 +808,7 @@ static int menu_mouse_hook(Cpu *c, uint64_t site) {
         unsigned height = guest_invoke2(c, 0x70015ccc00ull, 0, 0);
         MenuMouse previous = menu_mouse;
         menu_mouse = menu_mouse_frame(width, height, developer_console_open());
+        sparring_mouse_frame(c,&menu_mouse);
         if (ENV("LARECOMP_MOUSE_TRACE") &&
             (previous.x != menu_mouse.x || previous.y != menu_mouse.y || menu_mouse.pressed || menu_mouse.released))
             LOG("[mouse] screen %ux%u pointer %.1f/%.1f held=%x down=%x up=%x\n", width, height,

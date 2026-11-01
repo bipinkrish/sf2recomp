@@ -32,6 +32,14 @@ int main(void) {
     assert(lan_menu_handle_event(&e) && !lan_menu_requests());
     e.gaxis.value=0;lan_menu_handle_event(&e);e.gaxis.value=-24000;
     assert(lan_menu_handle_event(&e) && lan_menu_requests()==LAN_MENU_UP);
+    e.type=SDL_EVENT_KEY_DOWN;e.key.scancode=SDL_SCANCODE_ESCAPE;
+    g_bind_key[BIND_X]=SDL_SCANCODE_ESCAPE;
+    assert(lan_menu_handle_event(&e) && !lan_menu_requests());
+    e.key.scancode=SDL_SCANCODE_RETURN;g_bind_key[BIND_Y]=SDL_SCANCODE_RETURN;
+    assert(lan_menu_handle_event(&e) && !lan_menu_requests());
+    g_bind_key[BIND_Y]=SDL_SCANCODE_I;g_bind_key[BIND_X]=SDL_SCANCODE_L;
+    e.key.scancode=SDL_SCANCODE_KP_ENTER;
+    assert(lan_menu_handle_event(&e) && lan_menu_requests()==LAN_MENU_CONFIRM);
     e.type=SDL_EVENT_MOUSE_BUTTON_DOWN;assert(!lan_menu_handle_event(&e));
     lan_menu_publish(false);lan_menu_update_capture();
     assert(resets==2 && !lan_menu_capture() && !lan_menu_requests());

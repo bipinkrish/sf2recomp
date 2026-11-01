@@ -18,8 +18,10 @@ class MouseMenuTests(unittest.TestCase):
 
 bool menu_is_open(void) { return developer_console_open(); }
 bool menu_input_captured(void) { return developer_console_open(); }
-bool movie_overlay_active(void) { return false; }
-void movie_request_skip(void) {}
+static bool movie_visible;
+static unsigned movie_skips;
+bool movie_overlay_active(void) { return movie_visible; }
+void movie_request_skip(void) { movie_skips++; }
 void menu_request_quit(void) {}
 bool menu_quit_requested(void) { return false; }
 uint64_t plat_now_ns(void) { return 1000000; }
@@ -127,6 +129,27 @@ int main(void) {
     float sx, sy; memcpy(&sx, &cpu.v[0], 4); memcpy(&sy, &cpu.v[1], 4);
     assert(sx == -2 && sy == -3);
     frame(); assert(menu_mouse.scroll_x == 0 && menu_mouse.scroll_y == 0);
+
+    // Each mouse button can skip, even before the guest polls. The skip press
+    // and its later release must not reach the menu revealed by the movie.
+    const Uint8 buttons[] = {SDL_BUTTON_LEFT, SDL_BUTTON_RIGHT, SDL_BUTTON_MIDDLE};
+    for (unsigned i = 0; i < 3; ++i) {
+        movie_visible = true;
+        button(SDL_EVENT_MOUSE_BUTTON_DOWN, buttons[i], 500, 500);
+        assert(movie_skips == i + 1);
+        frame();
+        assert(!menu_mouse.pressed && !menu_mouse.held);
+        movie_visible = false;
+        button(SDL_EVENT_MOUSE_BUTTON_UP, buttons[i], 500, 500);
+        frame();
+        assert(!menu_mouse.pressed && !menu_mouse.held && !menu_mouse.released);
+        // A fresh click works normally after skipping.
+        button(SDL_EVENT_MOUSE_BUTTON_DOWN, buttons[i], 500, 500);
+        button(SDL_EVENT_MOUSE_BUTTON_UP, buttons[i], 500, 500);
+        frame();
+        assert(menu_mouse.pressed == (1u << i) && menu_mouse.released == (1u << i));
+        frame();
+    }
     SDL_DestroyWindow(window); SDL_Quit();
 }
 '''

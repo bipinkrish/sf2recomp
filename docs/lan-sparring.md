@@ -254,3 +254,13 @@ The final executable SHA-256 is
 The canonical machine-readable summary is
 `build/validation/lan-integration/summary.json`; it links individual reports,
 binary hashes, traces, historical failures, and final build/test logs.
+
+### Desktop navigation
+
+The Normal/LAN, Host/Join and host-list choices reuse the main menu's native
+menu items and kunai selection artwork, including pointer hover and keyboard
+focus. Enter confirms and Escape goes back when those keys are unassigned.
+Explicit keyboard mappings take priority; the new default Pause key is Tab.
+Character and arena cell clicks are transmitted as absolute, player-owned
+selection events on the existing lobby connection. Both computers must use this
+updated build; its GUI compatibility identifier also covers mouse selection.

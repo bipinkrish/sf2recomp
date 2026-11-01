@@ -47,6 +47,17 @@ int main(int argc,char **argv) {
             }
             SDL_Delay(1);
         }
+        // Absolute mouse choices are ordered with keyboard input on the same
+        // persistent session, including roster indices above the key-event range.
+        assert(lan_gui_send_menu(0,1,200+lan_player(),3));mask=0;
+        while(mask!=3) {
+            assert(SDL_GetTicksNS()<until);lan_gui_poll();
+            while(lan_gui_pop_menu(&e,0)) {
+                assert(e.input_type==3 && e.event==200+e.player && e.down==1);
+                mask|=1u<<e.player;
+            }
+            SDL_Delay(1);
+        }
         uint32_t expected[3];
         for(unsigned i=0;i<3;++i)expected[i]=lan_selection_bounded(&host_choices,i==2?14:60);
         if(host)assert(lan_gui_send_match(expected));

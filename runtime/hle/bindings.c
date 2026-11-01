@@ -11,7 +11,7 @@
 _Static_assert(PADB_LTRIGGER == SDL_GAMEPAD_BUTTON_COUNT, "trigger pseudo-buttons follow SDL's buttons");
 
 // Defaults: Nintendo layout by position (east = A, south = B, north = X, west = Y), triggers = ZL / ZR;
-// keyboard WASD left stick, arrows d-pad, K/J/L/I = A/B/X/Y, Q/E = L/R, 1/3 = ZL/ZR, Enter / Backspace = Plus /
+// keyboard WASD left stick, arrows d-pad, K/J/L/I = A/B/X/Y, Q/E = L/R, 1/3 = ZL/ZR, Tab / Backspace = Plus /
 // Minus, F / numpad 0 = stick clicks, numpad 8/5/4/6 right stick.
 #define DEF_PAD { \
     SDL_GAMEPAD_BUTTON_EAST, SDL_GAMEPAD_BUTTON_SOUTH, SDL_GAMEPAD_BUTTON_NORTH, SDL_GAMEPAD_BUTTON_WEST, \
@@ -20,7 +20,7 @@ _Static_assert(PADB_LTRIGGER == SDL_GAMEPAD_BUTTON_COUNT, "trigger pseudo-button
     SDL_GAMEPAD_BUTTON_DPAD_LEFT, SDL_GAMEPAD_BUTTON_DPAD_UP, SDL_GAMEPAD_BUTTON_DPAD_RIGHT, SDL_GAMEPAD_BUTTON_DPAD_DOWN}
 #define DEF_KEY { \
     SDL_SCANCODE_K, SDL_SCANCODE_J, SDL_SCANCODE_L, SDL_SCANCODE_I, SDL_SCANCODE_F, SDL_SCANCODE_KP_0, \
-    SDL_SCANCODE_Q, SDL_SCANCODE_E, SDL_SCANCODE_1, SDL_SCANCODE_3, SDL_SCANCODE_RETURN, SDL_SCANCODE_BACKSPACE, \
+    SDL_SCANCODE_Q, SDL_SCANCODE_E, SDL_SCANCODE_1, SDL_SCANCODE_3, SDL_SCANCODE_TAB, SDL_SCANCODE_BACKSPACE, \
     SDL_SCANCODE_LEFT, SDL_SCANCODE_UP, SDL_SCANCODE_RIGHT, SDL_SCANCODE_DOWN, \
     SDL_SCANCODE_W, SDL_SCANCODE_S, SDL_SCANCODE_A, SDL_SCANCODE_D, SDL_SCANCODE_KP_8, SDL_SCANCODE_KP_5, \
     SDL_SCANCODE_KP_4, SDL_SCANCODE_KP_6}
@@ -42,6 +42,19 @@ static const char *const k_pad_ini[PADB_HOST_COUNT] = {
     "dpad_up", "dpad_down", "dpad_left", "dpad_right", "misc1", "rpaddle1", "lpaddle1", "rpaddle2", "lpaddle2",
     "touchpad", "misc2", "misc3", "misc4", "misc5", "misc6", "ltrigger", "rtrigger",
 };
+
+bool bind_key_unassigned(int scancode) {
+    if(scancode<=0 || scancode>=SDL_SCANCODE_COUNT)return false;
+    for(int i=0;i<BIND_KEY_COUNT;++i)if(g_bind_key[i]==scancode)return false;
+    return true;
+}
+bool bind_menu_key(int scancode,int action) {
+    if(action<0 || action>=BIND_KEY_COUNT || scancode<=0)return false;
+    if(g_bind_key[action]==scancode)return true;
+    return bind_key_unassigned(scancode) &&
+        ((action==BIND_B && scancode==SDL_SCANCODE_ESCAPE) ||
+         (action==BIND_A && (scancode==SDL_SCANCODE_RETURN || scancode==SDL_SCANCODE_KP_ENTER)));
+}
 
 int bind_slot_from_name(const char *name) {
     for (int i = 0; i < BIND_KEY_COUNT; i++) if (!strcasecmp(name, k_ini[i])) return i;

@@ -133,6 +133,8 @@ int main(void) {
 #include <assert.h>
 #include "hle/hooks.c"
 #include "ui/menu_stubs.c"
+uint64_t renderer_present_count(void) { return 1; }
+uint64_t plat_now_ns(void) { return 1000000; }
 static uint64_t calls[8], values[8];
 static int call_count, cheat_id;
 static bool fighting;

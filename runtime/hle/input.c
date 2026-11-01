@@ -158,6 +158,11 @@ static void recompute_keyboard(void) {
     }
     for (int i = 0; i < BIND_PAD_COUNT; i++)
         if (held_key(g_bind_key[i])) b |= 1ull << i;
+    if(input_menu_navigation_active()) {
+        if(held_key(SDL_SCANCODE_ESCAPE) && bind_key_unassigned(SDL_SCANCODE_ESCAPE))b|=1ull<<BIND_B;
+        if((held_key(SDL_SCANCODE_RETURN) && bind_key_unassigned(SDL_SCANCODE_RETURN)) ||
+           (held_key(SDL_SCANCODE_KP_ENTER) && bind_key_unassigned(SDL_SCANCODE_KP_ENTER)))b|=1ull<<BIND_A;
+    } else if(held_key(SDL_SCANCODE_ESCAPE) && bind_key_unassigned(SDL_SCANCODE_ESCAPE))b|=1ull<<BIND_PLUS;
     key_buttons = b;
     key_lx = (held_key(g_bind_key[BIND_LS_RIGHT]) - held_key(g_bind_key[BIND_LS_LEFT])) * 32767;
     key_ly = (held_key(g_bind_key[BIND_LS_UP]) - held_key(g_bind_key[BIND_LS_DOWN])) * 32767;
@@ -452,10 +457,32 @@ static void scan_connected_pads(void) {
 }
 
 void input_handle_event(const SDL_Event *e) {
+    // Consume the whole skip click, including its release after the overlay goes
+    // away, so it cannot activate a menu item while the next scene is loading.
+    static uint32_t movie_mouse_consumed;
+    if (e->type == SDL_EVENT_MOUSE_BUTTON_DOWN || e->type == SDL_EVENT_MOUSE_BUTTON_UP) {
+        uint32_t bit = e->button.button > 0 && e->button.button <= 32 ? SDL_BUTTON_MASK(e->button.button) : 0;
+        if (e->type == SDL_EVENT_MOUSE_BUTTON_DOWN && movie_overlay_active()) {
+            movie_mouse_consumed |= bit;
+            menu_mouse_reset();
+            movie_request_skip();
+            return;
+        }
+        if (movie_mouse_consumed & bit) {
+            if (e->type == SDL_EVENT_MOUSE_BUTTON_UP) movie_mouse_consumed &= ~bit;
+            return;
+        }
+    } else if (e->type == SDL_EVENT_WINDOW_FOCUS_LOST) {
+        movie_mouse_consumed = 0;
+    }
     menu_mouse_event(e);
     scan_connected_pads();  // pads present at startup may have emitted ADDED before this event loop
     switch (e->type) {
     case SDL_EVENT_KEY_DOWN: case SDL_EVENT_KEY_UP: {
+        if(movie_overlay_active() && e->key.scancode==SDL_SCANCODE_SPACE && bind_key_unassigned(SDL_SCANCODE_SPACE)) {
+            if(e->type==SDL_EVENT_KEY_DOWN && !e->key.repeat)movie_request_skip();
+            break; // skip must never become a held combat/menu button
+        }
         if (e->type == SDL_EVENT_KEY_DOWN && e->key.scancode == SDL_SCANCODE_F9 && !e->key.repeat) g_debug_frame_request = 1;
         if (e->key.scancode < SDL_SCANCODE_COUNT) keys_down[e->key.scancode] = e->type == SDL_EVENT_KEY_DOWN;
         uint64_t before = key_buttons;

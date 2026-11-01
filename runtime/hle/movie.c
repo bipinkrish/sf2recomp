@@ -60,7 +60,7 @@ typedef struct {
     bool audio_subsystem;
     uint64_t start_ns;
     atomic_bool stop, source_ready, playback_started, first_frame_ready, first_frame_submitted;
-    atomic_bool video_done, audio_done, audio_eof, audio_clock_active;
+    atomic_bool video_done, audio_done, audio_eof, audio_clock_active, monitor_done;
     atomic_uint_fast64_t audio_bytes_submitted;
 } MoviePlayer;
 
@@ -503,16 +503,30 @@ static void *movie_monitor(void *arg) {
     audio_movie_set_active(false);
     atomic_store(&g_movie_visible, false);
     LOG("[movie] host playback finished%s\n", atomic_load(&p->stop) ? " (stopped)" : "");
+    atomic_store(&p->monitor_done, true);
     return NULL;
 }
 
-static void movie_stop_locked(void) {
+// Hide and silence immediately. The monitor joins/reaps the decoder in the background;
+// the window thread must keep presenting while the guest loads the next scene.
+static void movie_cancel_locked(void) {
     bool was_visible = atomic_exchange(&g_movie_visible, false);
     atomic_store(&g_movie.stop, true);
     atomic_store(&g_movie_skip_requested, false);
     // The monitor reaps a completed child while leaving its PID in the player. Only signal a live overlay, avoiding
     // the chance that a reused PID is signalled when a later movie/reset cleans up an already-finished clip.
     if (was_visible && g_movie.child) movie_child_kill(g_movie.child);
+    if (g_movie.audio_stream) {
+        SDL_SetAudioStreamGain(g_movie.audio_stream, 0.0f);
+        SDL_PauseAudioStreamDevice(g_movie.audio_stream);
+        SDL_ClearAudioStream(g_movie.audio_stream);
+    }
+    audio_movie_set_active(false);
+    renderer_movie_clear();
+}
+
+static void movie_stop_locked(void) {
+    movie_cancel_locked();
     if (g_movie.monitor_started) {
         pthread_join(g_movie.monitor_thread, NULL);
         g_movie.monitor_started = false;
@@ -542,6 +556,7 @@ static void movie_stop_locked(void) {
     atomic_store(&g_movie.audio_done, false);
     atomic_store(&g_movie.audio_eof, false);
     atomic_store(&g_movie.audio_clock_active, false);
+    atomic_store(&g_movie.monitor_done, false);
     atomic_store(&g_movie.audio_bytes_submitted, 0);
     atomic_store(&g_movie_displayed_frame, UINT64_MAX);
     movie_frames_clear();
@@ -639,15 +654,20 @@ void movie_request_skip(void) {
     if (movie_overlay_active()) atomic_store(&g_movie_skip_requested, true);
 }
 
-// UI thread: stopping joins decoder workers and releases the SDL audio device.
-void movie_poll(void) {
-    if (!atomic_exchange(&g_movie_skip_requested, false)) return;
-    pthread_mutex_lock(&g_movie_lock);
-    if (movie_overlay_active()) {
-        LOG("[movie] skipped by mapped confirm/back input\n");
-        movie_stop_locked();
+// UI thread: request cancellation without joining workers or waiting for startup's lock.
+// Reclaim the player only after its monitor has completed all blocking shutdown work.
+bool movie_poll(void) {
+    if (!atomic_load(&g_movie_skip_requested) && !atomic_load(&g_movie.monitor_done)) return false;
+    if (pthread_mutex_trylock(&g_movie_lock)) return false;
+    bool dismissed = false;
+    if (atomic_exchange(&g_movie_skip_requested, false) && movie_overlay_active()) {
+        LOG("[movie] skipped by confirm/back or mouse input\n");
+        movie_cancel_locked();
+        dismissed = true;
     }
+    if (g_movie.monitor_started && atomic_load(&g_movie.monitor_done)) movie_stop_locked();
     pthread_mutex_unlock(&g_movie_lock);
+    return dismissed;
 }
 
 bool movie_render_tick(void) {

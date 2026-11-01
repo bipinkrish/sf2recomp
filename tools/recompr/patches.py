@@ -13,21 +13,32 @@ PATCHES = {}
 # Replay's feature bit is 2u (runtime/replay.h). Keep the literal in generated
 # C so adding diagnostic hooks does not change the shared CPU ABI header.
 HOOKS = {
+    0x7000e6fca0: (0xa9be4ff4, (), "LAN main-menu item click"),
+    0x7000e6fd00: (0xf9402800, (), "LAN main-menu item pointer down"),
+    0x7000e6fd10: (0xf9402c00, (), "LAN main-menu item pointer up"),
+    0x7000e6fd20: (0xf9403000, (), "LAN main-menu item hover"),
+    0x7000e6fd30: (0xf9403400, (), "LAN main-menu item hover exit"),
+    0x7000d985a0: (0x17fff810, (), "release Sparring mouse target on deactivation"),
+    0x7000d985b0: (0xf81e0ff3, (), "release Sparring mouse target before free"),
+    0x7000e5b660: (0xa9bc5ff8, (), "desktop keyboard pause-menu context"),
+    0x7000e5b8f0: (0xa9be4ff4, (), "desktop keyboard combat context"),
+    0x7000e5b9d0: (0xa9bd57f6, (), "desktop keyboard results context"),
+
     0x7000cf1360: (0xa9bd57f6, (), "LAN controls in the original Sparring tutorial", "4u"),
 
     # Native in-game LAN dialogs, selection and session lifecycle (bit 4).
     0x7000e6ed90: (0xf81d0ff5, (), "native Sparring LAN UI/session", "4u"),
     0x7000dc7550: (0xf9401801, (), "native Sparring LAN UI/session", "4u"),
     0x7000cee2d0: (0xa9bd57f6, (), "native Sparring LAN UI/session", "4u"),
-    0x7000f48ef0: (0xd101c3ff, (), "native Sparring LAN UI/session", "4u"),
+    0x7000f48ef0: (0xd101c3ff, (), "native Sparring LAN UI/session"),
     0x7000d95000: (0xf81b0ff9, (), "native Sparring LAN UI/session", "4u"),
     0x7000d94fd0: (0xa9bf7bfd, (), "native Sparring LAN UI/session", "4u"),
     0x7000d982c0: (0xa9bf7bfd, (), "native Sparring LAN UI/session", "4u"),
     0x7000e44380: (0xf81b0ff9, (), "native Sparring LAN UI/session", "4u"),
     0x7000e46200: (0xf81d0ff5, (), "native Sparring LAN UI/session", "4u"),
     0x7000d98fa0: (0xa9be4ff4, (), "native Sparring LAN UI/session", "4u"),
-    0x7000e43000: (0xa9bd57f6, (), "native Sparring LAN UI/session", "4u"),
-    0x7000e45ea0: (0xa9be4ff4, (), "native Sparring LAN UI/session", "4u"),
+    0x7000e43000: (0xa9bd57f6, (), "native Sparring LAN UI/session"),
+    0x7000e45ea0: (0xa9be4ff4, (), "native Sparring LAN UI/session"),
     0x7000e51220: (0xd10143ff, (), "native Sparring LAN UI/session", "4u"),
     0x7000e51a20: (0xa9be4ff4, (), "native Sparring LAN UI/session", "4u"),
     0x7000e51760: (0xa9bd57f6, (), "native Sparring LAN UI/session", "4u"),

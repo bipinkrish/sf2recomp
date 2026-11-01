@@ -178,6 +178,16 @@ unbinds an action. Analog gamepad sticks keep their normal axes. Multiple action
 may share a host input. Invalid recognized values warn and preserve the previous
 binding; unknown sections/keys are ignored for future additions.
 
+Desktop menu shortcuts also accept **Enter** (or keypad Enter) to confirm and
+**Escape** to go back. During combat, unassigned Escape opens the native pause
+menu; the default Pause/Plus key is now **Tab**. **Space** skips video cutscenes
+while a video is playing. These shortcuts are fallbacks: if a key is assigned to
+any keyboard action (including a stick direction), its configured action wins.
+An existing INI with `plus = Return` therefore keeps Enter as Pause; use
+`plus = Tab` to enable Enter as the menu-confirm shortcut. The configured A/B
+keys keep working alongside the shortcuts, and binding capture and the developer
+console retain their own Enter/Escape handling.
+
 The main menu includes **Exit** to close the native game and return to the
 desktop, including in fullscreen. It uses the game's menu navigation and
 localized button artwork.
@@ -187,7 +197,10 @@ handlers and hit testing. Sliders and scroll views with existing pointer handler
 accept dragging and the mouse wheel. The pointer maps to the displayed game area
 after resizing, including fullscreen, HiDPI and custom aspect ratios; black bars
 are outside the clickable area. Keyboard/controller navigation clears mouse hover
-until the mouse is used again. Mouse input does not map to combat buttons.
+until the mouse is used again. Mouse input does not map to combat buttons. Sparring character and arena cells
+also accept a left-click to select and confirm the active player's choice.
+In LAN, each computer's clicks control only its own player and are synchronized
+with the peer. Equipment confirmation continues through the native controls.
 
 For input diagnostics, `LARECOMP_MOUSE_TRACE=1` logs SDL pointer events and their
 mapped Unity coordinates. Scripted runs can use `LARECOMP_HOST_INPUT` entries such

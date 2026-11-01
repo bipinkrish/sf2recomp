@@ -17,10 +17,42 @@ uint64_t renderer_present_count(void) { return 1; }
 bool rt_probe_u64(uint64_t a,uint64_t *v) { return false; }
 bool nvn_texture_region_color(const NvnTexture*t,uint32_t x,uint32_t y,uint32_t w,uint32_t h,float rgb[3]) { return false; }
 void *hle_alloc(uint64_t n) { return calloc(1,n); }
+static uint64_t prototype,selection_table,selected_rect;
+static unsigned moved_player,confirmed_id;
+static bool dialog_blocks;
 static uint64_t shown_info,shown_dialog;static unsigned original_entries,closed,back_prompts;
 void guest_call(Cpu *c,uint64_t pc) {
     switch(pc) {
     case 0x70005d9e60ull:return;
+    case 0x700121e790ull:c->x[0]=prototype;return;
+    case 0x700121e6b0ull:case 0x700121e720ull:case 0x7001226480ull:case 0x70012339d0ull:return;
+    case 0x70012333a0ull:
+        assert(c->x[0]==0 && (c->x[1]==prototype || c->x[1]==lan_menu_template) && c->x[3]==0);
+        c->x[0]=(uintptr_t)calloc(1,128);ST64(c->x[0]+0x28,(uintptr_t)calloc(1,512));return;
+    case 0x700123a050ull:case 0x700123a250ull:case 0x700123a550ull:case 0x700123a7d0ull:return;
+    case 0x7000e71230ull:ST64(c->x[0]+0x180,c->x[1]);return;
+    case 0x7000e70080ull:return;
+    case 0x7000e6c080ull:ST8(c->x[0]+0x70,c->x[1]);return;
+    case GUEST_BEHAVIOUR_SET_ENABLED:assert(c->x[1]==0);return;
+    case 0x7000e43da0ull:case 0x7000e46120ull: {
+        moved_player=c->x[1];uint64_t selector=LD64(selection_table+0x18+moved_player*8);
+        ST32(selector+0x38,LD32(selector+0x38)+(int32_t)c->x[2]);
+        ST32(selector+0x3c,LD32(selector+0x3c)+(int32_t)c->x[3]);return; }
+    case 0x7000d94dd0ull:case 0x7000d94e40ull:
+        c->x[0]=(uintptr_t)calloc(1,32);ST32(c->x[0]+0x18,pc==0x7000d94dd0ull?7:9);return;
+    case 0x7000e44df0ull:case 0x7000d98de0ull:
+        assert(lan_native_call && c->x[3]==0);confirmed_id=c->x[2];return;
+    case 0x7000cede90ull:
+        c->x[0]=(uintptr_t)calloc(1,80);ST64(c->x[0]+0x40,dialog_blocks);return;
+    case 0x700121ead0ull:assert(c->x[0]==789);c->x[0]=321;return;
+    case 0x7000af7250ull:assert(c->x[0]==321);c->x[0]=123;return;
+    case 0x70015d9e00ull:assert(c->x[0]==789);c->x[0]=32;return;
+    case 0x70015da1f0ull:assert(c->x[0]==789);c->x[0]=900+c->x[1];return;
+    case 0x7000d982c0ull:c->x[0]=1;return;
+    case 0x7000af9300ull:
+        assert(c->x[0]==0 && c->x[2]==123);bool inside=c->x[1]==selected_rect;
+        { float x,y;memcpy(&x,&c->v[0],4);memcpy(&y,&c->v[1],4);assert(x==480 && y==270); }
+        memset(c,0x5a,sizeof *c);c->x[0]=inside;return;
     case GUEST_STRING_ALLOC:c->x[0]=(uintptr_t)calloc(1,32+c->x[1]*2);return;
     case 0x70008ea5c0ull:c->x[0]=c->x[1];return;
     case 0x700039cb10ull:c->x[0]=(uintptr_t)calloc(1,256);return;
@@ -102,6 +134,40 @@ int main(void) {
     assert(lan_menu_handle_event(&back));cpu=saved;lan_ui_pump(&cpu);
     label(0,"NORMAL");assert(!lan_gui_active() && lan_menu_capture());
     click(&cpu,0);assert(original_entries==1 && closed>=2 && !lan_enabled() && back_prompts==3);
+    // Reuse main-menu components and keep pointer hover, exit, click and
+    // keyboard focus on the same selected choice without firing source listeners.
+    prototype=(uintptr_t)calloc(1,128);lan_menu_prototype=prototype;lan_mode_dialog(&cpu);
+    assert(lan_menu_buttons[0] && lan_menu_buttons[1]);
+    assert(LD8(lan_menu_buttons[0]+0x70)==1 && !LD8(lan_menu_buttons[1]+0x70));
+    cpu=saved;cpu.x[0]=lan_menu_buttons[1];assert(lan_ui_hook(&cpu,0x7000e6fd20ull)==1);
+    assert(lan_choice==1 && !LD8(lan_menu_buttons[0]+0x70) && LD8(lan_menu_buttons[1]+0x70));
+    assert(lan_ui_hook(&cpu,0x7000e6fd30ull)==1 && !LD8(lan_menu_buttons[1]+0x70));
+    uint64_t pointer=(uintptr_t)calloc(1,336);cpu.x[1]=pointer;ST32(pointer+0x12c,1);
+    assert(lan_ui_hook(&cpu,0x7000e6fca0ull)==1 && !lan_action);
+    ST32(pointer+0x12c,0);assert(lan_ui_hook(&cpu,0x7000e6fca0ull)==1 && lan_action==LAN_CHOICE_LAN);
+    lan_action=0;lan_close_dialog(&cpu);lan_menu_prototype=0;
+    // A click uses native movement + Confirm for only the owning player.
+    uint64_t module=(uintptr_t)calloc(1,256),items=(uintptr_t)calloc(1,64);
+    selection_table=(uintptr_t)calloc(1,64);ST64(module+0x20,selection_table);ST64(module+0x98,items);
+    ST32(module+0x5c,8);ST64(items+0x18,32);
+    for(unsigned i=0;i<2;++i)ST64(selection_table+0x18+i*8,(uintptr_t)calloc(1,80));
+    cpu=saved;assert(sparring_select_cell(&cpu,module,0,1,26));assert(!memcmp(&cpu,&saved,sizeof cpu));
+    uint64_t selector=LD64(selection_table+0x20);
+    assert(moved_player==1 && confirmed_id==9 && LD32(selector+0x38)==2 && LD32(selector+0x3c)==3);
+    assert(!sparring_select_cell(&cpu,module,0,1,32));ST8(module+0x59,1);
+    assert(!sparring_select_cell(&cpu,module,0,1,0));
+    selected_rect=456;MenuMouse mouse={.x=480,.y=270};
+    assert(sparring_contains(&cpu,selected_rect,123,&mouse) && !memcmp(&cpu,&saved,sizeof cpu));
+    sparring_module=module;sparring_kind=0;ST64(selection_table+0x28,789);selected_rect=926;
+    mouse.pressed=mouse.released=1;sparring_mouse_frame(&cpu,&mouse);
+    assert(moved_player==0 && confirmed_id==7 && !memcmp(&cpu,&saved,sizeof cpu));
+    ST8(module+0x58,1);ST8(module+0x59,0);sparring_mouse_frame(&cpu,&mouse);
+    assert(moved_player==1 && confirmed_id==9); // shared Normal mouse advances to player 2
+    moved_player=99;dialog_blocks=true;sparring_mouse_frame(&cpu,&mouse);assert(moved_player==99);
+    dialog_blocks=false;mouse.pressed=0;mouse.released=1;sparring_pressed=-1;
+    sparring_mouse_frame(&cpu,&mouse);assert(moved_player==99); // release without a matching press
+    cpu.x[0]=module;
+    assert(lan_ui_hook(&cpu,0x7000d985a0ull)==-1 && !sparring_module);
     g_settings.allow_sparring_lan_multiplayer=false;
     assert(lan_ui_hook(&cpu,0x7000e6ed90ull)==-1);
 }

@@ -302,7 +302,7 @@ void lan_finish(uint32_t tick,uint64_t state) {
 
 
 // The native browser shares this transport; no launcher/interpreter is involved.
-enum { LOBBY=6, MATCH=7, GUI_SIM_DELTA=0x1000, DISCOVERY_PORT=34251, DISCOVERY_MAGIC=0x53463244 };
+enum { LOBBY=6, MATCH=7, GUI_SIM_DELTA=0x1001, DISCOVERY_PORT=34251, DISCOVERY_MAGIC=0x53463244 };
 static bool gui_match;
 static LanSocket discovery=BAD_SOCKET;
 static uint64_t gui_until, query_at, gui_host_id;
@@ -518,7 +518,7 @@ void lan_gui_poll(void) {
                 if(discovery!=BAD_SOCKET) { close_socket(discovery);discovery=BAD_SOCKET; }
                 fprintf(stderr,"[lan] in-game connection established as player %u\n",player+1);
             } else if(type==LOBBY && bytes==4 && get(packet+12)==menu_received++ && hash==0 &&
-                      p[0]<=2 && p[1]<=1 && p[2]<=24 && p[3]<=2) {
+                      p[0]<=2 && p[1]<=1 && ((p[2]<=24 && p[3]<=2) || (p[0]<2 && p[1]==1 && p[3]==3))) {
                 gui_queue((LanMenuEvent){1-player,p[0],p[1],p[2],p[3]});
             } else if(type==MATCH && player && bytes==16 && get(packet+12)==match_serial++ && hash==0) {
                 config.seed=get(p);for(unsigned i=0;i<3;++i) { config.match[i]=get(p+4+i*4);if(config.match[i]>255)fail("Invalid selected fighter or arena."); }
@@ -531,7 +531,7 @@ void lan_gui_poll(void) {
 bool lan_gui_send_menu(unsigned module,unsigned down,unsigned event,unsigned input_type) {
     if(!enabled || gui_combat || gui_status!=LAN_GUI_CONNECTED)return false;
     if(setjmp(gui_escape)) { gui_guard=false;return false; }gui_guard=true;
-    if(module>2 || down>1 || event>24 || input_type>2)fail("Invalid local menu input.");
+    if(module>2 || down>1 || !((event<=24 && input_type<=2) || (module<2 && down==1 && event<=255 && input_type==3)))fail("Invalid local menu input.");
     uint8_t payload[4]={module,down,event,input_type};
     send_packet(LOBBY,menu_sent++,0,payload,sizeof payload,deadline(1));
     gui_queue((LanMenuEvent){player,module,down,event,input_type});
