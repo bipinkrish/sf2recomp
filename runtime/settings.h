@@ -49,6 +49,8 @@ typedef struct Settings {
     bool experimental_keyboard_prompts;
     bool network_enabled;
     bool unlock_all_sparring_characters;
+    bool enable_shadow_in_sparring;
+    bool enable_titan_in_sparring;
     bool allow_sparring_lan_multiplayer;
     bool unlock_all_videos;
     bool show_intro;
@@ -64,6 +66,7 @@ typedef struct Settings {
     bool developer_build_info;
     bool developer_model_info;
     int screen_filter;
+    bool use_completed_save;
     char save_directory[SETTINGS_SAVE_DIRECTORY_CAP];
 } Settings;
 

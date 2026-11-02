@@ -24,6 +24,7 @@ bool lan_gui_active(void);
 int lan_gui_status(void);
 const char *lan_gui_error(void);
 bool lan_gui_host(uint16_t port);
+unsigned lan_local_addresses(char out[8][16]);
 bool lan_gui_search(void);
 bool lan_gui_join(const LanHost *host);
 void lan_gui_poll(void);

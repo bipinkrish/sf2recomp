@@ -70,6 +70,8 @@ class PackageTests(unittest.TestCase):
     def test_runtime_only_and_settings_preserved_on_reconversion(self):
         convert.package_game(self.game, self.output, self.exe, self.base / "sdl", self.ffmpeg)
         self.assertTrue((self.output / "sf2").is_file())
+        completed = pathlib.Path("profiles/completed/save_0/userdata/users.xml")
+        self.assertEqual((self.output / completed).read_bytes(), (ROOT / completed).read_bytes())
         self.assertEqual((self.output / "lib/ffmpeg/bin/ffmpeg").read_bytes(), b"fixture")
         self.assertEqual((self.output / "lib/ffmpeg/lib/libavcodec.so.1").read_bytes(), b"fixture")
         self.assertEqual((self.output / "lib/fonts/NotoSans-Regular.ttf").read_bytes(), b"font fixture")

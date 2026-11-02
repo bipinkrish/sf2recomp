@@ -726,12 +726,42 @@ static void drop_uncommitted_tree(const char *root, unsigned depth) {
     if (d) closedir(d);
 }
 
+// Seed once from the packaged snapshot. Publish users.xml last, so an
+// interrupted first launch can retry without replacing an existing profile.
+static bool seed_completed_save(const char *root) {
+    char users[1200], directory[1200];
+    if (snprintf(users, sizeof users, "%s/userdata/users.xml", root) >= sizeof users ||
+        snprintf(directory, sizeof directory, "%s/userdata", root) >= sizeof directory) {
+        errno = ENAMETOOLONG; return false;
+    }
+    if (!access(users, F_OK)) return true;
+    if (mkdir(directory, 0755) && errno != EEXIST) return false;
+    static const char *const names[] = {"initSettings.bin", "users.xml"};
+    for (unsigned i = 0; i < sizeof names / sizeof names[0]; ++i) {
+        char source[1200], target[1200], temporary[1300];
+        snprintf(source, sizeof source, "profiles/completed/save_0/userdata/%s", names[i]);
+        if (snprintf(target, sizeof target, "%s/%s", directory, names[i]) >= sizeof target) {
+            errno = ENAMETOOLONG; return false;
+        }
+        snprintf(temporary, sizeof temporary, "%s.seed", target);
+        if (!copy_file(source, temporary) || !sync_save_file(temporary) || replace_file(temporary, target)) {
+            int error = errno; unlink(temporary); errno = error; return false;
+        }
+        sync_dir_of(target);
+    }
+    LOG("[save] initialized completed campaign profile at %s\n", root);
+    return true;
+}
+
 static Service *open_host_fs(const char *sub) {
     HostFs *fs = calloc(1, sizeof *fs);
     // Settings are loaded after the data-root chdir; relative paths therefore
     // refer to that writable root. LARECOMP_SAVE_DIR is applied by settings_init.
     g_save_dir = g_settings.save_directory;
-    snprintf(fs->root, sizeof fs->root, "%s/%s", g_save_dir, sub);
+    bool completed = g_settings.use_completed_save && strcmp(sub, "sdcard");
+    int length = snprintf(fs->root, sizeof fs->root, "%s/%s%s", g_save_dir,
+                          completed ? "completed/" : "", sub);
+    if (length >= sizeof fs->root) { free(fs); errno = ENAMETOOLONG; return NULL; }
     char cmd[1200];
     snprintf(cmd, sizeof cmd, "%s", fs->root);
     for (char *q = cmd + 1; *q; q++)
@@ -739,6 +769,14 @@ static Service *open_host_fs(const char *sub) {
     mkdir(cmd, 0755);
     fs->journaled = strcmp(sub, "sdcard") != 0;
     pthread_mutex_lock(&g_mount_lock);
+    if (completed && !strcmp(sub, "save_0") && !seed_completed_save(fs->root)) {
+        int error = errno;
+        LOG("[save] cannot initialize completed campaign profile at %s: %s\n", fs->root, strerror(error));
+        pthread_mutex_unlock(&g_mount_lock);
+        plat_notice("The completed campaign save could not be loaded. Keep profiles/completed with the app, "
+                    "or set [storage] use_completed_save = false and restart to load your normal save.");
+        free(fs); errno = error; return NULL;
+    }
     bool other_live = false;
     for (int i = 0; i < LIVE_MOUNTS_MAX; i++)
         if (g_live_mounts[i] && !strcmp(g_live_mounts[i]->root, fs->root)) other_live = true;

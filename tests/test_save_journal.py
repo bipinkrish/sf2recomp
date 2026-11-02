@@ -129,11 +129,14 @@ int main(int argc, char **argv) {
     assert(argc == 3);
     assert(settings_load_file(argv[1]));
     settings_init();
-    Service *mount = open_host_fs("save_0"); assert(mount);
+    Service *mount = open_host_fs("save_0");
+    if (!strcmp(argv[2], "missing_profile")) { assert(!mount && notices == 1); return 0; }
+    assert(mount);
     HostFs *fs = mount->state;
     printf("save_root=%s\n", fs->root);
     if (!strcmp(argv[2], "seed")) {
-        rpc(mount, 2, "/userdata", 0);
+        char userdata[1200]; snprintf(userdata, sizeof userdata, "%s/userdata", fs->root);
+        if (access(userdata, F_OK)) rpc(mount, 2, "/userdata", 0);
         rpc(mount, 0, "/userdata/progress.xml", 0);
         Service *file = open_save(mount, 2);
         write_save(file, "committed progress");
@@ -242,3 +245,48 @@ int main(int argc, char **argv) {
             self.invoke(folder, config, "verify", override)
             self.assertEqual((override / "save_0/userdata/progress.xml").read_text(), "committed progress")
             self.assertFalse((folder / "save").exists())
+
+    def test_completed_profile_seeds_once_and_switches_without_overwriting(self):
+        with tempfile.TemporaryDirectory(prefix="sf2-completed-profile-") as directory:
+            folder = pathlib.Path(directory)
+            config = folder / "sf2recomp.ini"
+            config.write_text('[storage]\nsave_directory = "custom saves"\nuse_completed_save = false\n')
+            self.invoke(folder, config, "seed")
+            normal = folder / "custom saves/save_0/userdata/progress.xml"
+            template = folder / "profiles/completed/save_0/userdata"
+            template.mkdir(parents=True)
+            (template / "users.xml").write_text("completed campaign snapshot")
+            (template / "initSettings.bin").write_bytes(b"preferences")
+            config.write_text('[storage]\nsave_directory = "custom saves"\nuse_completed_save = true\n')
+            result = self.invoke(folder, config, "seed")
+            self.assertIn("custom saves/completed/save_0", result.stdout)
+            completed = folder / "custom saves/completed/save_0/userdata"
+            self.assertEqual((completed / "users.xml").read_text(), "completed campaign snapshot")
+            self.assertEqual((completed / "initSettings.bin").read_bytes(), b"preferences")
+            self.assertEqual(normal.read_text(), "committed progress")
+            (completed / "users.xml").write_text("changed equipment in completed profile")
+            (template / "users.xml").write_text("updated package snapshot")
+            self.invoke(folder, config, "verify")
+            self.assertEqual((completed / "users.xml").read_text(), "changed equipment in completed profile")
+            config.write_text('[storage]\nsave_directory = "custom saves"\nuse_completed_save = false\n')
+            result = self.invoke(folder, config, "verify")
+            self.assertIn("save_root=custom saves/save_0", result.stdout)
+            self.assertEqual(normal.read_text(), "committed progress")
+
+    def test_completed_profile_recovers_interrupted_seed_and_reports_missing_template(self):
+        with tempfile.TemporaryDirectory(prefix="sf2-completed-retry-") as directory:
+            folder = pathlib.Path(directory)
+            config = folder / "sf2recomp.ini"
+            config.write_text('[storage]\nuse_completed_save = true\n')
+            self.invoke(folder, config, "missing_profile")
+            self.assertFalse((folder / "save/save_0").exists())
+            template = folder / "profiles/completed/save_0/userdata"
+            template.mkdir(parents=True)
+            (template / "users.xml").write_text("complete")
+            (template / "initSettings.bin").write_bytes(b"settings")
+            target = folder / "save/completed/save_0/userdata"
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "users.xml.seed").write_text("interrupted copy")
+            self.invoke(folder, config, "seed")
+            self.assertEqual((target / "users.xml").read_text(), "complete")
+            self.assertFalse((target / "users.xml.seed").exists())

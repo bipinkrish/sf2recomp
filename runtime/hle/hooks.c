@@ -680,11 +680,13 @@ RT_ON_RESET(reset_keyboard_hint_state) {
 // experiments require a restart; guest UI objects are never hot-unhooked.
 static void reset_developer_state(void);
 static void reset_lan_ui(void);
+static void reset_campaign_replay(void);
 void rt_hooks_configure(void) {
     LOG("[network] %s\n", g_settings.network_enabled ? "original network paths enabled" : "disabled (offline policy)");
     reset_keyboard_hint_state();
     reset_developer_state();
     reset_lan_ui();
+    reset_campaign_replay();
     replay_init();
     rt_hook_features =
 #ifdef __ANDROID__
@@ -772,8 +774,10 @@ static bool guest_object_named(Cpu *c, uint64_t object, const char *expected) {
 }
 
 #include "developer_hooks.inc"
+#include "sparring_roster_hooks.inc"
 #include "lan_ui_hooks.inc"
 #include "platform_ui_hooks.inc"
+#include "campaign_replay_hooks.inc"
 
 // The shipped MainSection has a fully wired, localized Exit item. Reveal it
 // before GeneralMenuList.Awake collects active buttons and installs navigation.
@@ -871,6 +875,10 @@ static int menu_mouse_hook(Cpu *c, uint64_t site) {
 }
 
 int rt_hook(Cpu *c, uint64_t site) {
+    int sparring_result = sparring_roster_hook(c, site);
+    if (sparring_result >= 0) return sparring_result;
+    int campaign_result = campaign_replay_hook(c, site);
+    if (campaign_result >= 0) return campaign_result;
     int platform_result = platform_ui_hook(c, site);
     if (platform_result >= 0) return platform_result;
     int lan_result = lan_ui_hook(c,site);

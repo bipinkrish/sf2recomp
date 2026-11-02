@@ -68,13 +68,16 @@ __attribute__((constructor(101))) static void reserve_guest_space(void) {
 #endif
 
 static KThread *boot(const char *root) {
+    uint64_t started = plat_now_ns();
     char exefs[1024], npdm_path[1024];
     snprintf(exefs, sizeof exefs, "%s/exefs", root);
     snprintf(npdm_path, sizeof npdm_path, "%s/main.npdm", exefs);
 
     loader_load(exefs);
+    LOG("[startup] guest modules loaded in %llu ms\n", (plat_now_ns() - started) / 1000000);
     kernel_init();
     dispatch_init();
+    LOG("[startup] kernel and dispatch ready at %llu ms\n", (plat_now_ns() - started) / 1000000);
     watch_arm();  // Optional address watch for debugging, without changing guest behavior.
 
     uint32_t stack_size = 0x100000;

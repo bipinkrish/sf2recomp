@@ -20,6 +20,12 @@ HARNESS=r'''
 Settings g_settings={.network_enabled=true,.ai_enabled=true};
 bool menu_quit_requested(void) { return false; }
 int main(int argc,char **argv) {
+    const char *roster=getenv("SF2_TEST_ROSTER");
+    if(roster) {
+        unsigned mask=(unsigned)atoi(roster);
+        g_settings.enable_shadow_in_sparring=!!(mask&1);
+        g_settings.enable_titan_in_sparring=!!(mask&2);
+    }
     lan_init();
     if(!lan_enabled())return 0;
     assert(!g_settings.network_enabled && !g_settings.ai_enabled && g_settings.player_setup==PLAYER_SETUP_SOLO);
@@ -59,12 +65,14 @@ class LanTransportTests(unittest.TestCase):
     def base_env(self):return {k:v for k,v in os.environ.items() if not k.startswith('SF2_LAN_')}
     def port(self):
         with socket.socket() as s:s.bind(('127.0.0.1',0));return str(s.getsockname()[1])
-    def pair(self,mode='',delay=2,host_limit=None,join_limit=None):
+    def pair(self,mode='',delay=2,host_limit=None,join_limit=None,host_roster=None,join_roster=None):
         port=self.port();host=self.base_env();join=dict(host)
         host.update(SF2_LAN_HOST='127.0.0.1',SF2_LAN_PORT=port,SF2_LAN_SEED='12345',SF2_LAN_DELAY=str(delay))
         join.update(SF2_LAN_JOIN='127.0.0.1',SF2_LAN_PORT=port)
         if host_limit is not None:host['SF2_REPLAY_TICKS']=str(host_limit)
         if join_limit is not None:join['SF2_REPLAY_TICKS']=str(join_limit)
+        if host_roster is not None:host['SF2_TEST_ROSTER']=str(host_roster)
+        if join_roster is not None:join['SF2_TEST_ROSTER']=str(join_roster)
         a=subprocess.Popen([str(self.binary),mode],env=host,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
         b=subprocess.Popen([str(self.binary),mode],env=join,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
         try:
@@ -83,6 +91,12 @@ class LanTransportTests(unittest.TestCase):
         self.assertEqual((a,b),(0,0),(al+bl).decode())
         a,b,al,bl=self.pair(host_limit=128,join_limit=256)
         self.assertEqual((a,b),(3,3));self.assertIn(b'step limits differ',al+bl)
+
+    def test_roster_options_must_match_before_selection_indices_are_exchanged(self):
+        a,b,al,bl=self.pair(host_roster=3,join_roster=1)
+        self.assertEqual((a,b),(3,3));self.assertIn(b'state/setup mismatch',al+bl)
+        a,b,al,bl=self.pair(host_roster=1,join_roster=1)
+        self.assertEqual((a,b),(0,0),(al+bl).decode())
 
     def test_divergence_stops_both_peers(self):
         a,b,al,bl=self.pair('diverge');self.assertEqual((a,b),(3,3));self.assertIn(b'divergence at step 10',al+bl)

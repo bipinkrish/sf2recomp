@@ -20,7 +20,7 @@ The Switch version was chosen because it includes **Sparring mode**, which offer
 
 ## Screenshots
 
-Captured from the native Linux/Vulkan build. Click any image for full resolution.
+Captured from the native Linux and Android builds. Click any image for full resolution.
 
 [![Wraith versus Aquaris on the night lake stage, filling the 32:9 view](docs/screenshots/ultrawide-night.png)](docs/screenshots/ultrawide-night.png)
 
@@ -40,6 +40,10 @@ see the [graphics guide](docs/runtime-guide.md#graphics-and-frame-rate).*
 [![Wraith and Puma fighting beneath giant forest branches in 32:9](docs/screenshots/ultrawide-forest.png)](docs/screenshots/ultrawide-forest.png)
 
 *Forest Sparring at 5120×1440, with corrected fight framing and ground alignment.*
+
+[![Lynx versus Corsair on Android, with touch controls and the boss-power button ready](docs/screenshots/android-sparring.png)](docs/screenshots/android-sparring.png)
+
+*Android emulator · 2424×1080 · Sparring with touch controls and Lynx's boss power ready.*
 
 ## Status
 
@@ -84,6 +88,8 @@ restarting; no rebuild is needed.
 | **Desktop Exit button** | The main menu's localized **Exit** option closes the game and returns to the desktop, including in fullscreen. |
 | **Game network blocking** | `[network] enabled = false` is the default and blocks game connections, DNS, uploads, online multiplayer, external web links and the remote developer listener. Offline Sparring remains available. Enabling networking does not implement missing online services. |
 | **Unlocked Sparring roster** | `[gameplay] unlock_all_sparring_characters = true` makes every Sparring character available without campaign progression. Enabled by default; does not change saved Story unlocks. |
+| **Shadow and Titan in Sparring** | Enabled by default with `[gameplay] enable_shadow_in_sparring` and `enable_titan_in_sparring`. Shadow uses his equipped campaign gear; Titan uses his own sword, ranged arm and magic. Move down past the third roster row to reveal more fighters at the original portrait size. See [roster settings](docs/runtime-guide.md#sparring-roster). |
+| **Boss refights and completed save** | Defeated bosses and Gates of Shadows have a Refight button with an X shortcut, including the six boss encounters after the Gates. Refights grant no rewards and leave saves unchanged. APKs and native packages bundle a completed save, selected with `[storage] use_completed_save = true`. Disabled by default; uses a separate profile. |
 | **Unlocked Extras movies** | `[gameplay] unlock_all_videos = true` enables gallery movie playback without changing watched-video save flags. Enabled in the supplied INI. |
 | **Intro and gameplay toggles** | Skip the intro with mapped A/B, Space, or a mouse click, or disable it with `[gameplay] show_intro = false`. Startup data and GPU heap preparation run during playback to reduce the wait after skipping. `ai_enabled` and `show_time_results` expose the original AI and timing-display controls. |
 | **Desktop developer console** | Opt in with `[developer] console = true`; **F1** or **backtick** opens the original console with desktop text input, command history and scrolling. |

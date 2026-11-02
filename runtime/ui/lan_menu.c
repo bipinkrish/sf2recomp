@@ -7,7 +7,11 @@
 #include <stdatomic.h>
 static atomic_bool modal;
 static atomic_int desktop_menu_navigation=INPUT_NAV_MENU;
-void input_menu_navigation(InputNavigation context) { atomic_store(&desktop_menu_navigation,context); }
+static atomic_bool campaign_back;
+void input_menu_navigation(InputNavigation context) {
+    atomic_store(&desktop_menu_navigation,context);atomic_store(&campaign_back,false);
+}
+bool campaign_back_requested(void) { return atomic_exchange(&campaign_back,false); }
 bool input_menu_navigation_active(void) { return atomic_load(&desktop_menu_navigation)!=INPUT_NAV_COMBAT; }
 int input_menu_back_binding(void) {
     // Sparring uses B to undo equipment/Ready and Start to leave the scene.
@@ -23,6 +27,12 @@ bool lan_menu_capture(void) { return atomic_load(&modal); }
 unsigned lan_menu_requests(void) { return atomic_exchange(&requests,0); }
 static void request(unsigned action) { atomic_fetch_or(&requests,action); }
 bool lan_menu_handle_event(const SDL_Event *e) {
+    if(!lan_menu_capture() && atomic_load(&desktop_menu_navigation)==INPUT_NAV_CAMPAIGN &&
+       (e->type==SDL_EVENT_KEY_DOWN || e->type==SDL_EVENT_KEY_UP) &&
+       e->key.scancode==SDL_SCANCODE_ESCAPE && bind_key_unassigned(SDL_SCANCODE_ESCAPE)) {
+        if(e->type==SDL_EVENT_KEY_DOWN && !e->key.repeat)atomic_store(&campaign_back,true);
+        return true;
+    }
     if(!lan_menu_capture())return false;
     if(e->type==SDL_EVENT_KEY_DOWN || e->type==SDL_EVENT_GAMEPAD_BUTTON_DOWN || e->type==SDL_EVENT_GAMEPAD_AXIS_MOTION)
         menu_mouse_event(e); // keyboard/pad focus clears pointer hover like other menus

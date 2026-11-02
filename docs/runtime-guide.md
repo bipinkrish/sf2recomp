@@ -31,6 +31,7 @@ keyboard_prompts = false
 
 [storage]
 save_directory = save
+use_completed_save = false
 
 [gameplay]
 unlock_all_sparring_characters = true
@@ -91,6 +92,74 @@ Sparring characters are all unlocked by default, independently of campaign saves
 Set `[gameplay] unlock_all_sparring_characters = false` to restore the original
 save-based unlocks, then restart. This option changes only the sparring roster in
 memory; it does not add unlocks to your save or change Story progression.
+
+Shadow and Titan are also available by default. Control them separately in the
+INI, then restart:
+
+```ini
+[gameplay]
+enable_shadow_in_sparring = true
+enable_titan_in_sparring = true
+```
+
+Shadow uses the equipment currently equipped in the active campaign profile,
+including armor, helmet, ranged weapon and magic. Without a started campaign,
+he uses the unequipped starter body and fists, with no ranged weapon or magic.
+His loadout is refreshed for each fight; Sparring does not equip or modify items
+in the campaign. Shadow and Titan do not use the weapon selection carousel.
+
+Titan uses his giant sword, extendable arm on the ranged input, and Mind Throw
+on the magic input. Headbutts, stomps, sword attacks and throws use the normal
+attack buttons and directional combinations. His shield is automatic; he has no
+separate active boss-power button. The versus screen identifies Mind Throw and
+the automatic shield. His real magic uses the normal magic control on desktop,
+gamepad and mobile.
+
+Sparring remains first to two wins. Titan uses the same combined loadout in every
+round, choosing the strongest values from his three campaign phases: 30% sword
+lifesteal, 22% harpoon lifesteal, 50% magic Enfeeble and Weakness, 70% head-hit
+magic recharge, helmet regeneration with a 1.375 chance factor, a three-second
+shield cooldown, 15% Enlightenment restoring 15% health, and 50% Ricochet.
+These are configured perk chances; enchantment resistance and native trigger
+conditions still apply. The campaign values and selected values are tabulated
+beside the Titan template in `runtime/hle/sparring_roster_hooks.inc`.
+
+The roster keeps its original portrait sizes and 11 columns. Three rows remain
+visible. Move down from the third row to bring the extra row into view, and move
+back up to reveal the first row. Keyboard and gamepad navigation skip unused
+positions in the final row. Mouse and touch select only visible cells.
+The mouse wheel and a vertical swipe over the roster also reveal or hide the
+extra row. A swipe does not confirm the fighter underneath your finger.
+
+Both LAN players must use the same values for these roster options. The LAN
+handshake rejects mismatched rosters before selection indices are exchanged.
+Shadow's campaign loadout is local to each installation. Use matching equipped
+gear on both machines for LAN matches involving Shadow.
+
+## Boss refights and the completed save
+
+Select a defeated boss on the Story map, then select **Refight** or press the
+mapped **X** button. This works for Lynx, Hermit, Butcher, Wasp, Widow, Shogun and
+Titan, including the six boss encounters after Gates of Shadows. Gates of
+Shadows also has Refight, which starts its full boss sequence. The completed tag
+remains visible. The movie button keeps its **A** shortcut. Refight starts the boss's final fight, skipping the bodyguards.
+Winning, losing or quitting a refight grants no money, experience, items,
+achievements or campaign progress, and does not save.
+
+Android APKs and native app packages include the completed campaign snapshot.
+To load it, set this option in `sf2recomp.ini` and restart:
+
+```ini
+[storage]
+use_completed_save = true
+```
+
+The default is `false`. The first enabled launch copies the bundled snapshot to
+`completed/save_0` inside your configured `save_directory`. Later launches and
+package updates preserve that separate profile, including equipment changes.
+Your normal save stays in `save_0`. Set the option back to `false` and restart to
+return to it. The bundled template stays in `profiles/completed` beside the app's
+other resources. Boss refights leave the selected profile unchanged.
 
 ## Developer console and overlays
 

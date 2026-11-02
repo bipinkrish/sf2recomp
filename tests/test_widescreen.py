@@ -313,3 +313,46 @@ int main(int argc, char **argv) {
                     wide = root / "wide.ini"
                     wide.write_text(f"[video]\naspect_ratio = {ratio}\n")
                     subprocess.run([str(root / "test"), str(wide), *configs, str(native), str(initial)], check=True)
+
+    def test_sparring_covers_only_scene_background_without_accumulating_scale(self):
+        source=r'''
+#include <assert.h>
+#include "hle.h"
+#include "settings.h"
+#include "hle/widescreen_hooks.inc"
+static unsigned scaled;
+static uint64_t names[4];
+void guest_call(Cpu *c,uint64_t pc) {
+    switch(pc) {
+    case 0x700121e6b0ull:c->x[0]=1;return;
+    case 0x70015d8be0ull:c->x[0]=2;return;
+    case 0x700122e460ull:c->x[0]=names[c->x[0]];return;
+    case 0x70015d9e00ull:assert(c->x[0]==2);c->x[0]=2;return;
+    case 0x70015da1f0ull:c->x[0]=c->x[1]?3:1;return;
+    case 0x70015d8ae0ull: {
+        float x,y,z;memcpy(&x,&c->v[0],4);memcpy(&y,&c->v[1],4);memcpy(&z,&c->v[2],4);
+        assert(c->x[0]==3 && x==2424.0f/1920 && y==1 && z==1);++scaled;return;
+    }
+    default:assert(!"unexpected guest call");
+    }
+}
+int main(void) {
+    const char *labels[]={"","CharacterSelectModule","[PvpScene]","Background"};
+    for(unsigned i=1;i<4;++i) {
+        names[i]=(uintptr_t)calloc(1,128);ST32(names[i]+0x10,strlen(labels[i]));
+        for(unsigned j=0;labels[i][j];++j)ST16(names[i]+0x14+j*2,labels[i][j]);
+    }
+    Cpu cpu;memset(&cpu,0xa5,sizeof cpu);Cpu before=cpu;
+    g_settings.aspect=ASPECT_ORIGINAL;
+    widescreen_sparring_background(&cpu,99);assert(!scaled);
+    g_settings.aspect=ASPECT_NATIVE;g_settings.native_width=2424;g_settings.native_height=1080;
+    for(unsigned i=0;i<2;++i) {
+        widescreen_sparring_background(&cpu,99);assert(scaled==i+1);
+        assert(!memcmp(&cpu,&before,sizeof cpu));
+    }
+}
+'''
+        with tempfile.TemporaryDirectory(prefix="sf2-sparring-background-") as d:
+            root=Path(d);(root/"test.c").write_text(source)
+            compile_harness(root/"test.c",root/"test")
+            subprocess.run([str(root/"test")],check=True,timeout=5)

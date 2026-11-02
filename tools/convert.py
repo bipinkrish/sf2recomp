@@ -141,6 +141,7 @@ def package_game(game, output, executable, sdl_dir, ffmpeg_dir, target="linux"):
     config = output / "sf2recomp.ini"
     if not config.exists():
         shutil.copy2(ROOT / "sf2recomp.ini", config)
+    shutil.copytree(ROOT / "profiles/completed", output / "profiles/completed", dirs_exist_ok=True)
     notices = output / "licenses"
     notices.mkdir(exist_ok=True)
     for name, path in {

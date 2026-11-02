@@ -38,7 +38,7 @@ int bind_label_family(void);                   // the connected controller's fam
 int input_family_of_type(int sdl_gamepad_type); // runtime/hle/input.c: 0 Nintendo, 1 Xbox (or labelled like one), 2 PS
 int input_menu_family(uint32_t sdl_joystick_id); // runtime/hle/input.c: our menus' layout for that pad (0: any)
 bool input_any_gamepad_connected(void);
-typedef enum { INPUT_NAV_COMBAT, INPUT_NAV_MENU, INPUT_NAV_SPARRING } InputNavigation;
+typedef enum { INPUT_NAV_COMBAT, INPUT_NAV_MENU, INPUT_NAV_SPARRING, INPUT_NAV_CAMPAIGN } InputNavigation;
 bool input_menu_navigation_active(void);
 int input_menu_back_binding(void);
 void input_menu_navigation(InputNavigation context); // guest publishes context; SDL reads atomically

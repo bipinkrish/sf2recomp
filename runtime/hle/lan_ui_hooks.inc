@@ -60,20 +60,23 @@ static uint64_t lan_new(Cpu *c,const char *name) {
 static void lan_capture_menu_item(Cpu *c,uint64_t transform) {
     (void)c;lan_menu_prototype=transform;
 }
-static void lan_menu_row(Cpu *c,unsigned index,uint64_t row,const char *text,int size) {
-    if(!lan_menu_prototype || !row)return;
-    uint64_t type=lan_type(c,"Nekki.SF2.GUI.GeneralMenu.MenuItemButton, Assembly-CSharp");
+static void lan_keep_menu_template(Cpu *c) {
+    if(!lan_menu_prototype)return;
     if(!lan_menu_template) {
+        uint64_t type=lan_type(c,"Nekki.SF2.GUI.GeneralMenu.MenuItemButton, Assembly-CSharp");
         uint64_t source=type?guest_invoke2(c,0x700121e790ull,lan_menu_prototype,type):0;
         if(!source)return;
-        // The main-menu scene is destroyed when Sparring loads. Keep one
-        // inactive template so errors/reconnect dialogs can still use its art.
+        // Capture while the main menu still owns a live source. A disconnect
+        // can be the first dialog, after Unity has destroyed that scene.
         lan_menu_template=guest_invoke4(c,0x70012333a0ull,0,source,0,0);
         if(!lan_menu_template)return;
         uint64_t object=guest_invoke2(c,0x700121e720ull,lan_menu_template,0);
         guest_invoke2(c,0x7001226480ull,object,0);
         guest_invoke2(c,0x70012339d0ull,0,object);
     }
+}
+static void lan_menu_row(Cpu *c,unsigned index,uint64_t row,const char *text,int size) {
+    if(!lan_menu_template || !row)return;
     uint64_t prototype=lan_menu_template;
     uint64_t parent=guest_invoke2(c,0x700121e6b0ull,row,0);
     uint64_t item=guest_invoke4(c,0x70012333a0ull,0,prototype,parent,0);
@@ -176,7 +179,7 @@ static bool lan_show(Cpu *c,unsigned phase,const char *title,const char *const l
         unsigned n=rows?LD32(rows+0x18):0;
         for(unsigned i=0;items && i<n && i<count;++i) {
             uint64_t row=LD64(items+0x20+i*8),label=row?LD64(row+0x18):0;
-            if(commands[i] && lan_menu_prototype) {
+            if(commands[i] && lan_menu_template) {
                 lan_menu_row(c,i,row,labels[i],commands[i]>=LAN_CHOICE_HOST_BASE?48:80);
             } else if(label) {
                 // ScrollDialog rows normally treat Text as a localization key.
@@ -232,6 +235,7 @@ static bool lan_submenu(Cpu *c,unsigned phase,const char *first,const char *seco
     return true;
 }
 static void lan_mode_dialog(Cpu *c) {
+    lan_keep_menu_template(c);
     if(lan_submenu(c,LAN_UI_MODE,"NORMAL","LAN MULTIPLAYER",LAN_CHOICE_NORMAL,LAN_CHOICE_LAN))return;
     const char *labels[]={"NORMAL","LAN MULTIPLAYER"};unsigned cmds[]={LAN_CHOICE_NORMAL,LAN_CHOICE_LAN};
     lan_show(c,LAN_UI_MODE,"SPARRING",labels,cmds,2);
@@ -255,6 +259,14 @@ static void lan_browser(Cpu *c) {
 static void lan_wait_dialog(Cpu *c,const char *message) {
     const char *labels[]={message};unsigned cmds[]={0};
     lan_show(c,LAN_UI_WAIT,"LAN MULTIPLAYER",labels,cmds,1);
+}
+static void lan_host_wait_dialog(Cpu *c) {
+    char addresses[8][16],message[320];unsigned count=lan_local_addresses(addresses);
+    size_t used=snprintf(message,sizeof message,"Waiting for player 2...\nHost IP%s: ",count>1?"s":"");
+    if(!count)snprintf(message+used,sizeof message-used,"unavailable. Check Wi-Fi.");
+    for(unsigned i=0;i<count;++i)
+        used+=snprintf(message+used,sizeof message-used,"%s%s",i?", ":"",addresses[i]);
+    lan_wait_dialog(c,message);
 }
 static void lan_error_dialog(Cpu *c) {
     const char *labels[]={lan_gui_error(),"RETURN TO MENU"};unsigned cmds[]={0,LAN_CHOICE_LEAVE};
@@ -382,7 +394,8 @@ static bool sparring_contains(Cpu *c,uint64_t rect,uint64_t camera,const MenuMou
 static void sparring_mouse_frame(Cpu *c,const MenuMouse *mouse) {
     if(!sparring_module || lan_dialog || developer_console_open()) { sparring_pressed=-1;return; }
     if(mouse->x<0 || mouse->y<0) { sparring_pressed=-1;return; }
-    if(!(mouse->pressed&1) && !(mouse->released&1))return;
+    // Swipes need held/motion frames; wheel events have no button edges.
+    if(!(mouse->held&1) && !(mouse->pressed&1) && !(mouse->released&1) && !mouse->scroll_y)return;
     uint64_t manager=guest_invoke2(c,0x7000cede90ull,0,0);
     if(manager && LD64(manager+0x40)) { sparring_pressed=-1;return; }
     uint64_t module=sparring_module,table=LD64(module+0x20),container=table?LD64(table+0x28):0;
@@ -391,9 +404,14 @@ static void sparring_mouse_frame(Cpu *c,const MenuMouse *mouse) {
     uint64_t type=lan_type(c,"UnityEngine.Canvas, UnityEngine");
     uint64_t canvas=type?guest_invoke2(c,0x700121ead0ull,container,type):0;
     uint64_t camera=canvas?guest_invoke2(c,0x7000af7250ull,canvas,0):0;
+    if(!sparring_kind && table==sparring_view.table && sparring_roster_scroll_input(c,table,mouse,
+            sparring_contains(c,LD64(table+0x30),camera,mouse))) {
+        sparring_pressed=-1;return;
+    }
     unsigned children=guest_invoke2(c,0x70015d9e00ull,container,0);
     int hit=-1;
     for(unsigned i=0;i<count && i<children;++i) {
+        if(!sparring_kind && !sparring_roster_cell_visible(table,i))continue;
         uint64_t cell=guest_invoke2(c,0x70015da1f0ull,container,i);
         if(cell && sparring_contains(c,cell,camera,mouse)) { hit=i;break; }
     }
@@ -413,6 +431,14 @@ static void sparring_mouse_frame(Cpu *c,const MenuMouse *mouse) {
 static void lan_ui_pump(Cpu *c) {
     if(lan_ui_pumping)return;
     lan_ui_pumping=true;
+    if(campaign_back_requested()) {
+        uint64_t dialogs=guest_invoke2(c,0x7000cede90ull,0,0);
+        uint64_t back=guest_invoke2(c,0x7000f0cce0ull,0,0);
+        uint64_t controllers=back?LD64(back+0x18):0;
+        if((dialogs && LD64(dialogs+0x40)) || (controllers && LD32(controllers+0x18)))
+            guest_invoke2(c,0x7000f0cf40ull,back,0);
+        else lan_go(c,7);
+    }
     lan_update_back_prompt(c);
     lan_dialog_input(c);
     unsigned action=lan_action;lan_action=0;
@@ -455,9 +481,14 @@ static void lan_ui_pump(Cpu *c) {
         if(status==LAN_GUI_CONNECTED) {
             LanMenuEvent event;
             unsigned kind=lan_end_screen?2:lan_module_kind;
-            if((lan_active_module || lan_end_screen) && !lan_match_starting)while(lan_gui_pop_menu(&event,kind)) {
+            uint64_t module=lan_active_module;
+            if((module || lan_end_screen) && !lan_match_starting)while(lan_gui_pop_menu(&event,kind)) {
                 if(kind==2) { lan_end_screen=0;lan_active_module=0;lan_go(c,8);break; }
-                if(event.input_type==3) { sparring_select_cell(c,lan_active_module,kind,event.player,event.event);continue; }
+                if(event.input_type==3) {
+                    sparring_select_cell(c,module,kind,event.player,event.event);
+                    if(lan_active_module!=module || lan_module_kind!=kind)break;
+                    continue;
+                }
                 uint64_t input=guest_invoke2(c,event.player?0x7000d94e40ull:0x7000d94dd0ull,0,0);
                 uint32_t id=input?LD32(input+0x18):event.player;
                 uint64_t method=kind? (event.down?0x7000d98c30ull:0x7000d98de0ull) :
@@ -466,6 +497,7 @@ static void lan_ui_pump(Cpu *c) {
                 lan_native_call=true;
                 guest_invoke4(c,method,lan_active_module,event.input_type,id,event.event);
                 lan_native_call=false;
+                if(lan_active_module!=module || lan_module_kind!=kind)break;
             }
             if(lan_pvp_scene && lan_gui_take_match())lan_begin_native_match(c);
         }
@@ -475,7 +507,9 @@ static void lan_ui_pump(Cpu *c) {
 static int lan_ui_hook(Cpu *c,uint64_t site) {
     if(site==0x7000f48ef0ull) {
         sparring_module=0;sparring_pressed=-1;
-        input_menu_navigation(c->x[1]==5?INPUT_NAV_COMBAT:c->x[1]==8?INPUT_NAV_SPARRING:INPUT_NAV_MENU);
+        unsigned screen=c->x[1];
+        input_menu_navigation(screen==5?INPUT_NAV_COMBAT:screen==8?INPUT_NAV_SPARRING:
+            (screen==2 || screen==3 || screen==4 || screen==6)?INPUT_NAV_CAMPAIGN:INPUT_NAV_MENU);
     }
     if(site==0x7000e5b660ull || site==0x7000e5b9d0ull) { input_menu_navigation(true);return -1; }
     if(site==0x7000e5b8f0ull) { input_menu_navigation(false);return -1; }
@@ -510,6 +544,9 @@ static int lan_ui_hook(Cpu *c,uint64_t site) {
         lan_dialog=0;lan_menu_publish(false);lan_action=LAN_CHOICE_BACK;return -1;
     }
     if(!lan_gui_active())return -1;
+    // ConfirmItem inlines ControlCount instead of using HaveSecondPlayer.
+    // A LAN session has two players even with one local input device.
+    if(site==0x7000d98aa8ull || site==0x7000d98b48ull) { c->x[0]=2;return 0; }
     if(site==0x7000cf1360ull && (c->x[1]==0 || c->x[1]==13) && c->x[2]) {
         char alias[64];uint64_t info=c->x[2];
         if(dev_read_string(LD64(info+0x20),alias,sizeof alias) && !strcmp(alias,"PVPTutorial2")) {
@@ -529,7 +566,7 @@ static int lan_ui_hook(Cpu *c,uint64_t site) {
     if(site==0x7000d95000ull && !lan_native_call) {
         lan_pvp_scene=c->x[0];lan_native_call=true;
         guest_invoke2(c,site,lan_pvp_scene,c->x[1]);lan_native_call=false;
-        if(lan_gui_status()!=LAN_GUI_CONNECTED)lan_wait_dialog(c,"Waiting for player 2 to join this host...");
+        if(lan_gui_status()!=LAN_GUI_CONNECTED)lan_host_wait_dialog(c);
         return 1;
     }
     if(site==0x7000d961f0ull && !lan_match_starting) {

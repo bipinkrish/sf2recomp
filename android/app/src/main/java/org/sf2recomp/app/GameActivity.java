@@ -14,6 +14,13 @@ public final class GameActivity extends SDLActivity {
 
     @Override protected String[] getLibraries() { return new String[]{"SDL3", "main"}; }
 
+    @Override public void loadLibraries() {
+        long started = android.os.SystemClock.elapsedRealtime();
+        super.loadLibraries();
+        android.util.Log.i("ShadowFight2", "[startup] native libraries loaded "
+            + (android.os.SystemClock.elapsedRealtime() - started) + " ms");
+    }
+
     @Override protected String[] getArguments() {
         return new String[]{game.getAbsolutePath()};
     }

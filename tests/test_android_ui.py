@@ -19,11 +19,13 @@ static uint64_t mobile,actions,boss,fight,raid,original_raid,magic,missile,punch
 static unsigned char cloned_button[400],ring_image[256],icon_image[256];
 static unsigned destroys,icon_tints,vertices,triangles;
 static bool icon_ready,icon_awake,ring_visible;
+static uint64_t assigned_input;
 
 bool movie_playback_completed(void) { return completed; }
 bool movie_watched_to_end(void) { return watched; }
 void guest_call(Cpu *c,uint64_t pc) {
     switch(pc) {
+    case 0x7000c92820ull:assert(c->x[1]==0);c->x[0]=assigned_input;return;
     case 0x70015bca30ull:++completions;ST8(c->x[0]+0x28,0);return;
     case 0x7000c7e300ull:c->x[0]=mobile;return;
     case 0x7000c91c70ull:c->x[0]=fight;return;
@@ -81,6 +83,17 @@ void guest_call(Cpu *c,uint64_t pc) {
     }
 }
 int main(void) {
+    unsigned char control[32]={0},input_data[32]={0};Cpu routing={0};
+    assigned_input=(uintptr_t)input_data;
+    for(unsigned type=0;type<=2;type+=2) {
+        ST32(input_data+0x14,type);ST32(input_data+0x18,7);
+        routing.x[0]=(uintptr_t)control;routing.x[19]=999;Cpu before=routing;
+        assert(platform_ui_hook(&routing,0x7000c970b0ull)==1 && routing.x[0]==type);
+        before.x[0]=type;assert(!memcmp(&routing,&before,sizeof routing));
+        assert(LD32(control+0x14)==7);
+    }
+    assigned_input=0;routing.x[0]=(uintptr_t)control;
+    assert(platform_ui_hook(&routing,0x7000c970b0ull)==1 && routing.x[0]==0);
     unsigned char controller[128]={0};Cpu cpu={0};cpu.x[0]=(uintptr_t)controller;
     ST8(controller+0x28,1);Cpu saved=cpu;
     assert(platform_ui_hook(&cpu,0x70015bc860ull)==0 && !completions);

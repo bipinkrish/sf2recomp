@@ -20,6 +20,8 @@ static bool interrupted(void) { return WSAGetLastError()==WSAEINTR; }
 #else
 #include <arpa/inet.h>
 #include <fcntl.h>
+#include <ifaddrs.h>
+#include <net/if.h>
 #include <netinet/tcp.h>
 #include <sys/select.h>
 #include <sys/socket.h>
@@ -33,11 +35,43 @@ static bool interrupted(void) { return errno==EINTR; }
 
 enum { MAGIC=0x5346324c, VERSION=1, HELLO=1, CONFIG=2, FRAME=3, END=4, READY=5, HEADER=32, MAX_PAYLOAD=LAN_MAX_EVENTS*2 };
 // Change on incompatible simulation/input/initialization/hash-policy changes.
-#define SIMULATION_ID UINT64_C(0x5346320100030004)
+// Roster indices depend on both INI switches. Reject unlike rosters before
+// exchanging menu indices, including with older binaries lacking these cells.
+#define SIMULATION_ID (UINT64_C(0x5346320100030007) | \
+    ((uint64_t)g_settings.enable_shadow_in_sparring << 12) | \
+    ((uint64_t)g_settings.enable_titan_in_sparring << 13))
 static LanSocket peer=BAD_SOCKET, listener=BAD_SOCKET;
 static bool enabled;
 static unsigned player;
 static LanConfig config;
+unsigned lan_local_addresses(char out[8][16]) {
+    unsigned count=0;
+#ifdef _WIN32
+    char hostname[256];struct addrinfo hints={0},*list=NULL;
+    hints.ai_family=AF_INET;
+    if(gethostname(hostname,sizeof hostname) || getaddrinfo(hostname,NULL,&hints,&list))return 0;
+    for(struct addrinfo *item=list;item && count<8;item=item->ai_next) {
+        struct sockaddr_in *address=(struct sockaddr_in *)item->ai_addr;
+#else
+    struct ifaddrs *list=NULL;
+    if(getifaddrs(&list))return 0;
+    for(struct ifaddrs *item=list;item && count<8;item=item->ifa_next) {
+        if(!item->ifa_addr || item->ifa_addr->sa_family!=AF_INET || !(item->ifa_flags&IFF_UP))continue;
+        struct sockaddr_in *address=(struct sockaddr_in *)item->ifa_addr;
+#endif
+        uint32_t ip=ntohl(address->sin_addr.s_addr);
+        if(!ip || (ip>>24)==127)continue;
+        char text[16];if(!inet_ntop(AF_INET,&address->sin_addr,text,sizeof text))continue;
+        unsigned i=0;while(i<count && strcmp(out[i],text))++i;
+        if(i==count)strcpy(out[count++],text);
+    }
+#ifdef _WIN32
+    freeaddrinfo(list);
+#else
+    freeifaddrs(list);
+#endif
+    return count;
+}
 static uint32_t next_tick, remote_next_tick;
 static uint64_t history_hash[LAN_MAX_DELAY+1];
 static uint32_t history_tick[LAN_MAX_DELAY+1];

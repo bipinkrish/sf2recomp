@@ -40,6 +40,9 @@ Settings g_settings = {
     .experimental_keyboard_prompts = false,
     .network_enabled = false,
     .unlock_all_sparring_characters = true,
+    .enable_shadow_in_sparring = true,
+    .enable_titan_in_sparring = true,
+    .use_completed_save = false,
     .allow_sparring_lan_multiplayer = true,
     .show_intro = true,
     .ai_enabled = true,
@@ -157,6 +160,8 @@ static const ConfigOption config_options[] = {
     {"general", "language", CONFIG_LANGUAGE, &g_settings.language},
     {"network", "enabled", CONFIG_BOOL, &g_settings.network_enabled},
     {"gameplay", "unlock_all_sparring_characters", CONFIG_BOOL, &g_settings.unlock_all_sparring_characters},
+    {"gameplay", "enable_shadow_in_sparring", CONFIG_BOOL, &g_settings.enable_shadow_in_sparring},
+    {"gameplay", "enable_titan_in_sparring", CONFIG_BOOL, &g_settings.enable_titan_in_sparring},
     {"gameplay", "allow_sparring_lan_multiplayer", CONFIG_BOOL, &g_settings.allow_sparring_lan_multiplayer},
     {"gameplay", "unlock_all_videos", CONFIG_BOOL, &g_settings.unlock_all_videos},
     {"gameplay", "show_intro", CONFIG_BOOL, &g_settings.show_intro},
@@ -182,6 +187,7 @@ static const ConfigOption config_options[] = {
     {"input", "prompts", CONFIG_PROMPTS, &g_settings.prompts},
     {"input", "player_setup", CONFIG_PLAYER_SETUP, &g_settings.player_setup},
     {"experimental", "keyboard_prompts", CONFIG_BOOL, &g_settings.experimental_keyboard_prompts},
+    {"storage", "use_completed_save", CONFIG_BOOL, &g_settings.use_completed_save},
     {"storage", "save_directory", CONFIG_PATH, g_settings.save_directory, sizeof g_settings.save_directory},
 };
 

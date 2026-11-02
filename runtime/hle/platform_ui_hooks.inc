@@ -220,6 +220,29 @@ static void hide_menu_footer(Cpu *c, uint64_t list) {
     }
 }
 
+#ifdef __ANDROID__
+static void mobile_tutorial_menu_target(Cpu *c,uint64_t object) {
+    // The tutorial still owns this button's native click listener.
+    // Keep its hit area on a visible navigation control after hiding
+    // the footer, so the tutorial blocker cannot strand the player.
+    uint64_t main=guest_invoke2(c,0x7000e27660ull,0,0);
+    uint64_t navigation=main?LD64(main+0x108):0;
+    uint64_t header=navigation?LD64(navigation+0x48):0;
+    if(header) {
+        uint64_t rect=guest_invoke2(c,0x7001226320ull,object,0);
+        uint64_t parent=guest_invoke2(c,0x700121e6b0ull,header,0);
+        hide_ui_module(c,rect);
+        guest_invoke4(c,0x70015d8ec0ull,rect,parent,0,0);
+        guest_set_vec2(c,0x700123a050ull,rect,0,0);
+        guest_set_vec2(c,0x700123a250ull,rect,1,1);
+        guest_set_vec2(c,0x700123a9d0ull,rect,.5f,.5f);
+        guest_set_vec2(c,0x700123a550ull,rect,0,0);
+        guest_set_vec2(c,0x700123a7d0ull,rect,0,0);
+        LOG("[touch] tutorial menu target follows scene header\n");
+    }
+}
+#endif
+
 static int platform_ui_hook(Cpu *c, uint64_t site) {
     if (site == 0x7000cdc110ull) { // HintList.Init
         hide_menu_footer(c, c->x[0]);
@@ -227,6 +250,11 @@ static int platform_ui_hook(Cpu *c, uint64_t site) {
     }
 #ifdef __ANDROID__
     switch (site) {
+    case 0x7000f7cdc0ull: { // TutorialExtension.ActivateTutorialControl
+        if(guest_object_named(c,c->x[1],"HintGroup_Common_Menu"))
+            mobile_tutorial_menu_target(c,c->x[1]);
+        return 0;
+    }
     case 0x700011efb0ull:return mobile_boss_mesh(c);
     case 0x7000c90a10ull: { // GameController.Update (Refresh is inlined by IL2CPP)
         if(mobile_boss_owner!=c->x[0]) {
@@ -271,9 +299,16 @@ static int platform_ui_hook(Cpu *c, uint64_t site) {
     case 0x7000c8f830ull: // InitTouchControl: ActionButtons.SetVisible
         c->x[1] = 1; return 0;
     case 0x7000c970b0ull: // TouchControlData.InputType
-        // Touch controls drive the same local player as guest gamepad index 0.
-        // Keep InputSelector's existing solo/Sparring/LAN team assignment.
-        c->x[0] = 2; return 1;
+        // Sparring assigns a gamepad; Dojo can use the default touch team. Follow the
+        // current player's native assignment, including its control index.
+        {
+            uint64_t data=guest_invoke2(c,0x7000c92820ull,0,0);
+            if(data) {
+                ST32(c->x[0]+0x14,LD32(data+0x18));
+                c->x[0]=LD32(data+0x14);
+            } else c->x[0]=0;
+            return 1;
+        }
     case 0x70012283e0ull: c->x[0] = android_touch_count; return 1;
     case 0x70012285c0ull: c->x[0] = 1; return 1;
     case 0x7001228450ull: { // Input.GetTouch returns a struct through x8

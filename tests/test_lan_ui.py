@@ -19,12 +19,13 @@ bool nvn_texture_region_color(const NvnTexture*t,uint32_t x,uint32_t y,uint32_t 
 void *hle_alloc(uint64_t n) { return calloc(1,n); }
 static uint64_t prototype,selection_table,selected_rect,main_section,submenu_clone;
 static unsigned moved_player,confirmed_id;
-static bool dialog_blocks;
+static float pointer_y=270;
+static bool dialog_blocks,source_destroyed;
 static uint64_t shown_info,shown_dialog;static unsigned original_entries,closed,back_prompts;
 void guest_call(Cpu *c,uint64_t pc) {
     switch(pc) {
     case 0x70005d9e60ull:return;
-    case 0x700121e790ull:c->x[0]=prototype;return;
+    case 0x700121e790ull:assert(!source_destroyed);c->x[0]=prototype;return;
     case 0x700121e6b0ull:case 0x700121e720ull:case 0x7001226480ull:case 0x70012339d0ull:return;
     case 0x70015d8be0ull:c->x[0]=1234;return;
     case 0x7001233760ull:return;
@@ -63,7 +64,7 @@ void guest_call(Cpu *c,uint64_t pc) {
     case 0x7000d982c0ull:c->x[0]=1;return;
     case 0x7000af9300ull:
         assert(c->x[0]==0 && c->x[2]==123);bool inside=c->x[1]==selected_rect;
-        { float x,y;memcpy(&x,&c->v[0],4);memcpy(&y,&c->v[1],4);assert(x==480 && y==270); }
+        { float x,y;memcpy(&x,&c->v[0],4);memcpy(&y,&c->v[1],4);assert(x==480 && y==pointer_y); }
         memset(c,0x5a,sizeof *c);c->x[0]=inside;return;
     case GUEST_STRING_ALLOC:c->x[0]=(uintptr_t)calloc(1,32+c->x[1]*2);return;
     case 0x70008ea5c0ull:c->x[0]=c->x[1];return;
@@ -79,7 +80,7 @@ void guest_call(Cpu *c,uint64_t pc) {
               ST64(row+0x18,label);ST64(items+0x20+i*8,row); } }
         c->x[0]=shown_dialog;return;
     case 0x7000e73b90ull:assert(c->x[1]==1);ST32(c->x[0]+0x1cc,1);return;
-    case 0x7000e72180ull:assert(c->x[1]==80);return;
+    case 0x7000e72180ull:assert(c->x[1]==80 || c->x[1]==55);return;
     case 0x70011cb2f0ull:assert(c->x[1]==1);return;
     case 0x70011cba70ull:assert(c->x[1]==0);return;
     case 0x70011cbb80ull:
@@ -149,7 +150,13 @@ int main(void) {
     click(&cpu,0);assert(original_entries==1 && closed>=2 && !lan_enabled() && back_prompts==3);
     // Reuse main-menu components and keep pointer hover, exit, click and
     // keyboard focus on the same selected choice without firing source listeners.
-    prototype=(uintptr_t)calloc(1,128);lan_menu_prototype=prototype;lan_mode_dialog(&cpu);
+    prototype=(uintptr_t)calloc(1,128);lan_capture_menu_item(&cpu,prototype);
+    lan_mode_dialog(&cpu);
+    assert(lan_menu_template && !memcmp(&cpu,&saved,sizeof cpu));
+    // The first error dialog can open after the source scene is gone.
+    source_destroyed=true;lan_menu_prototype=0x3000000001ull;
+    lan_error_dialog(&cpu);assert(lan_menu_buttons[1]);
+    lan_mode_dialog(&cpu);
     assert(lan_menu_buttons[0] && lan_menu_buttons[1]);
     assert(LD8(lan_menu_buttons[0]+0x70)==1 && !LD8(lan_menu_buttons[1]+0x70));
     cpu=saved;cpu.x[0]=lan_menu_buttons[1];assert(lan_ui_hook(&cpu,0x7000e6fd20ull)==1);
@@ -182,6 +189,19 @@ int main(void) {
     moved_player=99;dialog_blocks=true;sparring_mouse_frame(&cpu,&mouse);assert(moved_player==99);
     dialog_blocks=false;mouse.pressed=0;mouse.released=1;sparring_pressed=-1;
     sparring_mouse_frame(&cpu,&mouse);assert(moved_player==99); // release without a matching press
+    // Exercise the actual frame dispatcher, not just the swipe helper. Held
+    // motion and wheel frames have no pressed/released edges.
+    sparring_view.table=selection_table;sparring_view.content=789;
+    ST64(selection_table+0x30,selected_rect);
+    mouse=(MenuMouse){.x=480,.y=270,.pressed=1,.held=1};
+    sparring_mouse_frame(&cpu,&mouse);assert(sparring_view.pressed);
+    mouse.pressed=0;mouse.y=pointer_y=310;
+    sparring_mouse_frame(&cpu,&mouse);assert(sparring_view.first_row==1 && sparring_view.dragged);
+    mouse.held=0;mouse.released=1;
+    sparring_mouse_frame(&cpu,&mouse);assert(!sparring_view.pressed && moved_player==99);
+    mouse.released=0;mouse.scroll_y=1;
+    sparring_mouse_frame(&cpu,&mouse);assert(sparring_view.first_row==0);
+    reset_sparring_roster();pointer_y=270;
     cpu.x[0]=module;
     assert(lan_ui_hook(&cpu,0x7000d985a0ull)==-1 && !sparring_module);
     cpu.x[1]=8;assert(lan_ui_hook(&cpu,0x7000f48ef0ull)==-1);
@@ -212,6 +232,16 @@ int main(void) {
     lan_action=LAN_CHOICE_BACK;lan_ui_pump(&cpu);
     assert(!lan_menu_capture() && !lan_menu_root && !lan_main_root && lan_phase==LAN_UI_NONE);
     assert(LD64(section_items+0x20)==main_section && LD32(sections+0x18)==1);
+    // Physical device count must not bypass the remote player's readiness.
+    for(unsigned i=0;i<2;++i) {
+        uint64_t site=i?0x7000d98b48ull:0x7000d98aa8ull;
+        cpu=saved;cpu.x[0]=1;Cpu before=cpu;
+        assert(lan_ui_hook(&cpu,site)==-1 && !memcmp(&cpu,&before,sizeof cpu));
+        assert(lan_gui_host(0));
+        assert(lan_ui_hook(&cpu,site)==0 && cpu.x[0]==2);
+        cpu.x[0]=before.x[0];assert(!memcmp(&cpu,&before,sizeof cpu));
+        lan_gui_leave();
+    }
     g_settings.allow_sparring_lan_multiplayer=false;
     assert(lan_ui_hook(&cpu,0x7000e6ed90ull)==-1);
 }

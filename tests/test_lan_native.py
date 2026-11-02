@@ -30,6 +30,13 @@ static void pump_until_connected(bool host) {
     }
 }
 int main(int argc,char **argv) {
+    char addresses[8][16];unsigned address_count=lan_local_addresses(addresses);
+    assert(address_count<=8);
+    for(unsigned i=0;i<address_count;++i) {
+        unsigned a,b,c,d;assert(sscanf(addresses[i],"%u.%u.%u.%u",&a,&b,&c,&d)==4);
+        assert(a>0 && a!=127 && a<=255 && b<=255 && c<=255 && d<=255);
+        for(unsigned j=0;j<i;++j)assert(strcmp(addresses[i],addresses[j]));
+    }
     bool host=!strcmp(argv[1],"host");
     assert(host?lan_gui_host(atoi(argv[2])):lan_gui_search());
     pump_until_connected(host);

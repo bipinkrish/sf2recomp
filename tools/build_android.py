@@ -68,6 +68,7 @@ def prepare():
     config = config.replace("aspect_ratio = original", "aspect_ratio = native")
     config = config.replace("player_setup = keyboard_vs_controller", "player_setup = solo")
     (assets / "sf2recomp.ini").write_text(config)
+    shutil.copytree(ROOT / "profiles/completed", assets / "profiles/completed", dirs_exist_ok=True)
     licenses = assets / "licenses"
     licenses.mkdir(exist_ok=True)
     for name in ("LICENSE", "THIRD_PARTY_NOTICES"):
