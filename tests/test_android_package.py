@@ -12,6 +12,20 @@ import build_android
 
 
 class AndroidPackageTests(unittest.TestCase):
+    def test_rebuild_preserves_an_apk_being_installed(self):
+        with tempfile.TemporaryDirectory(prefix="sf2-apk-publish-") as temporary:
+            root=Path(temporary)
+            source, output=root/"new.apk", root/"output/game.apk"
+            source.write_bytes(b"old package")
+            build_android.publish_apk(source,output)
+            with output.open("rb") as installer:
+                self.assertEqual(installer.read(4),b"old ")
+                source.write_bytes(b"new and larger package")
+                build_android.publish_apk(source,output)
+                self.assertEqual(installer.read(),b"package")
+            self.assertEqual(output.read_bytes(),b"new and larger package")
+            self.assertFalse(output.with_suffix(".apk.tmp").exists())
+
     def test_local_game_package_cache_and_build_identity(self):
         with tempfile.TemporaryDirectory(prefix="sf2-android-package-") as temporary:
             root = Path(temporary)

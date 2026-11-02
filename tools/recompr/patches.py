@@ -13,8 +13,17 @@ PATCHES = {}
 # Replay's feature bit is 2u (runtime/replay.h). Keep the literal in generated
 # C so adding diagnostic hooks does not change the shared CPU ABI header.
 HOOKS = {
+    0x70015bc860: (0xa9be4ff4, (), "Android: complete managed movies when host playback ends"),
+    0x70015bbf50: (0xfc1e0fe8, (), "Android: record only completed host movies as watched"),
+    0x7001227dd0: (0xd100c3ff, (), "Android: primary touch held for legacy tutorial UI"),
+    0x7001227e40: (0xd100c3ff, (), "Android: primary touch press for legacy tutorial UI"),
+    0x7001227eb0: (0xd100c3ff, (), "Android: primary touch release for legacy tutorial UI"),
+    0x7001227f20: (0xd100c3ff, (), "Android: primary touch position for legacy tutorial UI"),
     0x7000cdc110: (0xa9bd57f6, (), "hide menu footers while retaining dialog and combat hints"),
     0x7000c95bf0: (0xa9be4ff4, (), "Android: hide duplicate Switch combat controls"),
+    0x7000c90a10: (0xf9402000, (), "Android: attach boss control after both HUD modules initialize"),
+    0x7000c8f630: (0xa9be4ff4, (), "Android: reset mobile boss control on HUD initialization"),
+    0x7000c90720: (0xa9be4ff4, (), "Android: release owned boss control with mobile HUD"),
     0x7000e1a610: (0xf81e0ff3, (), "Android: show the retained mobile controller"),
     0x7000c8f80c: (0x94165b1d, (), "Android: enable the mobile joystick container"),
     0x7000c8f830: (0xa8c567fa, (), "Android: enable the mobile action buttons"),
@@ -129,7 +138,7 @@ HOOKS = {
     0x7000fc9230: (0xd101c3ff, (), "configurable save-independent sparring character unlocks"),
     0x7000e6b820: (0xa9bd57f6, (), "native desktop exit menu item"),
     0x7000e6ef20: (0xf81e0ff3, (), "exit to desktop from the game menu"),
-    0x700011efb0: (0xf81c0ff7, (), "outline keyboard keys inside action buttons", "RT_HOOK_KEYBOARD_PROMPTS"),
+    0x700011efb0: (0xf81c0ff7, (), "native UI circle meshes", "(RT_HOOK_KEYBOARD_PROMPTS | RT_HOOK_MOBILE_UI)"),
     0x7000114f90: (0xf81e0ff3, (), "keep mapped labels in the replaced button theme", "RT_HOOK_KEYBOARD_PROMPTS"),
     0x7000ce0f40: (0xf81d0ff5, (), "mapped keyboard labels for graphic hints", "RT_HOOK_KEYBOARD_PROMPTS"),
     0x7000ce0dd0: (0xd65f03c0, (), "release destroyed hint state", "RT_HOOK_KEYBOARD_PROMPTS"),

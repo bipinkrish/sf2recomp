@@ -19,7 +19,8 @@ final class GameAssets {
             identity = new String(input.readAllBytes(), StandardCharsets.UTF_8).trim();
         }
         if (!identity.matches("[0-9a-f]{64}")) throw new IOException("Invalid game package identity");
-        File root = context.getFilesDir(), game = new File(root, "game");
+        File root = GameStorage.prepare(context.getFilesDir(), context.getExternalFilesDir(null));
+        File game = new File(context.getFilesDir(), "game");
         if (!GameBundle.isInstalled(game, identity, builds)) {
             try (InputStream input = assets.open("game.zip", AssetManager.ACCESS_STREAMING)) {
                 GameBundle.install(input, game, identity, builds);

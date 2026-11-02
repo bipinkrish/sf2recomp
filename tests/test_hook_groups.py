@@ -28,6 +28,7 @@ class HookGroupTests(unittest.TestCase):
         module.sym_names, module.eh_calls = {}, {}
         functions = []
         for name, metadata in (("optional", (words[0], (), "test", "RT_HOOK_KEYBOARD_PROMPTS")),
+                               ("shared", (words[0], (), "test", "(RT_HOOK_KEYBOARD_PROMPTS | RT_HOOK_MOBILE_UI)")),
                                ("mandatory", (words[0], (), "test")), ("original", None)):
             with patch.object(gen, "HOOKS", {base: metadata} if metadata else {}):
                 code = "\n".join(module.emit_function(base, base + 8, {base}, {}, {}))
@@ -61,6 +62,14 @@ int main(void) {
     rt_hook_features = 0;
     optional(&a);
     assert(a.x[0] == 100 && callbacks == 3);
+    shared(&a);
+    assert(a.x[0] == 101 && callbacks == 3); // neither feature: original
+    rt_hook_features = RT_HOOK_MOBILE_UI;
+    shared(&a);
+    assert(a.x[0] == 99 && callbacks == 4);
+    rt_hook_features = RT_HOOK_KEYBOARD_PROMPTS;
+    shared(&a);
+    assert(a.x[0] == 99 && callbacks == 5);
     return 0;
 }
 '''
@@ -73,7 +82,8 @@ int main(void) {
 
     def test_keyboard_and_replay_sites_have_separate_optional_groups(self):
         optional = {site for site, hook in patches.HOOKS.items() if len(hook) == 4 and hook[3] == "RT_HOOK_KEYBOARD_PROMPTS"}
-        self.assertEqual(optional, {0x700011efb0, 0x7000114f90, 0x7000cd7130, 0x7000cdb690,
+        self.assertEqual(patches.HOOKS[0x700011efb0][3], "(RT_HOOK_KEYBOARD_PROMPTS | RT_HOOK_MOBILE_UI)")
+        self.assertEqual(optional, {0x7000114f90, 0x7000cd7130, 0x7000cdb690,
                                    0x7000ce0dd0, 0x7000d9aec0, 0x7000ce0f40, 0x7000ce0de0,
                                    0x7000ce10a0, 0x7000f9a060})
         self.assertTrue(all(patches.HOOKS[site][3] == "RT_HOOK_KEYBOARD_PROMPTS" for site in optional))

@@ -9,6 +9,7 @@
 #include "../ui/menu.h"
 #include "../ui/mouse.h"
 #include "../ui/touch.h"
+#include "movie.h"
 #include <SDL3/SDL_scancode.h>
 #include <math.h>
 
@@ -685,7 +686,11 @@ void rt_hooks_configure(void) {
     reset_developer_state();
     reset_lan_ui();
     replay_init();
-    rt_hook_features = (g_settings.experimental_keyboard_prompts ? RT_HOOK_KEYBOARD_PROMPTS : 0) |
+    rt_hook_features =
+#ifdef __ANDROID__
+                       RT_HOOK_MOBILE_UI |
+#endif
+                       (g_settings.experimental_keyboard_prompts ? RT_HOOK_KEYBOARD_PROMPTS : 0) |
                        (replay_enabled() ? RT_HOOK_REPLAY : 0) |
                        (g_settings.allow_sparring_lan_multiplayer ? 4u : 0);
 }
@@ -824,6 +829,7 @@ static int menu_mouse_hook(Cpu *c, uint64_t site) {
             touch_mouse.released = t->phase == TOUCH_ENDED;
             touch_mouse.held = t->phase < TOUCH_ENDED;
         }
+        android_primary_touch=android_touch_count?touch_mouse:menu_mouse;
         sparring_mouse_frame(c, android_touch_count ? &touch_mouse : &menu_mouse);
 #else
         sparring_mouse_frame(c,&menu_mouse);

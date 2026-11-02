@@ -18,5 +18,7 @@ _Static_assert(sizeof(MenuTouch) == 0x44, "Unity Touch ABI");
 
 void menu_touch_event(const SDL_Event *event); // SDL thread
 void menu_touch_cancel(void);
+// Capture movie taps through release, so skipping cannot activate the next menu.
+bool menu_touch_movie_event(const SDL_Event *event, bool movie_visible);
 unsigned menu_touch_frame(unsigned width, unsigned height, bool captured,
                           MenuTouch out[MENU_TOUCH_MAX]);

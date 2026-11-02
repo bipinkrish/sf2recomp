@@ -11,6 +11,7 @@
 
 // The source-only executable does not run under SDLActivity.
 const char *SDL_GetAndroidInternalStoragePath(void) { return "/data/local/tmp"; }
+const char *SDL_GetAndroidExternalStoragePath(void) { return "/data/local/tmp"; }
 bool SDL_ShowSimpleMessageBox(SDL_MessageBoxFlags flags, const char *title, const char *message, SDL_Window *window) {
     (void)flags; (void)title; (void)message; (void)window; return true;
 }

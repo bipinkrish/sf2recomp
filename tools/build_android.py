@@ -63,9 +63,9 @@ def prepare():
     run(sys.executable, ROOT / "tools/setup_fonts.py", "--output", assets / "lib/fonts")
     assets.mkdir(parents=True, exist_ok=True)
     config = (ROOT / "sf2recomp.ini").read_text()
-    config = config.replace("show_intro = true", "show_intro = false")
     config = config.replace("target_fps = 120", "target_fps = 60")
     config = config.replace("internal_resolution = auto", "internal_resolution = 0.5x")
+    config = config.replace("aspect_ratio = original", "aspect_ratio = native")
     config = config.replace("player_setup = keyboard_vs_controller", "player_setup = solo")
     (assets / "sf2recomp.ini").write_text(config)
     licenses = assets / "licenses"
@@ -155,6 +155,17 @@ def package_game(game, identities):
     print(f"Bundled local game: {archive.stat().st_size / 1024**2:.0f} MiB", flush=True)
 
 
+def publish_apk(apk, output):
+    """Preserve the old inode while another process installs that APK."""
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary = output.with_suffix(".apk.tmp")
+    try:
+        shutil.copyfile(apk, temporary)
+        temporary.replace(output)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def gradle_command():
     if os.environ.get("GRADLE"): return os.environ["GRADLE"]
     return str(ROOT / "android" / ("gradlew.bat" if os.name == "nt" else "gradlew"))
@@ -185,8 +196,9 @@ def main():
     run(gradle_command(), "--no-daemon", f"-Psf2Abi={args.abi}",
         "installDebug" if args.install else "assembleDebug", cwd=ROOT / "android", env=environment)
     output = ROOT / f"build/android/sf2-recomp-{args.abi}-debug.apk"
-    output.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(apk, output)
+    # A wireless install may still hold the previous APK open. Publish through
+    # rename so a rebuild cannot truncate the file ADB is currently streaming.
+    publish_apk(apk, output)
     print(f"APK: {output}")
 
 

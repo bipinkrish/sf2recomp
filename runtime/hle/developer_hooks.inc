@@ -272,7 +272,10 @@ static int developer_hook(Cpu *c, uint64_t site) {
             return dev_return_bool(c, true);
         return 0;
     case 0x700102ec00ull: return dev_return_bool(c, g_settings.developer_trainer);
-    case 0x7000e1a5b0ull: return dev_return_bool(c, g_settings.show_intro);
+    case 0x7000e1a5b0ull:
+        // The original game shares its intro switch with manual gallery
+        // playback. Disabling the boot intro must not disable selected movies.
+        return dev_return_bool(c,c->x[30]==0x7000e6e49cull || g_settings.show_intro);
     case 0x7000e1a760ull: return dev_return_bool(c, g_settings.ai_enabled);
     case 0x7000e19adcull: // AssemblyController.Parse completed; apply INI after the original config
         guest_invoke2(c, 0x7000e19c10ull, 0, g_settings.show_intro);

@@ -81,6 +81,15 @@ int main(void) {
     assert(frame(false) == MENU_TOUCH_MAX && touches[0].phase == TOUCH_CANCELED);
     assert(frame(false) == MENU_TOUCH_MAX - 1);
     menu_touch_cancel(); assert(frame(false) == MENU_TOUCH_MAX - 1 && frame(false) == 0);
+    // A movie's skip finger stays captured after the overlay disappears.
+    SDL_Event tap={0};tap.type=SDL_EVENT_FINGER_DOWN;tap.tfinger.touchID=12;tap.tfinger.fingerID=777;
+    assert(menu_touch_movie_event(&tap,true));
+    tap.type=SDL_EVENT_FINGER_MOTION;assert(menu_touch_movie_event(&tap,false));
+    tap.type=SDL_EVENT_FINGER_UP;assert(menu_touch_movie_event(&tap,false));
+    tap.type=SDL_EVENT_FINGER_DOWN;assert(!menu_touch_movie_event(&tap,false));
+    assert(menu_touch_movie_event(&tap,true));
+    assert(!menu_touch_movie_event(&lost,false));
+    tap.type=SDL_EVENT_FINGER_UP;assert(!menu_touch_movie_event(&tap,false));
     SDL_DestroyWindow(window); SDL_Quit();
 }
 '''

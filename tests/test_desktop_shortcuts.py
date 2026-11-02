@@ -32,6 +32,12 @@ int main(void) {
     key(SDL_SCANCODE_ESCAPE,true);held(1ull<<BIND_B);
     key(SDL_SCANCODE_J,true);key(SDL_SCANCODE_ESCAPE,false);held(1ull<<BIND_B);
     key(SDL_SCANCODE_J,false);held(0);
+    input_menu_navigation(INPUT_NAV_SPARRING);
+    key(SDL_SCANCODE_ESCAPE,true);held(1ull<<BIND_PLUS);
+    key(SDL_SCANCODE_ESCAPE,false);held(0);
+    // The normal B binding still undoes a selection instead of leaving.
+    key(SDL_SCANCODE_J,true);held(1ull<<BIND_B);key(SDL_SCANCODE_J,false);held(0);
+    input_menu_navigation(INPUT_NAV_MENU);
     // Explicit keyboard actions (including analog directions) own the key.
     g_bind_key[BIND_X]=SDL_SCANCODE_ESCAPE;
     key(SDL_SCANCODE_ESCAPE,true);held(1ull<<BIND_X);key(SDL_SCANCODE_ESCAPE,false);held(0);

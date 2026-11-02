@@ -179,7 +179,8 @@ may share a host input. Invalid recognized values warn and preserve the previous
 binding; unknown sections/keys are ignored for future additions.
 
 Desktop menu shortcuts also accept **Enter** (or keypad Enter) to confirm and
-**Escape** to go back. During combat, unassigned Escape opens the native pause
+**Escape** to go back. In Sparring selection, Escape leaves for the main menu;
+the configured B key still undoes equipment/Ready selection. During combat, unassigned Escape opens the native pause
 menu; the default Pause/Plus key is now **Tab**. **Space** skips video cutscenes
 while a video is playing. These shortcuts are fallbacks: if a key is assigned to
 any keyboard action (including a stick direction), its configured action wins.
@@ -233,7 +234,8 @@ Keys inside visible action buttons have matching outline badges: circles for sin
 rectangles for longer names. Standalone hints stay plain. During the intro, either
 mapped A or B skips playback (**K** or **J** with the shipped bindings). The skip
 press is consumed so it cannot also activate the menu behind the movie. Mouse
-clicks also skip playback and are consumed through release.
+clicks also skip playback and are consumed through release. On Android, tapping
+the video skips it; that finger remains captured until release.
 
 The intro decoder starts before graphics and engine initialization finish. Module
 loading runs off the window thread so it can present the opening frames sooner;
@@ -242,6 +244,25 @@ Startup data loads while the intro plays. On GPUs that import the guest heap,
 the runtime also prepares that memory in a background worker from the first
 movie presentation, reducing the first-menu pause after skipping. Skipping very
 early can still require time for startup data parsing to finish.
+
+Android decodes the bundled H.264/AAC movies in-process using MediaCodec and
+MediaExtractor. Video planes are copied using their reported strides into the
+existing Vulkan movie overlay; audio uses the shared SDL playback clock. Frame
+zero must reach the window before audio starts, and pre-roll queues are bounded.
+Desktop builds retain their bundled FFmpeg decoder. On Android, host completion
+also calls the original managed completion handler, including on skip, so the
+game can leave the video screen immediately. Skipping does not mark a video as
+watched to the end.
+
+Android stores `sf2recomp.ini`, `save/` and `lasrecomp.log` in
+`Android/data/org.sf2recomp.app/files`. The bundled game stays in private app
+storage; editing the INI does not require re-extracting it.
+
+Sparring bosses have a separate touch power button with centered spiral
+artwork, Magic's size and palette, and native cooldown/ready state. It continues
+the action buttons' zigzag layout. Ordinary fighters do not show it. On
+desktop, the default combination is **1 + 3** (ZL + ZR); remapped trigger bindings
+apply as usual.
 
 With the experiment enabled, auto displays mapped keyboard labels when no gamepad
 is connected and controller glyphs when one is connected. Input mappings and intro
@@ -263,6 +284,7 @@ aspect_ratio = 21:9
 | `16:10` | 1728×1080 |
 | `21:9` | 2520×1080 |
 | `32:9` | 3840×1080 |
+| `native` (Android default) | Screen aspect ratio at 1080 lines, rounded to an even width |
 
 This changes Unity's native screen modes, camera/layout dimensions and
 color/depth buffers together. Presentation scales uniformly to fit the selected

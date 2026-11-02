@@ -213,6 +213,7 @@ static bool config_assign(const ConfigOption *option, const char *value) {
         else if (!strcmp(value, "16:10")) *(int *)option->value = ASPECT_16_10;
         else if (!strcmp(value, "21:9")) *(int *)option->value = ASPECT_21_9;
         else if (!strcmp(value, "32:9")) *(int *)option->value = ASPECT_32_9;
+        else if (!strcasecmp(value, "native")) *(int *)option->value = ASPECT_NATIVE;
         else return false;
     } else if (option->type == CONFIG_LANGUAGE) {
         if (!strcasecmp(value, "auto")) { *(int *)option->value = LANG_AUTO; return true; }

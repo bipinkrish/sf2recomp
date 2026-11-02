@@ -99,7 +99,7 @@ static int widescreen_hook(Cpu *c, uint64_t site) {
         // Expanding that reference also zooms the fighters vertically, pushing
         // their feet and ground markers below the viewport. Keep the authored
         // 16:9 fight framing while the actual camera/output reveal more sides.
-        if ((g_settings.aspect == ASPECT_21_9 || g_settings.aspect == ASPECT_32_9) &&
+        if (settings_custom_aspect() && settings_screen_width(1080)>1920 &&
             c->x[19] != widescreen_pvp_render) {
             float factor = 1920.0f / settings_screen_width(1080);
             float width, minimum;

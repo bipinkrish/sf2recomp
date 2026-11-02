@@ -55,10 +55,14 @@ int main(int argc, char **argv) {
     movie_preload_intro(); movie_request_skip(); assert(movie_poll());
     while (g_movie.monitor_started) { movie_poll(); movie_sleep_ns(1000000); }
     assert(!movie_guest_ready() && !g_movie.child);
+    assert(!movie_playback_completed() && !movie_watched_to_end());
     assert(movie_start("database/intro.mp4"));
     assert(movie_guest_ready() && !movie_overlay_active() && !g_movie.child);
+    assert(movie_playback_completed() && !movie_watched_to_end());
     assert(atomic_load(&g_movie.source_ready)); // empty guest tracks still succeed
     movie_reset();
+
+    assert(!movie_playback_completed() && !movie_watched_to_end());
 
     // Resetting before the engine claims the intro must allow a fresh next boot.
     movie_preload_intro(); assert(!movie_guest_ready()); movie_reset();

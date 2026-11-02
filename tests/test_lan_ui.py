@@ -17,7 +17,7 @@ uint64_t renderer_present_count(void) { return 1; }
 bool rt_probe_u64(uint64_t a,uint64_t *v) { return false; }
 bool nvn_texture_region_color(const NvnTexture*t,uint32_t x,uint32_t y,uint32_t w,uint32_t h,float rgb[3]) { return false; }
 void *hle_alloc(uint64_t n) { return calloc(1,n); }
-static uint64_t prototype,selection_table,selected_rect;
+static uint64_t prototype,selection_table,selected_rect,main_section,submenu_clone;
 static unsigned moved_player,confirmed_id;
 static bool dialog_blocks;
 static uint64_t shown_info,shown_dialog;static unsigned original_entries,closed,back_prompts;
@@ -26,7 +26,19 @@ void guest_call(Cpu *c,uint64_t pc) {
     case 0x70005d9e60ull:return;
     case 0x700121e790ull:c->x[0]=prototype;return;
     case 0x700121e6b0ull:case 0x700121e720ull:case 0x7001226480ull:case 0x70012339d0ull:return;
+    case 0x70015d8be0ull:c->x[0]=1234;return;
+    case 0x7001233760ull:return;
     case 0x70012333a0ull:
+        if(main_section && c->x[1]==main_section) {
+            submenu_clone=(uintptr_t)calloc(1,64);
+            uint64_t list=(uintptr_t)calloc(1,32),items=(uintptr_t)calloc(1,72);
+            ST64(submenu_clone+0x18,list);ST64(list+0x10,items);ST32(list+0x18,5);
+            for(unsigned i=0;i<5;++i) {
+                uint64_t button=(uintptr_t)calloc(1,128);ST64(items+0x20+i*8,button);
+                ST64(button+0x28,(uintptr_t)calloc(1,512));
+            }
+            c->x[0]=submenu_clone;return;
+        }
         assert(c->x[0]==0 && (c->x[1]==prototype || c->x[1]==lan_menu_template) && c->x[3]==0);
         c->x[0]=(uintptr_t)calloc(1,128);ST64(c->x[0]+0x28,(uintptr_t)calloc(1,512));return;
     case 0x700123a050ull:case 0x700123a250ull:case 0x700123a550ull:case 0x700123a7d0ull:return;
@@ -126,6 +138,7 @@ int main(void) {
     assert(pairs==15);
     Cpu cpu,saved;memset(&cpu,0xa5,sizeof cpu);saved=cpu;
     assert(g_settings.allow_sparring_lan_multiplayer);
+    cpu.x[0]=(uintptr_t)calloc(1,256);saved=cpu;
     assert(lan_ui_hook(&cpu,0x7000e6ed90ull)==1);
     assert(!memcmp(&cpu,&saved,sizeof cpu));
     label(0,"NORMAL");label(1,"LAN MULTIPLAYER");assert(!lan_gui_active() && !lan_enabled());
@@ -171,6 +184,34 @@ int main(void) {
     sparring_mouse_frame(&cpu,&mouse);assert(moved_player==99); // release without a matching press
     cpu.x[0]=module;
     assert(lan_ui_hook(&cpu,0x7000d985a0ull)==-1 && !sparring_module);
+    cpu.x[1]=8;assert(lan_ui_hook(&cpu,0x7000f48ef0ull)==-1);
+    assert(input_menu_navigation_active() && input_menu_back_binding()==BIND_PLUS);
+    cpu.x[1]=7;assert(lan_ui_hook(&cpu,0x7000f48ef0ull)==-1);
+    assert(input_menu_navigation_active() && input_menu_back_binding()==BIND_B);
+    cpu.x[1]=5;assert(lan_ui_hook(&cpu,0x7000f48ef0ull)==-1);
+    assert(!input_menu_navigation_active());
+    // Mode and role replace choices inside the main-menu section. They
+    // allocate no modal dialog and leave all original scene/list data intact.
+    cpu=saved;lan_menu_scene=(uintptr_t)calloc(1,256);
+    uint64_t sections=(uintptr_t)calloc(1,32),section_items=(uintptr_t)calloc(1,40);
+    main_section=(uintptr_t)calloc(1,64);
+    ST64(lan_menu_scene+0x88,sections);ST64(sections+0x10,section_items);
+    ST32(sections+0x18,1);ST64(section_items+0x20,main_section);
+    uint64_t previous_dialog=shown_dialog;
+    lan_mode_dialog(&cpu);
+    assert(!memcmp(&cpu,&saved,sizeof cpu) && lan_menu_root==submenu_clone);
+    assert(!lan_dialog && shown_dialog==previous_dialog && lan_menu_capture());
+    assert(lan_choice_count==3 && lan_commands[2]==LAN_CHOICE_BACK);
+    char text[64];assert(dev_read_string(LD64(LD64(lan_menu_buttons[0]+0x28)+0x180),text,sizeof text));
+    assert(!strcmp(text,"NORMAL"));
+    lan_action=LAN_CHOICE_LAN;lan_ui_pump(&cpu);
+    assert(!lan_dialog && lan_phase==LAN_UI_ROLE && shown_dialog==previous_dialog);
+    assert(dev_read_string(LD64(LD64(lan_menu_buttons[0]+0x28)+0x180),text,sizeof text));
+    assert(!strcmp(text,"HOST"));
+    lan_action=LAN_CHOICE_BACK;lan_ui_pump(&cpu);assert(lan_phase==LAN_UI_MODE);
+    lan_action=LAN_CHOICE_BACK;lan_ui_pump(&cpu);
+    assert(!lan_menu_capture() && !lan_menu_root && !lan_main_root && lan_phase==LAN_UI_NONE);
+    assert(LD64(section_items+0x20)==main_section && LD32(sections+0x18)==1);
     g_settings.allow_sparring_lan_multiplayer=false;
     assert(lan_ui_hook(&cpu,0x7000e6ed90ull)==-1);
 }

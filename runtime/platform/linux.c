@@ -309,7 +309,7 @@ bool plat_exe_path(char *buf, size_t size) {
 #ifdef __ANDROID__
     // Android loads libmain.so from the APK. Resource/config users need our
     // writable resource directory, rather than /proc/self/exe (app_process).
-    const char *dir = SDL_GetAndroidInternalStoragePath();
+    const char *dir = SDL_GetAndroidExternalStoragePath();
     return dir && snprintf(buf, size, "%s/sf2", dir) < (int)size;
 #else
     ssize_t n = readlink("/proc/self/exe", buf, size - 1);

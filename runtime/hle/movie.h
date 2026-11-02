@@ -6,6 +6,8 @@
 void movie_preload_intro(void);  // boot/UI thread, after settings and SDL initialization, before guest boot
 bool movie_guest_ready(void);   // guest requested a movie this boot; its startup heap is established
 bool movie_overlay_active(void);
+bool movie_playback_completed(void);
+bool movie_watched_to_end(void);
 bool movie_render_tick(void);  // true while frame zero must be shown before audio can start
 void movie_presented(void);
 

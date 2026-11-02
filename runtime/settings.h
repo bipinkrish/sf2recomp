@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-enum { ASPECT_UNLOCKED = 0, ASPECT_ORIGINAL = 1, ASPECT_21_9 = 2, ASPECT_16_10 = 3, ASPECT_32_9 = 4 };
+enum { ASPECT_UNLOCKED = 0, ASPECT_ORIGINAL = 1, ASPECT_21_9 = 2, ASPECT_16_10 = 3, ASPECT_32_9 = 4, ASPECT_NATIVE = 5 };
 enum { RES_MATCH = 0, RES_DYNAMIC = 9, RES_Q75 = 10, RES_Q25 = 11, RES_Q50 = 12 };
 enum { UPSCALE_BILINEAR = 0, UPSCALE_METALFX = 1, UPSCALE_FSR1 = 2 };
 #define UPSCALE_SHARP UPSCALE_FSR1
@@ -32,6 +32,7 @@ typedef struct Settings {
     bool reverb;
     int language;
     int aspect;
+    unsigned native_width, native_height; // window dimensions latched before guest startup
     bool fullscreen;
     int target_fps;
     int res_mode;
@@ -72,6 +73,10 @@ extern Settings g_settings;
 // All supported ratios have exact integer widths at both 720 and 1080 lines.
 static inline unsigned settings_screen_width(unsigned height) {
     switch (g_settings.aspect) {
+    case ASPECT_NATIVE:
+        if (g_settings.native_width && g_settings.native_height)
+            return ((unsigned long long)height * g_settings.native_width / g_settings.native_height + 1) & ~1u;
+        return height * 16 / 9;
     case ASPECT_16_10: return height * 16 / 10;
     case ASPECT_21_9: return height * 21 / 9;
     case ASPECT_32_9: return height * 32 / 9;
@@ -81,7 +86,7 @@ static inline unsigned settings_screen_width(unsigned height) {
 
 static inline bool settings_custom_aspect(void) {
     return g_settings.aspect == ASPECT_16_10 || g_settings.aspect == ASPECT_21_9 ||
-           g_settings.aspect == ASPECT_32_9;
+           g_settings.aspect == ASPECT_32_9 || g_settings.aspect == ASPECT_NATIVE;
 }
 
 const char *settings_language(void);

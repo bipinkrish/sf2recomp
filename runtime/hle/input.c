@@ -160,7 +160,7 @@ static void recompute_keyboard(void) {
     for (int i = 0; i < BIND_PAD_COUNT; i++)
         if (held_key(g_bind_key[i])) b |= 1ull << i;
     if(input_menu_navigation_active()) {
-        if(held_key(SDL_SCANCODE_ESCAPE) && bind_key_unassigned(SDL_SCANCODE_ESCAPE))b|=1ull<<BIND_B;
+        if(held_key(SDL_SCANCODE_ESCAPE) && bind_key_unassigned(SDL_SCANCODE_ESCAPE))b|=1ull<<input_menu_back_binding();
         if((held_key(SDL_SCANCODE_RETURN) && bind_key_unassigned(SDL_SCANCODE_RETURN)) ||
            (held_key(SDL_SCANCODE_KP_ENTER) && bind_key_unassigned(SDL_SCANCODE_KP_ENTER)))b|=1ull<<BIND_A;
     } else if(held_key(SDL_SCANCODE_ESCAPE) && bind_key_unassigned(SDL_SCANCODE_ESCAPE))b|=1ull<<BIND_PLUS;
@@ -459,6 +459,11 @@ static void scan_connected_pads(void) {
 
 void input_handle_event(const SDL_Event *e) {
 #ifdef __ANDROID__
+    bool movie_visible=movie_overlay_active();
+    if (menu_touch_movie_event(e,movie_visible)) {
+        if (movie_visible && e->type==SDL_EVENT_FINGER_DOWN) movie_request_skip();
+        return;
+    }
     menu_touch_event(e);
 #endif
     // Consume the whole skip click, including its release after the overlay goes

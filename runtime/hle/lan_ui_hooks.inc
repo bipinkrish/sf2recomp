@@ -17,6 +17,7 @@ static unsigned lan_visible_count,lan_choice_count,lan_choice,lan_commands[14];
 static uint64_t lan_back_owner,lan_selection_state;
 static char lan_back_prompt[96];
 static uint64_t lan_menu_prototype,lan_menu_template,lan_menu_buttons[14];
+static uint64_t lan_menu_root,lan_main_root;
 static uint64_t sparring_module;
 static unsigned sparring_kind;
 static int sparring_pressed=-1;
@@ -26,6 +27,7 @@ static void reset_lan_ui(void) {
     if(lan_gui_active()) { replay_gui_stop();lan_gui_leave(); }
     lan_menu_publish(false);lan_selection_state=0;lan_menu_prototype=lan_menu_template=sparring_module=0;
     memset(lan_menu_buttons,0,sizeof lan_menu_buttons);sparring_pressed=-1;
+    lan_menu_root=lan_main_root=0;
     input_menu_navigation(true);
     lan_dialog=lan_menu_scene=lan_pvp_scene=lan_active_module=lan_end_screen=0;
     lan_phase=lan_module_kind=lan_action=lan_visible_count=0;
@@ -113,6 +115,13 @@ static uint64_t lan_line(Cpu *c,const char *label,unsigned command) {
 }
 static void lan_close_dialog(Cpu *c) {
     uint64_t dialog=lan_dialog;lan_dialog=0;lan_menu_publish(false);
+    if(lan_menu_root) {
+        uint64_t root=lan_menu_root;lan_menu_root=0;
+        guest_invoke2(c,0x7001226480ull,root,0);
+        guest_invoke2(c,0x7001233760ull,0,root); // Object.Destroy
+        if(lan_main_root)guest_invoke2(c,0x7001226480ull,lan_main_root,1);
+        lan_main_root=0;
+    }
     memset(lan_menu_buttons,0,sizeof lan_menu_buttons);
     if(dialog) {
         lan_dialog_closing=true;guest_invoke2(c,0x7000cee250ull,dialog,0);lan_dialog_closing=false;
@@ -185,11 +194,50 @@ static bool lan_show(Cpu *c,unsigned phase,const char *title,const char *const l
     LOG("[lan-ui] %s (%u choices), dialog %" PRIx64 "\n",title,count,lan_dialog);
     return lan_dialog!=0;
 }
+// Reuse the actual main-menu section, including its layout, typeface and
+// kunai artwork. Only its choices change; the scene and background stay put.
+static bool lan_submenu(Cpu *c,unsigned phase,const char *first,const char *second,
+                        unsigned first_command,unsigned second_command) {
+    lan_close_dialog(c);
+    uint64_t lists=lan_menu_scene?LD64(lan_menu_scene+0x88):0;
+    uint64_t array=lists?LD64(lists+0x10):0;
+    uint64_t main=array && LD32(lists+0x18)?LD64(array+0x20):0;
+    if(!main)return false;
+    uint64_t rect=guest_invoke2(c,0x700121e6b0ull,main,0);
+    uint64_t parent=rect?guest_invoke2(c,0x70015d8be0ull,rect,0):0;
+    uint64_t clone=parent?guest_invoke4(c,0x70012333a0ull,0,main,parent,0):0;
+    if(!clone)return false;
+    lan_menu_root=guest_invoke2(c,0x700121e720ull,clone,0);
+    uint64_t buttons=LD64(clone+0x18),items=buttons?LD64(buttons+0x10):0;
+    unsigned count=buttons?LD32(buttons+0x18):0;
+    if(!lan_menu_root || !items || count<3) { lan_close_dialog(c);return false; }
+    const char *labels[]={first,second,"BACK"};
+    unsigned commands[]={first_command,second_command,LAN_CHOICE_BACK};
+    for(unsigned i=0;i<count;++i) {
+        uint64_t button=LD64(items+0x20+i*8);
+        uint64_t object=guest_invoke2(c,0x700121e720ull,button,0);
+        guest_invoke2(c,0x7001226480ull,object,i<3);
+        if(i>=3)continue;
+        lan_menu_buttons[i]=button;lan_commands[i]=commands[i];
+        uint64_t label=LD64(button+0x28);
+        guest_invoke2(c,0x7000e73b90ull,label,1);
+        guest_invoke2(c,0x7000e71230ull,label,guest_string(c,labels[i]));
+    }
+    lan_main_root=guest_invoke2(c,0x700121e720ull,main,0);
+    guest_invoke2(c,0x7001226480ull,lan_main_root,0);
+    guest_invoke2(c,0x7001226480ull,lan_menu_root,1);
+    lan_phase=phase;lan_choice_count=3;lan_choice=0;
+    lan_menu_publish(true);lan_focus_choice(c);
+    LOG("[lan-ui] main-menu submenu %u\n",phase);
+    return true;
+}
 static void lan_mode_dialog(Cpu *c) {
+    if(lan_submenu(c,LAN_UI_MODE,"NORMAL","LAN MULTIPLAYER",LAN_CHOICE_NORMAL,LAN_CHOICE_LAN))return;
     const char *labels[]={"NORMAL","LAN MULTIPLAYER"};unsigned cmds[]={LAN_CHOICE_NORMAL,LAN_CHOICE_LAN};
     lan_show(c,LAN_UI_MODE,"SPARRING",labels,cmds,2);
 }
 static void lan_role_dialog(Cpu *c) {
+    if(lan_submenu(c,LAN_UI_ROLE,"HOST","JOIN",LAN_CHOICE_HOST,LAN_CHOICE_JOIN))return;
     const char *labels[]={"HOST","JOIN"};unsigned cmds[]={LAN_CHOICE_HOST,LAN_CHOICE_JOIN};
     lan_show(c,LAN_UI_ROLE,"LAN MULTIPLAYER",labels,cmds,2);
 }
@@ -274,7 +322,7 @@ static void lan_begin_native_match(Cpu *c) {
     lan_native_call=false;lan_match_starting=false;lan_active_module=0;
 }
 static void lan_focus_choice(Cpu *c) {
-    if(!lan_dialog)return;
+    if(!lan_dialog && !lan_menu_root)return;
     for(unsigned i=0;i<lan_choice_count;++i)if(lan_menu_buttons[i])
         guest_invoke2(c,0x7000e6c080ull,lan_menu_buttons[i],i==lan_choice);
     if(lan_choice<lan_choice_count && lan_menu_buttons[lan_choice])return;
@@ -289,11 +337,12 @@ static void lan_focus_choice(Cpu *c) {
     if(button)guest_invoke2(c,0x70005d9e60ull,button,0);
 }
 static void lan_dialog_input(Cpu *c) {
-    unsigned requests=lan_menu_requests();if(!lan_dialog || !requests)return;
+    unsigned requests=lan_menu_requests();if((!lan_dialog && !lan_menu_root) || !requests)return;
     if(requests&LAN_MENU_BACK) { lan_action=LAN_CHOICE_BACK;return; }
     if(requests&(LAN_MENU_UP|LAN_MENU_DOWN)) {
         int direction=(requests&LAN_MENU_UP)?-1:1;
-        do { lan_choice=(lan_choice+lan_choice_count+1+direction)%(lan_choice_count+1); }
+        unsigned slots=lan_choice_count+(lan_menu_root?0:1);
+        do { lan_choice=(lan_choice+slots+direction)%slots; }
         while(lan_choice<lan_choice_count && !lan_commands[lan_choice]);
         lan_focus_choice(c);
     }
@@ -425,18 +474,20 @@ static void lan_ui_pump(Cpu *c) {
 }
 static int lan_ui_hook(Cpu *c,uint64_t site) {
     if(site==0x7000f48ef0ull) {
-        sparring_module=0;sparring_pressed=-1;input_menu_navigation(c->x[1]!=5);
+        sparring_module=0;sparring_pressed=-1;
+        input_menu_navigation(c->x[1]==5?INPUT_NAV_COMBAT:c->x[1]==8?INPUT_NAV_SPARRING:INPUT_NAV_MENU);
     }
     if(site==0x7000e5b660ull || site==0x7000e5b9d0ull) { input_menu_navigation(true);return -1; }
     if(site==0x7000e5b8f0ull) { input_menu_navigation(false);return -1; }
     if(site==0x7000e43000ull || site==0x7000e45ea0ull) {
         sparring_module=c->x[0];sparring_kind=site==0x7000e45ea0ull;sparring_pressed=-1;
+        input_menu_navigation(INPUT_NAV_SPARRING);
     }
     if(site==0x7000d985a0ull || site==0x7000d985b0ull) {
         if(c->x[0]==sparring_module)sparring_module=0;
         return -1;
     }
-    if(lan_dialog && (site==0x7000e6fca0ull || (site>=0x7000e6fd00ull && site<=0x7000e6fd30ull))) {
+    if((lan_dialog || lan_menu_root) && (site==0x7000e6fca0ull || (site>=0x7000e6fd00ull && site<=0x7000e6fd30ull))) {
         for(unsigned i=0;i<lan_choice_count;++i)if(lan_menu_buttons[i]==c->x[0]) {
             if(site==0x7000e6fd20ull) { lan_choice=i;lan_focus_choice(c); }
             else if(site==0x7000e6fd30ull)guest_invoke2(c,0x7000e6c080ull,c->x[0],0);

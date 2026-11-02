@@ -165,6 +165,10 @@ int main(int argc, char **argv) {
     assert(rt_hook(&cpu, 0x7000e19adcull) == 0);
     assert(!memcmp(&cpu, &before, sizeof cpu));
     assert(call_count == 3 && values[0] == 0 && values[1] == 0 && values[2] == 1);
+    assert(rt_hook(&cpu,0x7000e1a5b0ull)==1 && !cpu.x[0]);
+    cpu.x[30]=0x7000e6e49cull; // an explicitly selected gallery video still plays
+    assert(rt_hook(&cpu,0x7000e1a5b0ull)==1 && cpu.x[0]);
+    cpu=before;
     assert(calls[0] == 0x7000e19c10ull && calls[1] == 0x7000e19d30ull);
     assert(rt_hook(&cpu, 0x70000ad0e0ull) == 0); // global/online debug checks are unchanged
     assert(!memcmp(&cpu, &before, sizeof cpu));

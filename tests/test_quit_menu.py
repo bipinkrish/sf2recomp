@@ -23,6 +23,8 @@ typedef struct Node {
 static Node main_section, settings, content, story, exit_item, extra;
 static Node *current_root;
 static int activations;
+uint64_t renderer_present_count(void) { return 1; }
+uint64_t plat_now_ns(void) { return 1000000; }
 
 static void named(Node *node, const char *name) {
     ST32((uintptr_t)node->name + 0x10, strlen(name));

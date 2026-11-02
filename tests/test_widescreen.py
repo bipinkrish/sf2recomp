@@ -8,6 +8,25 @@ from test_settings import compile_harness
 
 
 class WidescreenTests(unittest.TestCase):
+    def test_phone_aspect_uses_even_guest_width_and_safe_fallback(self):
+        source = r"""
+#include <assert.h>
+#include "settings.h"
+int main(void) {
+    g_settings.aspect=ASPECT_NATIVE;
+    assert(settings_custom_aspect() && settings_screen_width(1080)==1920);
+    g_settings.native_width=2772;g_settings.native_height=1280;
+    assert(settings_screen_width(1080)==2338 && settings_screen_width(720)==1560);
+    g_settings.native_width=2424;g_settings.native_height=1080;
+    assert(settings_screen_width(1080)==2424 && settings_screen_width(720)==1616);
+    g_settings.native_height=0;assert(settings_screen_width(1080)==1920);
+}
+"""
+        with tempfile.TemporaryDirectory(prefix="sf2-phone-aspect-") as directory:
+            root=Path(directory);(root/"test.c").write_text(source)
+            compile_harness(root/"test.c",root/"test")
+            subprocess.run([str(root/"test")],check=True)
+
     def test_combat_framing_preserves_native_units_and_other_fight_modes(self):
         source = r'''
 #include <assert.h>

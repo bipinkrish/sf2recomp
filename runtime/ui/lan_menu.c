@@ -6,9 +6,13 @@
 #include <SDL3/SDL.h>
 #include <stdatomic.h>
 static atomic_bool modal;
-static atomic_bool desktop_menu_navigation=true;
-void input_menu_navigation(bool menu) { atomic_store(&desktop_menu_navigation,menu); }
-bool input_menu_navigation_active(void) { return atomic_load(&desktop_menu_navigation); }
+static atomic_int desktop_menu_navigation=INPUT_NAV_MENU;
+void input_menu_navigation(InputNavigation context) { atomic_store(&desktop_menu_navigation,context); }
+bool input_menu_navigation_active(void) { return atomic_load(&desktop_menu_navigation)!=INPUT_NAV_COMBAT; }
+int input_menu_back_binding(void) {
+    // Sparring uses B to undo equipment/Ready and Start to leave the scene.
+    return atomic_load(&desktop_menu_navigation)==INPUT_NAV_SPARRING ? BIND_PLUS : BIND_B;
+}
 static atomic_uint requests;
 static int axis_direction;
 static bool trigger_held[2];

@@ -14,6 +14,39 @@ SDL = ROOT / "build/dependencies/SDL3-3.4.16/include"
 
 @unittest.skipUnless(shutil.which("javac") and shutil.which("java"), "Java JDK required")
 class AndroidImportTests(unittest.TestCase):
+    def test_editable_storage_migrates_without_overwriting_or_resurrecting_saves(self):
+        source = r'''
+package org.sf2recomp.app;
+import java.io.*;
+import java.nio.file.*;
+public class StorageTest {
+    public static void main(String[] args) throws Exception {
+        File root=new File(args[0]), old=new File(root,"internal"), external=new File(root,"external");
+        new File(old,"save/userdata").mkdirs();external.mkdirs();
+        Files.write(new File(old,"sf2recomp.ini").toPath(),new byte[]{1});
+        Files.write(new File(old,"save/userdata/users.xml").toPath(),new byte[]{2});
+        Files.write(new File(external,"sf2recomp.ini").toPath(),new byte[]{3});
+        assert GameStorage.prepare(old,external).equals(external);
+        assert Files.readAllBytes(new File(external,"sf2recomp.ini").toPath())[0]==3;
+        File save=new File(external,"save/userdata/users.xml");
+        assert Files.readAllBytes(save.toPath())[0]==2;
+        assert new File(old,"save/userdata/users.xml").isFile();
+        Files.delete(save.toPath());GameStorage.prepare(old,external);
+        assert !save.exists(); // completed migration cannot undo a user's reset
+        try { GameStorage.prepare(old,null);throw new AssertionError("missing external storage accepted"); }
+        catch(IOException expected) {}
+        System.out.println("External config/save migration and preservation PASS");
+    }
+}
+'''
+        with tempfile.TemporaryDirectory(prefix="sf2-storage-") as temporary:
+            root=Path(temporary)
+            harness=root/"StorageTest.java"
+            harness.write_text(source)
+            implementation=ROOT/"android/app/src/main/java/org/sf2recomp/app/GameStorage.java"
+            subprocess.run(["javac","-d",str(root),str(implementation),str(harness)],check=True)
+            subprocess.run(["java","-ea","-cp",str(root),"org.sf2recomp.app.StorageTest",str(root/"data")],check=True)
+
     def test_bundled_game_installs_once_and_rejects_invalid_replacements(self):
         source = r'''
 package org.sf2recomp.app;

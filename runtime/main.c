@@ -114,7 +114,7 @@ static void log_startup_info(void) {
 
 int main(int argc, char **argv) {
 #ifdef __ANDROID__
-    const char *data = SDL_GetAndroidInternalStoragePath();
+    const char *data = SDL_GetAndroidExternalStoragePath();
     if (!data || setenv("LARECOMP_DATA_ROOT", data, 1)) return 1;
     // The library is loaded into an existing Activity process; never re-exec
     // Android's app_process when its address layout conflicts with the guest.
@@ -157,7 +157,7 @@ int main(int argc, char **argv) {
     if (!realpath(argument, resolved_root)) {
         fprintf(stderr, "Cannot open game directory %s: %s\n", argument, strerror(errno));
 #ifdef __ANDROID__
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "SF2 Recomp", "Cannot open the imported game directory.", NULL);
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Shadow Fight 2", "Cannot open the bundled game directory.", NULL);
 #endif
         return 2;
     }

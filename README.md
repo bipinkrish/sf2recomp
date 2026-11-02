@@ -52,7 +52,7 @@ also passed; full combat stability and campaign completion remain unverified.
 | Linux x86-64 | Current development target; tested with AMD Radeon 680M, NVIDIA RTX 4070 Laptop GPU and Mesa lavapipe software Vulkan |
 | Windows x86-64 | Experimental host/build/package support implemented; no verified native build. See the [Windows guide](docs/windows.md). |
 | macOS arm64 / x86-64 | Experimental host/build/conversion support implemented; native build and GPU validation pending. See the [macOS guide](docs/macos.md). |
-| Android arm64 / x86-64 | Development APKs build; API 35 x86-64 emulator verified through a completed local Sparring match, touch menus and a desktop LAN protocol connection. Physical ARM64 phone validation pending. See [Android development](#android-development). |
+| Android arm64 / x86-64 | Development APKs build; API 35 x86-64 emulator verified through a completed local Sparring match, touch menus and a desktop LAN protocol connection. ARM64 phone startup and movie output verified; sustained play still needs testing. See [Android development](#android-development). |
 
 The CPU game code runs natively, with a Vulkan renderer and SDL for windowing,
 input and audio. Keyboard/controller remapping, resolution scaling, FSR 1, SMAA
@@ -296,20 +296,33 @@ all conversion and packaging; the Android app has no importer or tool launcher.
 On its first launch it unpacks the bundled data into private app storage, then
 starts the game. Subsequent launches reuse that data. Bundled updates validate
 both NSO build IDs and replace files transactionally; interrupted swaps recover
-on the next launch. Configuration, fonts, logs, caches and saves also live in
-internal app storage. For a debug installation, inspect them with:
+on the next launch. Editable configuration, saves and logs live in
+`Android/data/org.sf2recomp.app/files` on shared storage. Existing internal INI
+and saves migrate once without replacing external files. Uninstalling the app
+removes its files, so back up saves and settings first. Inspect them with:
 
 ```sh
-adb shell run-as org.sf2recomp.app cat files/lasrecomp.log
-adb shell run-as org.sf2recomp.app cat files/sf2recomp.ini
+adb shell cat /sdcard/Android/data/org.sf2recomp.app/files/lasrecomp.log
+adb shell cat /sdcard/Android/data/org.sf2recomp.app/files/sf2recomp.ini
 ```
 
-Development limitations: movies are skipped until a native Android decoder is
-implemented. Backgrounding closes the game session until guest suspension and
+Movies use Android's in-process MediaCodec decoder with synchronized SDL audio;
+tap a video or press Android Back to skip it. The intro follows `show_intro` in
+the app's INI (enabled for new installations). Existing settings are preserved.
+Android defaults to `aspect_ratio = native`, matching the screen's shape while
+keeping movie proportions. Sparring's Normal/LAN and Host/Join choices use the
+main-menu background and layout, with a Back choice at each level.
+The boss-power touch button appears only for Sparring characters with a special
+ability. It continues the action buttons' zigzag layout and matches Magic's
+size and palette, with one centered spiral and native cooldown/ready state. On the
+default desktop keyboard layout, press **1 + 3** together (ZL + ZR) for that power;
+it is separate from magic.
+
+Development limitations: backgrounding closes the game session until guest suspension and
 surface recreation are implemented; reopen the game to start a new session.
 The LAN protocol and in-game Sparring flow are shared with desktop, with Android
 network permissions and a foreground Wi-Fi discovery lock. ARM64-to-desktop
-combat determinism, physical-phone GPU/memory compatibility and sustained play
+combat determinism, wider device compatibility and sustained play
 still require validation. No original Android APK or mobile assets are required
 by this target.
 
@@ -317,6 +330,13 @@ Source-only Android platform link checks (both ABIs):
 
 ```sh
 python3 -m unittest discover -s tests -p test_android.py -v
+```
+
+Native movie checks cross-link both ABIs. To execute the synthetic video/audio
+test on a connected emulator or phone:
+
+```sh
+ANDROID_MOVIE_DEVICE=emulator-5580 PYTHONPATH=tests python3 -m unittest test_android_movie -v
 ```
 
 `tests/android_platform.c` can also be cross-compiled with the NDK and run via
@@ -339,7 +359,12 @@ Subsequent emulator checks verified bundled first-launch startup, footer-free
 menu and Sparring selection, Android Back navigation, and simultaneous joystick
 movement and attack fingers using the retained mobile controls. The duplicate
 Switch combat indicators are hidden on Android. A footer-free desktop roster
-capture is included in the README; physical ARM64 phone testing remains pending.
+capture is included in the README. An Android 16 ARM64 phone with an Adreno 825
+also reached the game menu and produced decoded video and audio. Its driver
+lacks uniform-buffer 8-bit access; that unused feature is now requested only
+when supported. Sustained phone play still requires testing.
+The native movie decoder passed a synthetic H.264/AAC test for frame colors,
+audio output, EOF and cancellation; the full intro completed in the emulator.
 Evidence is kept locally under `build/validation/android` and `build/android-*.log`.
 
 ## Development

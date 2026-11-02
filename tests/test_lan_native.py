@@ -41,18 +41,20 @@ int main(int argc,char **argv) {
         uint64_t until=SDL_GetTicksNS()+5000000000ull;
         while(mask!=3) {
             assert(SDL_GetTicksNS()<until);lan_gui_poll();
-            while(lan_gui_pop_menu(&e,0)) {
+            while(mask!=3 && lan_gui_pop_menu(&e,0)) {
                 assert(e.module==0 && e.down==1 && e.event==4+e.player);
                 mask|=1u<<e.player;
             }
             SDL_Delay(1);
         }
+        // Stop consuming once both peers' inputs arrive: the faster peer can
+        // already enqueue the next phase before this poll finishes.
         // Absolute mouse choices are ordered with keyboard input on the same
         // persistent session, including roster indices above the key-event range.
         assert(lan_gui_send_menu(0,1,200+lan_player(),3));mask=0;
         while(mask!=3) {
             assert(SDL_GetTicksNS()<until);lan_gui_poll();
-            while(lan_gui_pop_menu(&e,0)) {
+            while(mask!=3 && lan_gui_pop_menu(&e,0)) {
                 assert(e.input_type==3 && e.event==200+e.player && e.down==1);
                 mask|=1u<<e.player;
             }

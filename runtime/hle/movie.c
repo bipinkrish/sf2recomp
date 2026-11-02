@@ -7,7 +7,7 @@
 #include <limits.h>
 #include <pthread.h>
 #include <signal.h>
-#if !defined(_WIN32) && !defined(SF2_MOVIE_SDL_PROCESS)
+#if !defined(__ANDROID__) && !defined(_WIN32) && !defined(SF2_MOVIE_SDL_PROCESS)
 #include <spawn.h>
 #include <sys/wait.h>
 #endif
@@ -24,8 +24,14 @@
 #include "../rt.h"
 #include "../settings.h"
 #include "movie.h"
+#include "movie_android.h"
 
-#if defined(_WIN32) || defined(SF2_MOVIE_SDL_PROCESS)
+#ifdef __ANDROID__
+#define MOVIE_INDEPENDENT_TRACKS 1
+typedef AndroidMovie *MovieChild;
+typedef AndroidMovieTrack *MoviePipe;
+#define MOVIE_PIPE_NONE NULL
+#elif defined(_WIN32) || defined(SF2_MOVIE_SDL_PROCESS)
 #define MOVIE_SDL_PROCESS 1
 typedef SDL_Process *MovieChild;
 typedef SDL_IOStream *MoviePipe;
@@ -35,6 +41,9 @@ extern char **environ;
 typedef pid_t MovieChild;
 typedef int MoviePipe;
 #define MOVIE_PIPE_NONE (-1)
+#endif
+#ifndef MOVIE_INDEPENDENT_TRACKS
+#define MOVIE_INDEPENDENT_TRACKS 0
 #endif
 extern void audio_movie_set_active(bool active);
 
@@ -72,6 +81,7 @@ static atomic_bool g_movie_visible;
 static atomic_bool g_movie_skip_requested;
 static atomic_bool g_intro_prestarted;
 static atomic_bool g_movie_guest_ready;
+static atomic_bool g_movie_completed, g_movie_watched_end;
 static char g_intro_path[PATH_MAX];
 static atomic_uint_fast64_t g_movie_displayed_frame = UINT64_MAX;
 static uint64_t movie_now_ns(void) {
@@ -125,7 +135,7 @@ static bool movie_resolve_path(const char *guest_path, char *out, size_t out_siz
     return true;
 }
 
-#ifndef MOVIE_SDL_PROCESS
+#if !defined(MOVIE_SDL_PROCESS) && !defined(__ANDROID__)
 static int movie_move_fd(int fd) {
     int n;
 #ifdef F_DUPFD_CLOEXEC
@@ -152,6 +162,7 @@ typedef struct {
     char library_dir[PATH_MAX];
 } MovieDecoder;
 
+#ifndef __ANDROID__
 static bool movie_select_decoder(MovieDecoder *decoder) {
     memset(decoder, 0, sizeof *decoder);
     const char *override = getenv("LARECOMP_FFMPEG");
@@ -178,8 +189,16 @@ static bool movie_select_decoder(MovieDecoder *decoder) {
     LOG("[movie] bundled decoder not found beside the executable; trying PATH (developer fallback)\n");
     return true;
 }
+#endif
 
-#ifndef MOVIE_SDL_PROCESS
+#ifdef __ANDROID__
+static bool movie_spawn_decoder(const char *path, const MovieDecoder *decoder,
+                                MovieChild *child, MoviePipe *video_fd, MoviePipe *audio_fd) {
+    (void)decoder;
+    *child=android_movie_open(path,video_fd,audio_fd);
+    return *child!=NULL;
+}
+#elif !defined(MOVIE_SDL_PROCESS)
 static char **movie_spawn_environment(const char *library_dir, char *ld_library_path, size_t path_size,
                                       char ***owned_env) {
     *owned_env = NULL;
@@ -317,7 +336,10 @@ static bool movie_spawn_decoder(const char *path, const MovieDecoder *decoder,
 #endif
 
 static ssize_t movie_pipe_read(MoviePipe pipe, void *out, size_t size, MoviePlayer *player) {
-#ifdef MOVIE_SDL_PROCESS
+#ifdef __ANDROID__
+    (void)player;
+    return android_movie_read(pipe,out,size);
+#elif defined(MOVIE_SDL_PROCESS)
     while (!atomic_load(&player->stop)) {
         size_t n = SDL_ReadIO(pipe, out, size);
         if (n) return (ssize_t)n;
@@ -335,15 +357,17 @@ static ssize_t movie_pipe_read(MoviePipe pipe, void *out, size_t size, MoviePlay
 }
 
 static void movie_pipe_close(MoviePipe pipe) {
-#ifndef MOVIE_SDL_PROCESS
+#if !defined(MOVIE_SDL_PROCESS) && !defined(__ANDROID__)
     if (pipe != MOVIE_PIPE_NONE) close(pipe);
 #else
-    (void)pipe; // SDL_DestroyProcess owns its I/O streams, after readers join.
+    (void)pipe; // The decoder owner frees streams/tracks after readers join.
 #endif
 }
 
 static void movie_child_kill(MovieChild child) {
-#ifdef MOVIE_SDL_PROCESS
+#ifdef __ANDROID__
+    android_movie_cancel(child);
+#elif defined(MOVIE_SDL_PROCESS)
     if (child) SDL_KillProcess(child, true);
 #else
     if (child > 0) kill(child, SIGTERM);
@@ -351,7 +375,9 @@ static void movie_child_kill(MovieChild child) {
 }
 
 static int movie_child_wait(MovieChild child) {
-#ifdef MOVIE_SDL_PROCESS
+#ifdef __ANDROID__
+    return android_movie_failed(child) ? 1 : 0;
+#elif defined(MOVIE_SDL_PROCESS)
     int status = 255;
     return SDL_WaitProcess(child, true, &status) ? status : 255;
 #else
@@ -363,7 +389,9 @@ static int movie_child_wait(MovieChild child) {
 }
 
 static void movie_child_destroy(MovieChild child) {
-#ifdef MOVIE_SDL_PROCESS
+#ifdef __ANDROID__
+    android_movie_close(child);
+#elif defined(MOVIE_SDL_PROCESS)
     if (child) SDL_DestroyProcess(child);
 #else
     (void)child;
@@ -424,7 +452,8 @@ static void *movie_video_reader(void *arg) {
             // Keep frame zero intact until the presenter has shown it and released playback.
             while (!atomic_load(&p->playback_started) && !atomic_load(&p->stop)) movie_sleep_ns(1000000ull);
         }
-        for (uint64_t index = 1; n == MOVIE_FRAME_BYTES && !atomic_load(&p->stop);) {
+        uint64_t index = 1;
+        for (; n == MOVIE_FRAME_BYTES && !atomic_load(&p->stop);) {
             n = movie_read_frame(p->video_fd, scratch, MOVIE_FRAME_BYTES, p);
             if (n != MOVIE_FRAME_BYTES) break;
             // FFmpeg catches up to its input clock after a slow graphics boot.
@@ -443,6 +472,15 @@ static void *movie_video_reader(void *arg) {
             frame->valid = true;
             pthread_mutex_unlock(&g_movie_frames_lock);
         }
+#ifdef __ANDROID__
+        // In-process decoding can reach EOF while the final queue is still
+        // being presented. Keep the overlay through the last complete frame.
+        if (atomic_load(&p->first_frame_ready)) {
+            while (!atomic_load(&p->stop) && atomic_load(&g_movie_displayed_frame)!=index-1)
+                movie_sleep_ns(1000000ull);
+            if (!atomic_load(&p->stop)) movie_sleep_ns(1000000000ull/MOVIE_FPS);
+        }
+#endif
         free(scratch);
     } else {
         LOG("[movie] cannot allocate video frame buffer\n");
@@ -467,9 +505,15 @@ static void *movie_audio_reader(void *arg) {
             playback_started = true;
             if (p->audio_stream) SDL_ResumeAudioStreamDevice(p->audio_stream);
         }
-        if (p->audio_stream && playback_started) {
-            while (!atomic_load(&p->stop) && SDL_GetAudioStreamQueued(p->audio_stream) > MOVIE_AUDIO_QUEUE_LIMIT)
+        // Independent codecs can bound pre-roll without blocking video output.
+        if (p->audio_stream && (playback_started || MOVIE_INDEPENDENT_TRACKS)) {
+            while (!atomic_load(&p->stop) && SDL_GetAudioStreamQueued(p->audio_stream) > MOVIE_AUDIO_QUEUE_LIMIT) {
+                if (!playback_started && atomic_load(&p->playback_started)) {
+                    playback_started=true;
+                    SDL_ResumeAudioStreamDevice(p->audio_stream);
+                }
                 movie_sleep_ns(5000000ull);
+            }
         }
         ssize_t n = movie_pipe_read(p->audio_fd, buffer, sizeof buffer, p);
         if (n > 0) {
@@ -513,6 +557,8 @@ static void *movie_monitor(void *arg) {
     if (!atomic_load(&p->stop) && status != 0)
         LOG("[movie] decoder exited with status %#x\n", status);
     audio_movie_set_active(false);
+    atomic_store(&g_movie_watched_end,!atomic_load(&p->stop) && status==0 && atomic_load(&p->first_frame_submitted));
+    atomic_store(&g_movie_completed,true);
     atomic_store(&g_movie_visible, false);
     LOG("[movie] host playback finished%s\n", atomic_load(&p->stop) ? " (stopped)" : "");
     atomic_store(&p->monitor_done, true);
@@ -523,6 +569,10 @@ static void *movie_monitor(void *arg) {
 // the window thread must keep presenting while the guest loads the next scene.
 static void movie_cancel_locked(void) {
     bool was_visible = atomic_exchange(&g_movie_visible, false);
+    if (was_visible) {
+        atomic_store(&g_movie_watched_end,false);
+        atomic_store(&g_movie_completed,true);
+    }
     atomic_store(&g_movie.stop, true);
     atomic_store(&g_movie_skip_requested, false);
     // The monitor reaps a completed child while leaving its PID in the player. Only signal a live overlay, avoiding
@@ -576,16 +626,6 @@ static void movie_stop_locked(void) {
 }
 
 static bool movie_start(const char *guest_path) {
-#ifdef __ANDROID__
-    // No external executable can be launched from app data on modern Android.
-    // A native movie decoder is still required. Keep the guest extractor's
-    // empty track list successful so it can finish the movie lifecycle.
-    (void)guest_path;
-    atomic_store(&g_movie.source_ready, true);
-    atomic_store(&g_movie_guest_ready, true);
-    LOG("[movie] playback skipped: Android decoder not implemented\n");
-    return true;
-#endif
     pthread_mutex_lock(&g_movie_lock);
     if (atomic_exchange(&g_intro_prestarted, false)) {
         char resolved[PATH_MAX];
@@ -604,7 +644,9 @@ static bool movie_start(const char *guest_path) {
     movie_stop_locked();
 
     char path[PATH_MAX];
-    MovieDecoder decoder;
+    atomic_store(&g_movie_completed,false);
+    atomic_store(&g_movie_watched_end,false);
+    MovieDecoder decoder={0};
     if (!movie_resolve_path(guest_path, path, sizeof path)) {
         LOG("[movie] cannot resolve game movie path: %s\n", guest_path ? guest_path : "(null)");
         pthread_mutex_unlock(&g_movie_lock);
@@ -615,7 +657,10 @@ static bool movie_start(const char *guest_path) {
         pthread_mutex_unlock(&g_movie_lock);
         return false;
     }
-    if (!movie_select_decoder(&decoder) ||
+    if (
+#ifndef __ANDROID__
+        !movie_select_decoder(&decoder) ||
+#endif
         !movie_spawn_decoder(path, &decoder, &g_movie.child, &g_movie.video_fd, &g_movie.audio_fd)) {
         LOG("[movie] decoder startup failed for %s (rebuild the app package or set LARECOMP_FFMPEG)\n", path);
         movie_frames_clear();
@@ -684,9 +729,6 @@ static bool movie_start(const char *guest_path) {
 }
 
 void movie_preload_intro(void) {
-#ifdef __ANDROID__
-    return;
-#endif
     if (!g_settings.show_intro || atomic_load(&g_intro_prestarted)) return;
     char path[PATH_MAX];
     if (!movie_resolve_path("intro.mp4", path, sizeof path) || !movie_start("intro.mp4")) return;
@@ -705,6 +747,10 @@ bool movie_guest_ready(void) {
 bool movie_overlay_active(void) {
     return atomic_load(&g_movie_visible);
 }
+bool movie_playback_completed(void) {
+    return atomic_load(&g_movie_guest_ready) && atomic_load(&g_movie_completed);
+}
+bool movie_watched_to_end(void) { return atomic_load(&g_movie_watched_end); }
 
 void movie_request_skip(void) {
     if (movie_overlay_active()) atomic_store(&g_movie_skip_requested, true);
@@ -792,7 +838,7 @@ static void movie_stop_from_guest(void) {
     pthread_mutex_lock(&g_movie_lock);
     if (movie_overlay_active()) {
         LOG("[movie] guest stopped playback\n");
-        movie_stop_locked();
+        movie_cancel_locked();
     }
     pthread_mutex_unlock(&g_movie_lock);
 }
@@ -803,6 +849,8 @@ RT_ON_RESET(movie_reset) {
     atomic_store(&g_movie_guest_ready, false);
     g_intro_path[0] = 0;
     movie_stop_locked();
+    atomic_store(&g_movie_completed,false);
+    atomic_store(&g_movie_watched_end,false);
     pthread_mutex_unlock(&g_movie_lock);
 }
 

@@ -16,6 +16,34 @@ typedef struct {
 static SDL_SpinLock touch_lock;
 static Contact contacts[MENU_TOUCH_MAX];
 static float window_width, window_height;
+static struct { SDL_TouchID device; SDL_FingerID finger; bool used; } movie_fingers[MENU_TOUCH_MAX];
+static void cancel_contacts(void);
+
+bool menu_touch_movie_event(const SDL_Event *e, bool visible) {
+    if (e->type==SDL_EVENT_WINDOW_FOCUS_LOST || e->type==SDL_EVENT_WINDOW_MINIMIZED) {
+        SDL_LockSpinlock(&touch_lock);
+        memset(movie_fingers,0,sizeof movie_fingers);
+        SDL_UnlockSpinlock(&touch_lock);
+        return false;
+    }
+    if (e->type!=SDL_EVENT_FINGER_DOWN && e->type!=SDL_EVENT_FINGER_MOTION &&
+        e->type!=SDL_EVENT_FINGER_UP && e->type!=SDL_EVENT_FINGER_CANCELED) return false;
+    SDL_LockSpinlock(&touch_lock);
+    int matched=-1, empty=-1;
+    for (int i=0;i<MENU_TOUCH_MAX;++i) {
+        if (!movie_fingers[i].used) { if(empty<0)empty=i; }
+        else if (movie_fingers[i].device==e->tfinger.touchID && movie_fingers[i].finger==e->tfinger.fingerID) matched=i;
+    }
+    if (matched<0 && visible && empty>=0) {
+        matched=empty;movie_fingers[matched].device=e->tfinger.touchID;
+        movie_fingers[matched].finger=e->tfinger.fingerID;movie_fingers[matched].used=true;
+    }
+    if (visible) cancel_contacts();
+    if (matched>=0 && (e->type==SDL_EVENT_FINGER_UP || e->type==SDL_EVENT_FINGER_CANCELED))
+        movie_fingers[matched].used=false;
+    SDL_UnlockSpinlock(&touch_lock);
+    return visible || matched>=0;
+}
 
 static void cancel_contacts(void) {
     for (unsigned i = 0; i < MENU_TOUCH_MAX; ++i) {
@@ -33,6 +61,7 @@ void menu_touch_cancel(void) {
 RT_ON_RESET(reset_menu_touch) {
     SDL_LockSpinlock(&touch_lock);
     memset(contacts, 0, sizeof contacts);
+    memset(movie_fingers, 0, sizeof movie_fingers);
     SDL_UnlockSpinlock(&touch_lock);
 }
 

@@ -487,7 +487,10 @@ static void create_device(void) {
                                             .pNext = g_vk.custom_border ? (void *)&cbc : g_vk.divisor ? (void *)&div : NULL};
     VkPhysicalDeviceVulkan12Features f12 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
                                             .timelineSemaphore = VK_TRUE, .shaderInt8 = VK_TRUE, .samplerMirrorClampToEdge = VK_TRUE,
-                                            .uniformAndStorageBuffer8BitAccess = VK_TRUE, .storageBuffer8BitAccess = VK_TRUE,
+                                            // Adreno exposes storage-buffer byte access but may omit the
+                                            // optional uniform-buffer equivalent. Our UBOs use 32-bit words.
+                                            .uniformAndStorageBuffer8BitAccess = have12.uniformAndStorageBuffer8BitAccess,
+                                            .storageBuffer8BitAccess = VK_TRUE,
                                             .scalarBlockLayout = VK_TRUE, .bufferDeviceAddress = g_vk.bda, .pNext = &f13};
     VkPhysicalDeviceVulkan11Features f11 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
                                             .storageBuffer16BitAccess = VK_TRUE, .pNext = &f12};
@@ -1350,6 +1353,14 @@ void ui_window_init(void) {
     }
     window = SDL_CreateWindow(game_window_title(), win_w, win_h, wflags);
     if (!window) FATAL("SDL_CreateWindow: %s\n", SDL_GetError());
+    SDL_DisableScreenSaver();
+    if (g_settings.aspect==ASPECT_NATIVE) {
+        int width=0,height=0;
+        if (SDL_GetWindowSize(window,&width,&height) && width>0 && height>0) {
+            g_settings.native_width=width;g_settings.native_height=height;
+            LOG("[video] native aspect: window %dx%d, guest %ux1080\n",width,height,settings_screen_width(1080));
+        }
+    }
     if (game_icon_path()[0]) {
         SDL_Surface *icon = SDL_LoadPNG(game_icon_path());
         if (!icon) LOG("[desktop] cannot load original icon: %s\n", SDL_GetError());
