@@ -37,7 +37,6 @@ Settings g_settings = {
     .bg_input = true,
     .prompts = PROMPTS_AUTO,
     .player_setup = PLAYER_SETUP_SOLO,
-    .experimental_keyboard_prompts = false,
     .network_enabled = false,
     .unlock_all_sparring_characters = true,
     .enable_shadow_in_sparring = true,
@@ -186,7 +185,6 @@ static const ConfigOption config_options[] = {
     {"video", "antialiasing", CONFIG_ANTIALIAS, &g_settings.antialias},
     {"input", "prompts", CONFIG_PROMPTS, &g_settings.prompts},
     {"input", "player_setup", CONFIG_PLAYER_SETUP, &g_settings.player_setup},
-    {"experimental", "keyboard_prompts", CONFIG_BOOL, &g_settings.experimental_keyboard_prompts},
     {"storage", "use_completed_save", CONFIG_BOOL, &g_settings.use_completed_save},
     {"storage", "save_directory", CONFIG_PATH, g_settings.save_directory, sizeof g_settings.save_directory},
 };
@@ -267,7 +265,6 @@ static bool config_assign(const ConfigOption *option, const char *value) {
         else return false;
     } else if (option->type == CONFIG_PROMPTS) {
         if (!strcasecmp(value, "auto")) *(int *)option->value = PROMPTS_AUTO;
-        else if (!strcasecmp(value, "keyboard")) *(int *)option->value = PROMPTS_KEYBOARD;
         else if (!strcasecmp(value, "nintendo")) *(int *)option->value = PROMPTS_NINTENDO;
         else if (!strcasecmp(value, "xbox")) *(int *)option->value = PROMPTS_XBOX;
         else if (!strcasecmp(value, "playstation")) *(int *)option->value = PROMPTS_PLAYSTATION;

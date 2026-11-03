@@ -39,7 +39,10 @@ static void lan_update_back_prompt(Cpu *c) {
     char key[64],text[96];
     if(input_any_gamepad_connected())
         snprintf(key,sizeof key,"%s",bind_pad_label(bind_prompt_host(BIND_B),bind_label_family()));
-    else if(!hint_key_label(HINT_B,key,sizeof key))snprintf(key,sizeof key,"unbound");
+    else {
+        const char *name=bind_key_label(g_bind_key[BIND_B]);
+        snprintf(key,sizeof key,"%s",name && *name && strcmp(name,"(none)") ? name : "Unbound");
+    }
     snprintf(text,sizeof text,"BACK [%s]",key);
     if(back==lan_back_owner && !strcmp(text,lan_back_prompt))return;
     lan_back_owner=back;snprintf(lan_back_prompt,sizeof lan_back_prompt,"%s",text);
@@ -167,7 +170,7 @@ static bool lan_show(Cpu *c,unsigned phase,const char *title,const char *const l
             guest_invoke2(c,0x70011cba70ull,back,0);
             uint64_t hint=LD64(back+0x140);
             if(hint) {
-                guest_invoke2(c,0x7000cd7120ull,hint,HINT_B);
+                guest_invoke2(c,0x7000cd7120ull,hint,1); // HintID.B
                 uint64_t object=guest_invoke2(c,0x700121e720ull,hint,0);
                 if(object)guest_invoke2(c,0x7001226480ull,object,1);
                 guest_invoke2(c,GUEST_BEHAVIOUR_SET_ENABLED,hint,1);

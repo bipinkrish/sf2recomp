@@ -11,15 +11,11 @@ Forked from [LAS Recomp](https://github.com/Peiikai/LASRecomp)'s generator
 | `lifter.py`, `simd_c.py` | Instruction and portable FP/SIMD lowering |
 | `gen.py` | C generation; `--symbols` seeds IL2CPP function boundaries and names |
 | `game_addresses.py` | Supported SF2 build IDs and guest address definitions |
-| `patches.py` | Console-stream, frame-rate, keyboard-hint and default offline hooks; no instruction patches |
+| `patches.py` | Console-stream, frame-rate and default offline hooks; no instruction patches |
 
 Hook metadata is `(instruction, jump_targets, description[, feature_bit])`.
 Optional groups are configured before guest threads start. A disabled site's
 generated guard skips the callback and executes its checked original instruction.
-Keyboard hints use `RT_HOOK_KEYBOARD_PROMPTS`; console and frame-rate compatibility
-hooks stay unconditional. Hint bookkeeping is allocated on first enabled use and
-freed on guest reset. This is a runtime gate, so executable code and one flag check
-per optional site remain even when the feature is off.
 
 From the repository root, with your extracted update and IL2CPP symbol map:
 

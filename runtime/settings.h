@@ -14,8 +14,7 @@ enum { UPSCALE_BILINEAR = 0, UPSCALE_METALFX = 1, UPSCALE_FSR1 = 2 };
 enum { AA_OFF = 0, AA_SMAA = 1 };
 enum { PLAYER_SETUP_SOLO = 0, PLAYER_SETUP_KEYBOARD_VS_CONTROLLER, PLAYER_SETUP_TWO_CONTROLLERS };
 enum {
-    PROMPTS_AUTO = 0, PROMPTS_NINTENDO = 1, PROMPTS_XBOX = 2, PROMPTS_PLAYSTATION = 3,
-    PROMPTS_KEYBOARD = 4
+    PROMPTS_AUTO = 0, PROMPTS_NINTENDO = 1, PROMPTS_XBOX = 2, PROMPTS_PLAYSTATION = 3
 };
 
 extern bool g_gpu_integrated;
@@ -46,7 +45,6 @@ typedef struct Settings {
     bool bg_input;
     int prompts;
     int player_setup;
-    bool experimental_keyboard_prompts;
     bool network_enabled;
     bool unlock_all_sparring_characters;
     bool enable_shadow_in_sparring;

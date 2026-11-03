@@ -173,7 +173,6 @@ static uint64_t sparring_scroll_content(Cpu *c, uint64_t table) {
     uint64_t parent = LD64(table + 0x30);
     uint64_t content = guest_invoke2(c, 0x70015da040ull, parent, guest_string(c, "SparringScrollContent"));
     if (content) return content;
-    if (!ensure_keyboard_hint_state()) return 0;
     uint64_t rect_type = guest_invoke2(c, 0x70008ea5c0ull, 0,
         guest_string(c, "UnityEngine.RectTransform, UnityEngine"));
     uint64_t type_type = guest_invoke2(c, 0x70008ea5c0ull, 0, guest_string(c, "System.Type"));
@@ -281,15 +280,39 @@ static uint64_t sparring_portrait(Cpu *c, uint64_t source, unsigned fighter) {
     return sprite;
 }
 
+// Create a plain UI child without cloning localization scripts or scaling.
+static uint64_t sparring_create_graphic(Cpu *c, uint64_t source, uint64_t parent, uint64_t type, const char *name) {
+    uint64_t rect_type = guest_invoke2(c, 0x70008ea5c0ull, 0,
+        guest_string(c, "UnityEngine.RectTransform, UnityEngine"));
+    uint64_t type_type = guest_invoke2(c, 0x70008ea5c0ull, 0,
+        guest_string(c, "System.Type"));
+    if (!type || !rect_type || !type_type) return 0;
+    uint64_t source_go = guest_invoke2(c, 0x700121e720ull, source, 0);
+    uint64_t go = guest_invoke2(c, 0x7000b5b110ull, LD64(source_go), 0);
+    uint64_t types = guest_invoke4(c, 0x70006e6740ull, 0, type_type, 1, 0);
+    if (!go || !types) return 0;
+    ST64(types + 0x20, rect_type);
+    guest_invoke4(c, 0x7001225f80ull, go, guest_string(c, name), types, 0);
+    uint64_t graphic = guest_invoke2(c, 0x70012260e0ull, go, type);
+    if (!graphic) return 0;
+    uint64_t rect = guest_invoke2(c, 0x700121e6b0ull, graphic, 0);
+    guest_invoke4(c, 0x70015d8ec0ull, rect, parent, 0, 0);
+    guest_set_vec2(c, 0x700123a050ull, rect, 0.5f, 0.5f); // anchorMin
+    guest_set_vec2(c, 0x700123a250ull, rect, 0.5f, 0.5f); // anchorMax
+    guest_set_vec2(c, 0x700123a550ull, rect, 0, 0);       // anchoredPosition
+    guest_set_vec2(c, 0x700123a9d0ull, rect, 0.5f, 0.5f); // pivot
+    guest_invoke2(c, 0x7000114ff0ull, graphic, 0); // no raycast target
+    return graphic;
+}
+
 static void sparring_fit_portrait(Cpu *c, uint64_t image, uint64_t sprite, unsigned fighter) {
     uint64_t rect = guest_invoke2(c, 0x700121e6b0ull, image, 0);
-    if (!ensure_keyboard_hint_state()) return;
-    if (!hints->image_type) hints->image_type = guest_invoke2(c, 0x70008ea5c0ull, 0,
+    uint64_t image_type = guest_invoke2(c, 0x70008ea5c0ull, 0,
         guest_string(c, "UnityEngine.UI.Image, UnityEngine.UI"));
     const char *name = "FittedSparringPortrait";
     uint64_t child = guest_invoke2(c, 0x70015da040ull, rect, guest_string(c, name));
-    uint64_t portrait = child ? guest_invoke2(c, 0x700121e790ull, child, hints->image_type) :
-                               create_hint_graphic(c, image, rect, hints->image_type, name);
+    uint64_t portrait = child ? guest_invoke2(c, 0x700121e790ull, child, image_type) :
+                               sparring_create_graphic(c, image, rect, image_type, name);
     if (!portrait) return;
     uint64_t portrait_rect = guest_invoke2(c, 0x700121e6b0ull, portrait, 0);
     guest_set_vec2(c, 0x700123a050ull, portrait_rect, 0, 0);

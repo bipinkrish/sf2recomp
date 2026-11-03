@@ -419,84 +419,18 @@ binding walker B chain, eaten to anchor 0, nnMain returns 0. 63 commits.
   scripted Story inputs without a fatal error. The packaged output was refreshed.
 
 
-## 2026-10-31 — keyboard intro skip and native prompt labels
+## 2026-10-31 — keyboard intro skip
 
-- The host movie now accepts the original skip actions, HintID A/B, through
-  keyboard/gamepad bindings before guest input is blocked. Decoder teardown runs
-  on the UI thread, and the triggering press is consumed through its release.
-- Image-only `HintUI`, `ButtonHintUI` and generic graphic hints now receive a plain
-  Unity Text child using the game's font and font size. Direction groups share
-  one label; a layout element reserves the measured text width. Controller mode
-  restores original artwork and disables the added text/layout. Destroy hooks
-  release cached hint records when their guest components are destroyed.
-- Verified with the actual INI: J skipped the normal-speed intro, the menu showed
-  `Up / Down Select` and `K OK`, and K opened Story with `MORE K`. A temporary
-  diagnostic INI rebound A to Space to verify that both labels and skip followed
-  the mapping; no Space binding was added to the user's INI.
-- Keyboard label color comes from the replaced sprite's dominant opaque artwork
-  color, multiplied by its own Graphic tint; later tint and alpha changes follow
-  that original graphic. Captions supply only the font. This matters because the
-  dark button beside MORE has a white tint with dark pixels baked into its BC3
-  atlas. Sampling uses the sprite rectangle in the original NVN backing storage,
-  ignores transparent padding, and caches the result until the sprite changes.
-  Unsupported formats retain the original tint. Regression tests cover atlas
-  bounds, tiled RGBA/BC3 palettes, transparency, mapping, restoration and fading.
-- Visually verified dark `MORE K` and cream main-menu keys with the actual INI.
-  All 49 tests pass; the packaged build was refreshed while preserving its INI.
-- Keys inside buttons with a separate visible background now have outline badges
-  in the same color as the mapped key: circles for single characters and rounded
-  rectangles for longer names. The key is sized to fit within the border and the
-  layout reserves its measured width. Standalone footer/header hints stay plain,
-  including legends that happen to have invisible Button components. Borders use
-  feathered Unity UI mesh geometry, following normal canvas clipping and fades;
-  controller mode disables them along with the generated labels.
-- The hint's LayoutElement now lives on the direct child of the nearest horizontal
-  layout, so long labels reserve space beside the caption. Fixed icon slots keep
-  the badge's left edge in place. Launch checks covered circled K and boxed Space
-  and Backspace; the temporary word bindings did not change the user's INI.
-- All 49 tests pass and the packaged executable matches the rebuilt runtime.
-  One final normal-binding launch stalled during Story loading: the main thread
-  waited on condvar 0x7240e5d628 from guest frame 0x7001a81eec, with the render queue
-  fully drained. An identical retry reached the Sensei dialog and rendered the
-  circled K. This intermittent scene-loading stall remains unresolved; its trace
-  is retained at build/validation/outline-story-stall.log.
+- The host movie accepts the original skip actions A/B through keyboard/gamepad
+  bindings before guest input is blocked. Decoder teardown runs on the UI thread,
+  and the triggering press is consumed through its release.
 
-## 2026-10-31 — experimental keyboard hints default off
+## 2026-10-31 — intermittent Story loading stall
 
-- All in-game keyboard prompt replacements, including inline text, image labels,
-  badge outlines and toggle changes, now require `[experimental] keyboard_prompts
-  = true`. The runtime default, supplied INI and existing local build/package INIs
-  set it to false. `prompts = keyboard` alone does not opt in. Keyboard mappings
-  and movie skip remain independent of this display feature.
-- Inline dialogue preserves the game's directional shorthand instead of expanding
-  it into key lists. Standalone direction groups use `WASD`, `Arrows`, or compact
-  numpad names; other names retain familiar abbreviations (`Esc`, `Enter`, `Bksp`).
-  Generated text rectangles follow measured content, and unusually wide names
-  shrink to a bounded width rather than expanding the entire dialog row.
-- All 50 tests pass, including default/INI opt-in behavior, UI restoration,
-  directional shorthand and width limits. Launches verified the original icons
-  with the default INI and compact prompts through the punching-bag tutorial with
-  a temporary opt-in INI. The package was refreshed with the experiment disabled.
-
-## 2026-10-31 — optional hooks bypass disabled callbacks
-
-- Keyboard hooks are now a separate runtime group configured after INI loading
-  and before guest threads start. Each generated optional site checks its group
-  bit before calling the hook; when disabled it executes the original, validated
-  instruction directly. Console and frame-rate compatibility hooks remain active.
-- Hint caches and cached Unity types moved from fixed global arrays into one
-  lazily allocated state block. Disabled runs allocate no hint state or UI and
-  perform no keyboard-hook lookups/scans. Reset frees the state. The executable
-  still contains the feature code and a flag check at each optional site.
-- Generator regression tests execute original and gated instructions and count
-  callbacks. Runtime tests exercise every disabled site with invalid guest
-  pointers, verify CPU state is preserved, check lazy allocation/reset and confirm
-  that frame-rate hooks remain active. All 52 tests pass.
-- Regenerated/rebuilt main and SDK. Both launch checks skipped the intro using J
-  and entered Story with K: disabled mode showed the original A icon, while opt-in
-  mode showed the circled K. The packaged executable was refreshed with the
-  experiment still disabled in its INI.
-
+A launch stalled during Story loading. The main thread waited on condvar
+`0x7240e5d628` from guest frame `0x7001a81eec`, with the render queue fully
+drained. An identical retry reached the Sensei dialog. The stall remains
+unresolved; its trace is retained at `build/validation/outline-story-stall.log`.
 
 ### 2026-10-31 — live play: shared-font wait and missing half comparison
 

@@ -44,29 +44,6 @@ def compile_harness(source, output):
 
 
 class SettingsTests(unittest.TestCase):
-    def test_experimental_keyboard_prompts_require_opt_in(self):
-        harness = r'''
-#include <assert.h>
-#include "settings.h"
-int main(int argc, char **argv) {
-    assert(argc == 4 && !g_settings.experimental_keyboard_prompts);
-    assert(settings_load_file(argv[1]) && g_settings.experimental_keyboard_prompts);
-    assert(settings_load_file(argv[2]) && !g_settings.experimental_keyboard_prompts);
-    assert(settings_load_file(argv[3]) && !g_settings.experimental_keyboard_prompts);
-    return 0;
-}
-'''
-        with tempfile.TemporaryDirectory(prefix="sf2-experimental-config-") as directory:
-            root = pathlib.Path(directory)
-            (root / "test.c").write_text(harness)
-            files = []
-            for name, value in (("on", "true"), ("off", "false"), ("invalid", "maybe")):
-                path = root / f"{name}.ini"
-                path.write_text(f"[experimental]\nkeyboard_prompts = {value}\n")
-                files.append(str(path))
-            compile_harness(root / "test.c", root / "test")
-            subprocess.run([str(root / "test"), *files], check=True)
-
     def test_extensible_config_and_environment_precedence(self):
         harness = r'''
 #include <assert.h>

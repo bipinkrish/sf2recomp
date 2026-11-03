@@ -26,9 +26,6 @@ antialiasing = off
 prompts = auto
 player_setup = solo
 
-[experimental]
-keyboard_prompts = false
-
 [storage]
 save_directory = save
 use_completed_save = false
@@ -286,24 +283,15 @@ overrides. Saves/caches/logs live beside the executable by default;
 `LARECOMP_DATA_ROOT` or `LARECOMP_DATA_HOME` selects another writable state folder.
 These overrides do not move the default executable-side INI.
 
-## Experimental keyboard prompts
+## Controller prompts and intro playback
 
-`[input] prompts` accepts `auto`, `keyboard`, `nintendo`, `xbox`, or `playstation`.
-Replacing in-game icons/text with keyboard labels is experimental and **off by
-default**. Menu footer strips are hidden on desktop and Android; centered dialogs and combat
-prompts remain visible. Opt in with `[experimental] keyboard_prompts = true`; `prompts = keyboard`
-alone does not enable it. With this experiment enabled, labels use current INI
-bindings and `prompts = keyboard` forces them even with a controller connected.
-When disabled, its hook group bypasses callbacks and runs the original game
-instructions; no hint cache or replacement UI is allocated. Each optional site
-retains a flag check, and the feature's code remains in the executable.
-Direction groups use compact names (`WASD`, `Arrows`); inline dialogue keeps the
-game's directional shorthand. Long key names shrink to a bounded width.
-Keys inside visible action buttons have matching outline badges: circles for single characters and rounded
-rectangles for longer names. Standalone hints stay plain. During the intro, either
-mapped A or B skips playback (**K** or **J** with the shipped bindings). The skip
-press is consumed so it cannot also activate the menu behind the movie. Mouse
-clicks also skip playback and are consumed through release. On Android, tapping
+`[input] prompts` accepts `auto`, `nintendo`, `xbox`, or `playstation`.
+Menu footer strips are hidden on desktop and Android; dialogs and combat prompts
+retain the original game artwork.
+
+During the intro, either mapped A or B skips playback, **K** or **J** with the
+shipped bindings. The skip press is consumed so it cannot also activate the menu
+behind the movie. Mouse clicks also skip playback and are consumed through release. On Android, tapping
 the video skips it; that finger remains captured until release.
 
 The intro decoder starts before graphics and engine initialization finish. Module

@@ -114,8 +114,6 @@ void *hle_alloc(size_t size) { return calloc(1, size); }
 bool input_any_gamepad_connected(void) { return false; }
 int input_pad_family(void) { return 1; }
 int input_family_of_type(int type) { return 1; }
-bool nvn_texture_region_color(const NvnTexture *t, uint32_t x, uint32_t y,
-                              uint32_t w, uint32_t h, float rgb[3]) { return false; }
 int main(void) {
     Cpu cpu; memset(&cpu, 0x5a, sizeof cpu); Cpu before = cpu;
     g_settings.developer_console = true;
@@ -153,8 +151,6 @@ bool rt_probe_u64(uint64_t a, uint64_t *v) { return false; }
 bool input_any_gamepad_connected(void) { return false; }
 int input_pad_family(void) { return 1; }
 int input_family_of_type(int type) { return 1; }
-bool nvn_texture_region_color(const NvnTexture *t, uint32_t x, uint32_t y,
-                              uint32_t w, uint32_t h, float rgb[3]) { return false; }
 int main(int argc, char **argv) {
     assert(argc == 2);
     assert(settings_load_file(argv[1]));

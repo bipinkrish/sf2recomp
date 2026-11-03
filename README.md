@@ -24,32 +24,28 @@ Captured from the native Linux and Android builds. Click any image for full reso
 
 [![Wraith versus Aquaris on the night lake stage, filling the 32:9 view](docs/screenshots/ultrawide-night.png)](docs/screenshots/ultrawide-night.png)
 
-*32:9 gameplay at 5120×1440. Experimental ultrawide mode uses scenery cover scaling;
-see the [graphics guide](docs/runtime-guide.md#graphics-and-frame-rate).*
-
-| Desktop main menu | Sparring combat |
-| :---: | :---: |
-| [![The main menu framed by autumn trees and an open dojo gate](docs/screenshots/main-menu.png)](docs/screenshots/main-menu.png) | [![Wraith and Hurricane fighting against a sunlit mountain village backdrop](docs/screenshots/sparring.png)](docs/screenshots/sparring.png) |
-| Original 16:9 · 1920×1080 | 16:10 · 1728×1080 |
-
-| Sparring character selection | Sunset arena |
-| :---: | :---: |
-| [![The Sparring character roster with Fury ready and the footer hidden](docs/screenshots/character-select.png)](docs/screenshots/character-select.png) | [![Wraith and May facing off between glowing stone pillars at sunset](docs/screenshots/sunset-arena.png)](docs/screenshots/sunset-arena.png) |
-| Original 16:9 · 1920×1080 | Original 16:9 · 1920×1080 |
-
 [![Wraith and Puma fighting beneath giant forest branches in 32:9](docs/screenshots/ultrawide-forest.png)](docs/screenshots/ultrawide-forest.png)
 
-*Forest Sparring at 5120×1440, with corrected fight framing and ground alignment.*
+*32:9 gameplay at 5120×1440. Ultrawide mode uses scenery cover scaling;
+see the [graphics guide](docs/runtime-guide.md#graphics-and-frame-rate).*
 
-[![Lynx versus Corsair on Android, with touch controls and the boss-power button ready](docs/screenshots/android-sparring.png)](docs/screenshots/android-sparring.png)
+<p>
+  <a href="docs/screenshots/main-menu.png"><img src="docs/screenshots/main-menu.png" width="49%" alt="The main menu framed by autumn trees and an open dojo gate"></a>
+  <a href="docs/screenshots/character-select.png"><img src="docs/screenshots/character-select.png" width="49%" alt="The Sparring character roster with Fury ready and the footer hidden"></a>
+</p>
 
-*Android emulator · 2424×1080 · Sparring with touch controls and Lynx's boss power ready.*
+*Desktop main menu · Sparring character selection*
+
+<p>
+  <a href="docs/screenshots/sunset-arena.png"><img src="docs/screenshots/sunset-arena.png" width="49%" alt="Wraith and May facing off between glowing stone pillars at sunset"></a>
+  <a href="docs/screenshots/android-sparring.png"><img src="docs/screenshots/android-sparring.png" width="49%" alt="Lynx versus Corsair on Android, with touch controls and the boss-power button ready"></a>
+</p>
+
+*Sunset arena. Original 16:9 at 1920×1080 · Android Sparring with touch controls.*
 
 ## Status
 
-This is a work in progress. Linux x86-64 builds run the animated menu, Story/Sensei
-introduction and intro cinematic. Selected tutorial and Kenji sparring tests have
-also passed; full combat stability and campaign completion remain unverified.
+This is a work in progress.
 
 | Platform | Status |
 | --- | --- |
@@ -84,7 +80,6 @@ restarting; no rebuild is needed.
 | **Remappable keyboard and controllers** | `[controls.keyboard]` and `[controls.gamepad]` map desktop inputs to Switch actions, including unbinding actions and sharing inputs. |
 | **Mouse menus** | Hover and left-click use the game's existing menu buttons. Pointer coordinates follow window resizing, black bars, HiDPI displays and configured aspect ratios; existing sliders and scroll views also receive mouse drag and wheel input. |
 | **Menu layout** | The bottom controller-hint strips are hidden on desktop and Android. Centered dialog prompts, combat hints and the gameplay HUD remain visible. |
-| **Keyboard prompts (experimental)** | `[experimental] keyboard_prompts = true` replaces supported in-game button hints with your mapped keys. Automatic selection follows controller presence. Disabled by default; some screens may need layout adjustments. |
 | **Desktop Exit button** | The main menu's localized **Exit** option closes the game and returns to the desktop, including in fullscreen. |
 | **Game network blocking** | `[network] enabled = false` is the default and blocks game connections, DNS, uploads, online multiplayer, external web links and the remote developer listener. Offline Sparring remains available. Enabling networking does not implement missing online services. |
 | **Unlocked Sparring roster** | `[gameplay] unlock_all_sparring_characters = true` makes every Sparring character available without campaign progression. Enabled by default; does not change saved Story unlocks. |

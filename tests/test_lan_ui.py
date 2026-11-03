@@ -15,7 +15,6 @@ void menu_request_quit(void) {}
 uint64_t plat_now_ns(void) { return 1000000; }
 uint64_t renderer_present_count(void) { return 1; }
 bool rt_probe_u64(uint64_t a,uint64_t *v) { return false; }
-bool nvn_texture_region_color(const NvnTexture*t,uint32_t x,uint32_t y,uint32_t w,uint32_t h,float rgb[3]) { return false; }
 void *hle_alloc(uint64_t n) { return calloc(1,n); }
 static uint64_t prototype,selection_table,selected_rect,main_section,submenu_clone;
 static unsigned moved_player,confirmed_id;

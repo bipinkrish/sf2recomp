@@ -29,8 +29,6 @@ uint64_t renderer_present_count(void) { return 1; }
 volatile int g_inject_plus;
 void *hle_alloc(uint64_t size) { return calloc(1, size); }
 bool rt_probe_u64(uint64_t a, uint64_t *v) { return false; }
-bool nvn_texture_region_color(const NvnTexture *t, uint32_t x, uint32_t y,
-                              uint32_t w, uint32_t h, float rgb[3]) { return false; }
 static unsigned screen_w = 1920, screen_h = 1080;
 void guest_call(Cpu *c, uint64_t pc) {
     assert(pc == 0x70015ccb90ull || pc == 0x70015ccc00ull);
