@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import sys
 import tempfile
+import tarfile
 import subprocess
 import unittest
 from unittest.mock import patch
@@ -18,6 +19,7 @@ import downloads
 import package_release
 import release
 import setup_android
+import setup_ffmpeg
 import centralize_literals
 
 
@@ -59,6 +61,24 @@ class DownloadTests(unittest.TestCase):
 
 
 class ReleaseBoundaryTests(unittest.TestCase):
+    def test_ffmpeg_source_extraction_does_not_depend_on_the_host_tar_command(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            archive = root / 'decoder source.tar.xz'
+            with tarfile.open(archive, 'w:xz') as output:
+                for name in ('configure', 'COPYING.LGPLv2.1', 'LICENSE.md'):
+                    entry = tarfile.TarInfo(f'ffmpeg-{setup_ffmpeg.VERSION}/{name}')
+                    entry.size = len(b'fixture')
+                    output.addfile(entry, io.BytesIO(b'fixture'))
+            with patch.object(setup_ffmpeg, 'source_archive', return_value=archive), \
+                    patch.object(setup_ffmpeg, 'installed', side_effect=[False, True]), \
+                    patch.object(setup_ffmpeg.shutil, 'which', return_value='build-tool'), \
+                    patch.object(setup_ffmpeg.subprocess, 'run') as run:
+                setup_ffmpeg.build(root / 'installed decoder', root / 'build work', target='windows')
+            source = root / f'build work/ffmpeg-{setup_ffmpeg.VERSION}-windows-source'
+            self.assertEqual((source / 'configure').read_bytes(), b'fixture')
+            self.assertEqual([call.args[0][0] for call in run.call_args_list], ['bash', 'make', 'make'])
+
     def test_archive_audit_rejects_keys_game_inputs_and_external_links(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

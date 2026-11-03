@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 from host_tools import host_target, require_host
+from downloads import unpack
 
 ROOT = Path(__file__).resolve().parent.parent
 VERSION = K.VERSION
@@ -74,17 +75,14 @@ def build(prefix, work, force=False, target=K.S_LINUX_09D1):
         print(f"Bundled FFmpeg {VERSION} is ready: {prefix}")
         return
 
-    for command in (K.S_CLANG_5CE7, K.S_MAKE_D1F9, K.S_TAR_CFE4):
+    for command in (K.S_CLANG_5CE7, K.S_MAKE_D1F9):
         if not shutil.which(command):
             raise RuntimeError(f"Missing build tool: {command}")
     archive = source_archive(work)
     source = work / f"ffmpeg-{VERSION}-{target}-source"
     if source.exists():
         shutil.rmtree(source)
-    source.mkdir(parents=True)
-    subprocess.run([
-        K.S_TAR_CFE4, *([K.S_FORCE_LOCAL_E595] if target == K.S_WINDOWS_F2ED else []), K.S_XJF_118B, archive.as_posix(), K.S_STRIP_COMPONENTS_1_B130, K.S_C_429A, source.as_posix(),
-    ], check=True)
+    unpack(archive, source, root=f"ffmpeg-{VERSION}")
 
     config = [K.S_CC_CLANG_98B4, f"--prefix={prefix.as_posix()}", f"--bindir={(prefix / K.S_BIN_0955).as_posix()}",
               f"--libdir={(prefix / K.S_LIB_427F).as_posix()}", *CONFIGURE]
