@@ -44,7 +44,7 @@ pacman -S --needed make curl tar \
   mingw-w64-ucrt-x86_64-clang mingw-w64-ucrt-x86_64-lld \
   mingw-w64-ucrt-x86_64-pkgconf mingw-w64-ucrt-x86_64-python \
   mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja \
-  mingw-w64-ucrt-x86_64-SDL3 \
+  mingw-w64-ucrt-x86_64-sdl3 \
   mingw-w64-ucrt-x86_64-vulkan-headers \
   mingw-w64-ucrt-x86_64-vulkan-loader \
   mingw-w64-ucrt-x86_64-vulkan-memory-allocator \
