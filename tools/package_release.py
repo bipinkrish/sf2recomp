@@ -196,10 +196,11 @@ def windows_toolchain(destination, prefix, helpers):
         if not source.is_absolute() or not source.is_file():
             raise ValueError(f"Windows compiler cannot locate required support archive {name}: {source}")
         copy(source, toolchain / K.S_LIB_427F / name)
-    seeds = [*helpers, *list((toolchain / K.S_BIN_0955).glob(K.S_EXE_4D40)),
-             prefix / K.S_BIN_SDL3_DLL_5FEC, prefix / K.S_BIN_LIBSHADERC_SHARED_DLL_0CDB]
+    # Include the Vulkan loader so CLI startup also works without a driver-installed copy.
+    runtime_dlls = [prefix / K.S_BIN_0955 / name for name in K.WINDOWS_RUNTIME_DLLS]
+    seeds = [*helpers, *list((toolchain / K.S_BIN_0955).glob(K.S_EXE_4D40)), *runtime_dlls]
     libraries = dependency_closure(seeds, [prefix / K.S_BIN_0955, *(p.parent for p in helpers)])
-    for path in [prefix / K.S_BIN_SDL3_DLL_5FEC, prefix / K.S_BIN_LIBSHADERC_SHARED_DLL_0CDB, *libraries.values()]:
+    for path in [*runtime_dlls, *libraries.values()]:
         copy(path, destination / K.S_NATIVE_LIB_601C / path.name)
     # LLVM's DLLs must also be adjacent to clang/LLD for loader startup.
     for path in (destination / K.S_NATIVE_LIB_601C).glob(K.S_DLL_166A):

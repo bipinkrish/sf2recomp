@@ -13,6 +13,7 @@ import subprocess
 import unittest
 from unittest.mock import patch
 import zipfile
+from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
@@ -23,6 +24,7 @@ import setup_android
 import setup_ffmpeg
 import centralize_literals
 import host_tools
+import ci_release
 
 
 class DownloadTests(unittest.TestCase):
@@ -63,13 +65,29 @@ class DownloadTests(unittest.TestCase):
 
 
 class ReleaseBoundaryTests(unittest.TestCase):
-    def test_windows_toolchain_copies_gcc_support_and_crt_startup_objects(self):
+    def test_windows_archive_preserves_the_full_version_and_platform_name(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary) / 'sf2recomp-0.1.0-windows-x86_64'
+            (folder / 'python').mkdir(parents=True)
+            (folder / 'python/python.exe').write_bytes(b'interpreter fixture')
+            (folder / 'release.json').write_text(json.dumps({'version': '0.1.0'}))
+            windows = SimpleNamespace(name='nt', environ=os.environ)
+            with patch.object(ci_release, 'os', windows), patch.object(ci_release.subprocess, 'run'):
+                ci_release.verify_and_archive(folder)
+            archive = folder.with_name(folder.name + '.zip')
+            self.assertTrue(archive.is_file())
+            with zipfile.ZipFile(archive) as contents:
+                self.assertIn(folder.name + '/python/python.exe', contents.namelist())
+            self.assertEqual(archive.with_name(archive.name + '.sha256').read_text(),
+                             hashlib.sha256(archive.read_bytes()).hexdigest() + '  ' + archive.name + '\n')
+
+    def test_windows_toolchain_copies_runtime_dlls_and_link_inputs(self):
         with tempfile.TemporaryDirectory(prefix='sf2 GCC support ') as temporary:
             root = Path(temporary)
             prefix = root / 'MSYS2/ucrt64'
             gcc = prefix / 'lib/gcc/x86_64-w64-mingw32/16.2.0'
             for relative in ('bin/clang.exe', 'bin/ld.lld.exe', 'bin/SDL3.dll',
-                             'bin/libshaderc_shared.dll', 'include/stdio.h', 'lib/libucrt.a',
+                             'bin/libshaderc_shared.dll', 'bin/vulkan-1.dll', 'include/stdio.h', 'lib/libucrt.a',
                              'lib/crt2.o', 'lib/crtbegin.o', 'lib/crtend.o',
                              'lib/clang/23/include/stddef.h'):
                 file = prefix / relative
@@ -86,6 +104,7 @@ class ReleaseBoundaryTests(unittest.TestCase):
                     patch('windows_dlls.dependency_closure', return_value={}):
                 destination = root / 'portable tool'
                 package_release.windows_toolchain(destination, prefix, [])
+                self.assertEqual((destination / 'native/lib/vulkan-1.dll').read_bytes(), b'bin/vulkan-1.dll')
                 for name in ('libgcc.a', 'libgcc_eh.a'):
                     self.assertEqual((destination / 'native/toolchain/lib' / name).read_bytes(),
                                      ('support ' + name).encode())

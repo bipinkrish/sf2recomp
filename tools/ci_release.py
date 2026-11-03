@@ -47,7 +47,7 @@ def verify_and_archive(folder):
         moved.rename(folder)
     audit(folder)
     if os.name == K.S_NT_88F0:
-        archive = folder.with_suffix(K.S_ZIP_14DF)
+        archive = folder.with_name(folder.name + K.S_ZIP_14DF)
         with zipfile.ZipFile(archive, K.S_W_780F, zipfile.ZIP_DEFLATED, compresslevel=K.N_6_E7F6) as output:
             for path in sorted(folder.rglob(K.S_EMPTY_15A7)):
                 if path.is_file():

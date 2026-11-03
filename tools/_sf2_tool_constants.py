@@ -1717,6 +1717,7 @@ class DOWNLOADS:
 
 
 class PACKAGE_RELEASE:
+    WINDOWS_RUNTIME_DLLS = ('SDL3.dll', 'libshaderc_shared.dll', 'vulkan-1.dll')
     WINDOWS_GCC_RUNTIME_LIBRARIES = ('libgcc.a', 'libgcc_eh.a')
     WINDOWS_LINK_INPUT_PATTERNS = ('*.a', '*.o')
     S_PATCHELF_5CE9 = 'patchelf*'  # tools/package_release.py:264
@@ -2324,6 +2325,7 @@ class CONVERT:
 
 
 class RELEASE:
+    WINDOWS_RUNTIME_DLL_GLOB = '*.dll'
     S_THE_PREBUILT_RUNTIME_VERSION_E19F = 'The prebuilt runtime version does not match this release; rebuild runtime-objs'  # tools/release.py:88
     S_SF2RECOMP_8F7E = 'SF2Recomp:'  # tools/release.py:199
     S_MAIN_ACB5 = '__main__'  # tools/release.py:195

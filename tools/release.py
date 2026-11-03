@@ -76,6 +76,10 @@ def check():
         binary = compile_sources([source], stage / (K.S_PROBE_EXE_E8BB if os.name == K.S_NT_88F0 else K.S_PROBE_A3E2))
         if sys.platform == K.S_DARWIN_5439:
             shutil.copytree(ROOT / K.S_NATIVE_LIB_601C, stage / K.S_LIB_427F)
+        elif os.name == K.S_NT_88F0:
+            # Match converted Windows folders: runtime DLLs sit beside the executable.
+            for library in (ROOT / K.S_NATIVE_LIB_601C).glob(K.WINDOWS_RUNTIME_DLL_GLOB):
+                shutil.copy2(library, stage / library.name)
         game = stage / K.S_SYNTHETIC_GAME_A790
         (game / K.S_EXEFS_00A0).mkdir(parents=True)
         for name in (K.S_MAIN_13FD, K.S_SDK_0065):
