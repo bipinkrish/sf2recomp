@@ -183,9 +183,19 @@ def windows_toolchain(destination, prefix, helpers):
         copy(prefix / K.S_BIN_0955 / name, toolchain / K.S_BIN_0955 / name)
     shutil.copytree(prefix / K.S_LIB_CLANG_EF86, toolchain / K.S_LIB_CLANG_EF86)
     shutil.copytree(prefix / K.S_INCLUDE_8C9D, toolchain / K.S_INCLUDE_8C9D)
-    # UCRT64 CRT/import libraries make the compiler independent of MSYS2.
-    for path in (prefix / K.S_LIB_427F).glob(K.S_A_0DDF):
-        copy(path, toolchain / K.S_LIB_427F / path.name)
+    # UCRT64 import libraries and startup objects make linking independent of MSYS2.
+    for pattern in K.WINDOWS_LINK_INPUT_PATTERNS:
+        for path in (prefix / K.S_LIB_427F).glob(pattern):
+            copy(path, toolchain / K.S_LIB_427F / path.name)
+    # GCC's compiler support archives live below lib/gcc/<triple>/<version>,
+    # outside the CRT/import-library glob. Ask this compiler for their locations.
+    for name in K.WINDOWS_GCC_RUNTIME_LIBRARIES:
+        source = Path(subprocess.check_output(
+            [str(prefix / K.S_BIN_0955 / K.S_CLANG_EXE_9FB8), K.S_TARGET_X86_64_W64_WINDOWS_GN_8EC4,
+             f"-print-file-name={name}"], text=True).strip())
+        if not source.is_absolute() or not source.is_file():
+            raise ValueError(f"Windows compiler cannot locate required support archive {name}: {source}")
+        copy(source, toolchain / K.S_LIB_427F / name)
     seeds = [*helpers, *list((toolchain / K.S_BIN_0955).glob(K.S_EXE_4D40)),
              prefix / K.S_BIN_SDL3_DLL_5FEC, prefix / K.S_BIN_LIBSHADERC_SHARED_DLL_0CDB]
     libraries = dependency_closure(seeds, [prefix / K.S_BIN_0955, *(p.parent for p in helpers)])

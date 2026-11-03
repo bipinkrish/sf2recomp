@@ -63,6 +63,39 @@ class DownloadTests(unittest.TestCase):
 
 
 class ReleaseBoundaryTests(unittest.TestCase):
+    def test_windows_toolchain_copies_gcc_support_and_crt_startup_objects(self):
+        with tempfile.TemporaryDirectory(prefix='sf2 GCC support ') as temporary:
+            root = Path(temporary)
+            prefix = root / 'MSYS2/ucrt64'
+            gcc = prefix / 'lib/gcc/x86_64-w64-mingw32/16.2.0'
+            for relative in ('bin/clang.exe', 'bin/ld.lld.exe', 'bin/SDL3.dll',
+                             'bin/libshaderc_shared.dll', 'include/stdio.h', 'lib/libucrt.a',
+                             'lib/crt2.o', 'lib/crtbegin.o', 'lib/crtend.o',
+                             'lib/clang/23/include/stddef.h'):
+                file = prefix / relative
+                file.parent.mkdir(parents=True, exist_ok=True)
+                file.write_bytes(relative.encode())
+            gcc.mkdir(parents=True)
+            for name in ('libgcc.a', 'libgcc_eh.a'):
+                (gcc / name).write_bytes(('support ' + name).encode())
+            def query(command, *, text):
+                self.assertEqual(command[:2], [str(prefix / 'bin/clang.exe'), '--target=x86_64-w64-windows-gnu'])
+                name = command[2].removeprefix('-print-file-name=')
+                return str(gcc / name) + '\n'
+            with patch.object(package_release.subprocess, 'check_output', side_effect=query), \
+                    patch('windows_dlls.dependency_closure', return_value={}):
+                destination = root / 'portable tool'
+                package_release.windows_toolchain(destination, prefix, [])
+                for name in ('libgcc.a', 'libgcc_eh.a'):
+                    self.assertEqual((destination / 'native/toolchain/lib' / name).read_bytes(),
+                                     ('support ' + name).encode())
+                for name in ('crt2.o', 'crtbegin.o', 'crtend.o'):
+                    self.assertEqual((destination / 'native/toolchain/lib' / name).read_bytes(),
+                                     ('lib/' + name).encode())
+                (gcc / 'libgcc_eh.a').unlink()
+                with self.assertRaisesRegex(ValueError, 'required support archive libgcc_eh.a'):
+                    package_release.windows_toolchain(root / 'incomplete tool', prefix, [])
+
     @unittest.skipIf(os.name == 'nt', 'exercises POSIX shell forwarding')
     def test_windows_dependency_script_reuses_its_selected_bash(self):
         shell = shutil.which('bash')

@@ -1717,6 +1717,8 @@ class DOWNLOADS:
 
 
 class PACKAGE_RELEASE:
+    WINDOWS_GCC_RUNTIME_LIBRARIES = ('libgcc.a', 'libgcc_eh.a')
+    WINDOWS_LINK_INPUT_PATTERNS = ('*.a', '*.o')
     S_PATCHELF_5CE9 = 'patchelf*'  # tools/package_release.py:264
     S_TXT_2E63 = '*.txt'  # tools/package_release.py:38
     S_LICENSES_A26A = 'licenses'  # tools/package_release.py:38
