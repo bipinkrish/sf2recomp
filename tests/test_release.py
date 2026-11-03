@@ -90,7 +90,9 @@ class ReleaseBoundaryTests(unittest.TestCase):
             root = Path(temporary) / 'tool/extensions/android'
             env = setup_android.environment(root)
             for key in ('JAVA_HOME', 'ANDROID_HOME', 'ANDROID_SDK_ROOT', 'GRADLE_USER_HOME', 'ANDROID_USER_HOME', 'ANDROID_PREFS_ROOT'):
-                self.assertTrue(Path(env[key]).is_relative_to(root), (key, env[key]))
+                # macOS /var aliases and Windows temp-path normalization must
+                # be resolved on both sides of the containment comparison.
+                self.assertTrue(Path(env[key]).resolve().is_relative_to(root.resolve()), (key, env[key]))
             with patch.object(setup_android.urllib.request, 'urlopen', side_effect=AssertionError('unexpected download')):
                 with self.assertRaisesRegex(ValueError, 'SDK licenses'):
                     setup_android.ensure(directory=root)

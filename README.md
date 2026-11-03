@@ -19,7 +19,7 @@ versions are not supported yet.
 | --- | --- |
 | Linux x86-64 | Tested desktop development target. |
 | Windows x86-64 | Experimental; native gameplay validation pending. |
-| macOS Apple Silicon / Intel | Experimental; native gameplay and GPU validation pending. |
+| macOS Apple Silicon | Experimental; native gameplay and GPU validation pending. |
 | Android arm64 / x86-64 | Development builds |
 
 ## Download and play
@@ -205,7 +205,7 @@ unverified; see [Status](#status).
 [Development and verification](docs/development.md)
 
 Linux x86-64 is the tested desktop development target. Windows x86-64 and macOS
-Apple Silicon/Intel support are experimental. Android arm64/x86-64 development
+Apple Silicon support are experimental. Android arm64/x86-64 development
 builds exist; see the source guide for validation details.
 
 ## License

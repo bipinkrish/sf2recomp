@@ -17,10 +17,10 @@ the compatibility revision when input, RNG, initialization or hashing changes.
 
 ## Build desktop packages
 
-`.github/workflows/release.yml` builds Linux x86-64, Windows x86-64, macOS arm64
-and macOS x86-64 on native runners. Pull requests affecting the build and manual
+`.github/workflows/release.yml` builds Linux x86-64, Windows x86-64 and macOS
+Apple Silicon on native runners. Pull requests affecting the build and manual
 runs produce downloadable workflow artifacts. Pushing a matching `v*` tag
-publishes all four checked archives and SHA-256 files to GitHub Releases after
+publishes all three checked archives and SHA-256 files to GitHub Releases after
 every platform succeeds. No game files or keys are supplied to CI.
 
 Local release builds require the developer dependencies for the build host,
@@ -84,3 +84,7 @@ project on any supported desktop host. It produces a private APK containing the
 user's translated code and game files. It does not publish APKs through CI.
 Windows/macOS Android builds still require native validation. The desktop ZIP
 does not include the SDK/NDK, Java, an emulator or Android Studio.
+
+The desktop workflow runs offline Android setup tests, which check paths and
+cached toolchain state. It does not download Android tools or compile an APK on
+any runner, including macOS.
