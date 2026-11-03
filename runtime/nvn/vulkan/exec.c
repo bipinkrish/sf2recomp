@@ -7049,7 +7049,7 @@ static void *exec_wd_run(void *arg) {
     (void)arg;
     volatile int reported = 0;
     for (;;) {
-        for (int i = 0; i < wd_interval_ms && !wd_done; i++) usleep(SF2C_EXEC_N_1000_4051);
+        for (int i = 0; i < wd_interval_ms && !wd_done; i++) SDL_Delay(1);
         if (wd_done) return NULL;
         if (reported < SF2C_EXEC_N_5_EF2D) {
             int tid = wd_target_tid;
