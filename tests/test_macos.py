@@ -1,8 +1,10 @@
 """macOS host selection, Mach-O relocation and conversion regression coverage."""
 import json
+import importlib.util
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -11,6 +13,7 @@ import test_convert
 import host_tools
 import macos_dylibs
 import setup_ffmpeg
+from _sf2_tool_constants import PACKAGE_RELEASE
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -58,6 +61,23 @@ class MacOSHostTests(unittest.TestCase):
 
 
 class MacOSRelocationTests(unittest.TestCase):
+    @unittest.skipUnless(importlib.util.find_spec('ziglang'), 'requires the release Zig compiler')
+    def test_bundled_corefoundation_stub_links_for_apple_silicon(self):
+        # Cross-linking on Linux exercises the same TBD parser as the Mac release.
+        with tempfile.TemporaryDirectory(prefix='sf2 mac link ') as folder:
+            root = Path(folder)
+            stub = root / 'CoreFoundation.tbd'
+            stub.write_text(PACKAGE_RELEASE.MACOS_COREFOUNDATION_TBD)
+            source = root / 'probe.c'
+            source.write_text('extern void CFRelease(void*); int main(void) { CFRelease(0); return 0; }\n')
+            output = root / 'probe'
+            env = {**os.environ, 'ZIG_GLOBAL_CACHE_DIR': str(root / 'zig-global'),
+                   'ZIG_LOCAL_CACHE_DIR': str(root / 'zig-local')}
+            subprocess.run([sys.executable, '-m', 'ziglang', 'cc', '-target', 'aarch64-macos.15.0',
+                            str(source), str(stub), '-o', str(output)], env=env, check=True,
+                           capture_output=True, text=True, timeout=90)
+            self.assertEqual(output.read_bytes()[:4], b'\xcf\xfa\xed\xfe')
+
     def test_rewrites_only_bundled_libraries_and_signs_after_edits(self):
         with tempfile.TemporaryDirectory(prefix="sf2 mac libs ") as folder:
             root = Path(folder)

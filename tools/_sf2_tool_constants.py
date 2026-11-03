@@ -1742,7 +1742,7 @@ class PACKAGE_RELEASE:
     S_LC_7BB6 = '-lc++'  # tools/package_release.py:318
     S_ROOT_NATIVE_COREFOUNDATION_T_EB83 = '{root}/native/CoreFoundation.tbd'  # tools/package_release.py:317
     S_WL_FORCE_LOAD_ROOT_NATIVE_RU_2805 = '-Wl,-force_load,{root}/native/runtime.a'  # tools/package_release.py:317
-    S_TAPI_TBD_V3_NARCHS_ARM64_X86_F69E = "--- !tapi-tbd-v3\narchs: [ arm64, x86_64 ]\nplatform: macosx\ninstall-name: '/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation'\nexports:\n  - archs: [ arm64, x86_64 ]\n    symbols: [ ___CFConstantStringClassReference, _CFRelease, _CFStringCreateWithCString, _CFUserNotificationDisplayAlert ]\n...\n"  # tools/package_release.py:316
+    MACOS_COREFOUNDATION_TBD = "--- !tapi-tbd-v3\narchs: [ arm64, x86_64 ]\nuuids: []\nplatform: macosx\ninstall-name: '/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation'\nexports:\n  - archs: [ arm64, x86_64 ]\n    symbols: [ ___CFConstantStringClassReference, _CFRelease, _CFStringCreateWithCString, _CFUserNotificationDisplayAlert ]\n...\n"  # tools/package_release.py
     S_NATIVE_COREFOUNDATION_TBD_DFC2 = 'native/CoreFoundation.tbd'  # tools/package_release.py:315
     S_LDL_264D = '-ldl'  # tools/package_release.py:310
     S_WL_RPATH_ORIGIN_LIB_7E44 = '-Wl,-rpath,$ORIGIN/lib'  # tools/package_release.py:310

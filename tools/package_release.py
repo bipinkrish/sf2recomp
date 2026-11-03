@@ -315,7 +315,7 @@ def main():
             # This project-authored interface stub describes only the four public
             # CoreFoundation symbols used by platform/macos.c. No Apple SDK ships.
             stub = destination / K.S_NATIVE_COREFOUNDATION_TBD_DFC2
-            stub.write_text(K.S_TAPI_TBD_V3_NARCHS_ARM64_X86_F69E)
+            stub.write_text(K.MACOS_COREFOUNDATION_TBD)
             link = [K.S_WL_FORCE_LOAD_ROOT_NATIVE_RU_2805, *libraries, K.S_ROOT_NATIVE_COREFOUNDATION_T_EB83,
                     K.S_LC_7BB6, K.S_WL_RPATH_EXECUTABLE_PATH_LIB_2A55, K.S_LM_656A, K.S_PTHREAD_AF25]
             from macos_dylibs import relocate
