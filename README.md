@@ -1,4 +1,4 @@
-# Shadow Fight 2 Recomp
+# sf2recomp
 
 A static recompilation of **Shadow Fight 2 for Nintendo Switch** into a native application. You supply your own extracted game files, then build the game
 locally from this compiler and runtime source.
@@ -13,39 +13,12 @@ The Switch version was chosen because it includes **Sparring mode**, which offer
 > if you use the optional NSP extraction workflow below. Recompilation and running
 > the converted game do not require keys.
 
-[Screenshots](#screenshots) · [Status](#status) · [Features](#features) · [Requirements](#requirements) ·
+[Status](#status) · [Features](#features) · [Requirements](#requirements) ·
 [Getting started](#getting-started) · [NSP extraction](#optional-extract-from-an-nsp) ·
 [Settings and controls](#settings-and-controls) · [Development](#development) ·
 [Legal](#legal)
 
-## Screenshots
-
-Captured from the native Linux and Android builds. Click any image for full resolution.
-
-[![Wraith versus Aquaris on the night lake stage, filling the 32:9 view](docs/screenshots/ultrawide-night.png)](docs/screenshots/ultrawide-night.png)
-
-[![Wraith and Puma fighting beneath giant forest branches in 32:9](docs/screenshots/ultrawide-forest.png)](docs/screenshots/ultrawide-forest.png)
-
-*32:9 gameplay at 5120×1440. Ultrawide mode uses scenery cover scaling;
-see the [graphics guide](docs/runtime-guide.md#graphics-and-frame-rate).*
-
-<p>
-  <a href="docs/screenshots/main-menu.png"><img src="docs/screenshots/main-menu.png" width="49%" alt="The main menu framed by autumn trees and an open dojo gate"></a>
-  <a href="docs/screenshots/character-select.png"><img src="docs/screenshots/character-select.png" width="49%" alt="The Sparring character roster with Fury ready and the footer hidden"></a>
-</p>
-
-*Desktop main menu · Sparring character selection*
-
-<p>
-  <a href="docs/screenshots/sunset-arena.png"><img src="docs/screenshots/sunset-arena.png" width="49%" alt="Wraith and May facing off between glowing stone pillars at sunset"></a>
-  <a href="docs/screenshots/android-sparring.png"><img src="docs/screenshots/android-sparring.png" width="49%" alt="Lynx versus Corsair on Android, with touch controls and the boss-power button ready"></a>
-</p>
-
-*Sunset arena. Original 16:9 at 1920×1080 · Android Sparring with touch controls.*
-
 ## Status
-
-This is a work in progress.
 
 | Platform | Status |
 | --- | --- |
@@ -67,32 +40,120 @@ release, and exposes some of the game's original developer tools. Settings below
 live in **`sf2recomp.ini` beside the converted executable** and take effect after
 restarting; no rebuild is needed.
 
-| Feature | What it provides |
-| --- | --- |
-| **Aspect ratios (experimental)** | `[video] aspect_ratio` accepts `16:10`, `21:9` or `32:9`, with native screen sizes of 1728×1080, 2520×1080 and 3840×1080 before uniform scaling. Restart after changing; `original` / `16:9` is the default. In 32:9, scenery is enlarged uniformly to cover the sides, cropping some background detail vertically. Fighter and HUD proportions are preserved. Movies keep their original proportions. |
-| **Native display resolution** | `[video] internal_resolution = auto` or `match` renders at the window's fitted drawable pixel size, following window resizing and fullscreen. Higher resolutions improve geometry edges; bitmap artwork and font atlases retain their original detail. |
-| **Resolution scaling** | Fixed internal-resolution presets of `0.25x`, `0.50x`, `0.75x`, `1x`, `2x`, `3x` and `4x` let you trade rendering detail for performance, within the GPU's texture-size limit. |
-| **Dynamic resolution** | `[video] internal_resolution = dynamic` adjusts render scale in response to GPU load to work toward the configured frame-rate target. |
-| **AMD FSR 1 upscaling** | `[video] upscaler = fsr1` enables spatial upscaling and sharpening when the rendered image is smaller than its window area. Use a lower internal resolution to activate it; `auto` selects bilinear on integrated GPUs and FSR 1 on discrete GPUs. |
-| **SMAA anti-aliasing** | `[video] antialiasing = smaa` enables optional post-process edge smoothing. Disabled by default. |
-| **Configurable frame rate** | `[video] target_fps` accepts **30–360**, including targets above 60 FPS, and sets the game's target frame rate and presentation pacing. Achievable performance depends on hardware; set the host display refresh rate separately. |
-| **Desktop window modes** | A resizable window or fullscreen, selected with `[video] fullscreen`. |
-| **Remappable keyboard and controllers** | `[controls.keyboard]` and `[controls.gamepad]` map desktop inputs to Switch actions, including unbinding actions and sharing inputs. |
-| **Mouse menus** | Hover and left-click use the game's existing menu buttons. Pointer coordinates follow window resizing, black bars, HiDPI displays and configured aspect ratios; existing sliders and scroll views also receive mouse drag and wheel input. |
-| **Menu layout** | The bottom controller-hint strips are hidden on desktop and Android. Centered dialog prompts, combat hints and the gameplay HUD remain visible. |
-| **Desktop Exit button** | The main menu's localized **Exit** option closes the game and returns to the desktop, including in fullscreen. |
-| **Game network blocking** | `[network] enabled = false` is the default and blocks game connections, DNS, uploads, online multiplayer, external web links and the remote developer listener. Offline Sparring remains available. Enabling networking does not implement missing online services. |
-| **Unlocked Sparring roster** | `[gameplay] unlock_all_sparring_characters = true` makes every Sparring character available without campaign progression. Enabled by default; does not change saved Story unlocks. |
-| **Shadow and Titan in Sparring** | Enabled by default with `[gameplay] enable_shadow_in_sparring` and `enable_titan_in_sparring`. Shadow uses his equipped campaign gear; Titan uses his own sword, ranged arm and magic. Move down past the third roster row to reveal more fighters at the original portrait size. See [roster settings](docs/runtime-guide.md#sparring-roster). |
-| **Boss refights and completed save** | Defeated bosses and Gates of Shadows have a Refight button with an X shortcut, including the six boss encounters after the Gates. Refights grant no rewards and leave saves unchanged. APKs and native packages bundle a completed save, selected with `[storage] use_completed_save = true`. Disabled by default; uses a separate profile. |
-| **Unlocked Extras movies** | `[gameplay] unlock_all_videos = true` enables gallery movie playback without changing watched-video save flags. Enabled in the supplied INI. |
-| **Intro and gameplay toggles** | Skip the intro with mapped A/B, Space, or a mouse click, or disable it with `[gameplay] show_intro = false`. Startup data and GPU heap preparation run during playback to reduce the wait after skipping. `ai_enabled` and `show_time_results` expose the original AI and timing-display controls. |
-| **Desktop developer console** | Opt in with `[developer] console = true`; **F1** or **backtick** opens the original console with desktop text input, command history and scrolling. |
-| **Fight trainer and shop cheats** | Optional `[developer] trainer` and `shop_cheats` expose the original fight controls and local shop actions through the console. Disabled by default; currency, items, levels and fight results can be saved by the game. |
-| **Debug overlays** | Opt in with `[developer] overlays = true`, then use **F2** to toggle the original FPS, memory, build and model/animation displays in supported scenes. |
-| **Configurable save location and imports** | `[storage] save_directory` selects a portable or custom save folder. Existing `userdata/` backups can be imported under its `save_0/` directory. |
-| **LAN Sparring (experimental)** | Native Normal/LAN and Host/Join menus, local host discovery and persistent two-player sessions. No Python launcher required. See the [LAN guide](docs/lan-sparring.md). |
-| **Desktop configuration** | The INI also provides language selection (including system-locale detection), master volume and reverb controls. Alternate configuration and writable data locations can be selected at launch. |
+Screenshots are from native Linux and Android builds. Click an image for full
+resolution.
+
+### Ultrawide and graphics
+
+- **Aspect ratios (experimental)**. `[video] aspect_ratio` accepts `16:10`, `21:9` or `32:9`, with native screen sizes of 1728×1080, 2520×1080 and 3840×1080 before uniform scaling. Restart after changing; `original` / `16:9` is the default. In 32:9, scenery is enlarged uniformly to cover the sides, cropping some background detail vertically. Fighter and HUD proportions are preserved. Movies keep their original proportions.
+
+- **Native display resolution**. `[video] internal_resolution = auto` or `match` renders at the window's fitted drawable pixel size, following window resizing and fullscreen. Higher resolutions improve geometry edges; bitmap artwork and font atlases retain their original detail.
+
+- **Resolution scaling**. Fixed internal-resolution presets of `0.25x`, `0.50x`, `0.75x`, `1x`, `2x`, `3x` and `4x` let you trade rendering detail for performance, within the GPU's texture-size limit.
+
+- **Dynamic resolution**. `[video] internal_resolution = dynamic` adjusts render scale in response to GPU load to work toward the configured frame-rate target.
+
+- **AMD FSR 1 upscaling**. `[video] upscaler = fsr1` enables spatial upscaling and sharpening when the rendered image is smaller than its window area. Use a lower internal resolution to activate it; `auto` selects bilinear on integrated GPUs and FSR 1 on discrete GPUs.
+
+- **SMAA anti-aliasing**. `[video] antialiasing = smaa` enables optional post-process edge smoothing. Disabled by default.
+
+- **Configurable frame rate**. `[video] target_fps` accepts **30–360**, including targets above 60 FPS, and sets the game's target frame rate and presentation pacing. Achievable performance depends on hardware; set the host display refresh rate separately.
+
+- **Desktop window modes**. A resizable window or fullscreen, selected with `[video] fullscreen`.
+
+[![Wraith versus Aquaris on the night lake stage, filling the 32:9 view](docs/screenshots/ultrawide-night.png)](docs/screenshots/ultrawide-night.png)
+
+*32:9 gameplay at 5120×1440, with scenery cover scaling.*
+
+### Desktop controls and menus
+
+- **Remappable keyboard and controllers**. `[controls.keyboard]` and `[controls.gamepad]` map desktop inputs to Switch actions, including unbinding actions and sharing inputs.
+
+- **Mouse menus**. Hover and left-click use the game's existing menu buttons. Pointer coordinates follow window resizing, black bars, HiDPI displays and configured aspect ratios; existing sliders and scroll views also receive mouse drag and wheel input.
+
+- **Menu layout**. The bottom controller-hint strips are hidden on desktop and Android. Centered dialog prompts, combat hints and the gameplay HUD remain visible.
+
+- **Desktop Exit button**. The main menu's localized **Exit** option closes the game and returns to the desktop, including in fullscreen.
+
+- **Desktop configuration**. The INI also provides language selection (including system-locale detection), master volume and reverb controls. Alternate configuration and writable data locations can be selected at launch.
+
+<p>
+  <a href="docs/screenshots/main-menu.png"><img src="docs/screenshots/main-menu.png" width="49%" alt="Desktop main menu without the bottom controller-hint strip and with an Exit option"></a>
+  <a href="docs/screenshots/mouse-settings.png"><img src="docs/screenshots/mouse-settings.png" width="49%" alt="The current desktop Settings menu with the Sound slider selected by mouse and no bottom controller hints"></a>
+</p>
+
+*Desktop main menu and Exit option · Mouse-operated settings.*
+
+### Sparring roster
+
+- **Unlocked Sparring roster**. `[gameplay] unlock_all_sparring_characters = true` makes every Sparring character available without campaign progression. Enabled by default; does not change saved Story unlocks.
+
+- **Shadow and Titan in Sparring**. Enabled by default with `[gameplay] enable_shadow_in_sparring` and `enable_titan_in_sparring`. Shadow uses his equipped campaign gear; Titan uses his own sword, ranged arm and magic. Move down past the third roster row to reveal more fighters at the original portrait size. See [roster settings](docs/runtime-guide.md#sparring-roster).
+
+<p>
+  <a href="docs/screenshots/character-select.png"><img src="docs/screenshots/character-select.png" width="49%" alt="The unlocked Sparring character roster with Fury ready and the footer hidden"></a>
+  <a href="docs/screenshots/sparring-titan.png"><img src="docs/screenshots/sparring-titan.png" width="49%" alt="Titan fighting Shogun in Sparring, with his sword and boss-power indicator visible"></a>
+</p>
+
+*Unlocked character selection · Titan versus Shogun in Sparring.*
+
+### Boss refights and movies
+
+- **Boss refights and completed save**. Defeated bosses and Gates of Shadows have a Refight button with an X shortcut, including the six boss encounters after the Gates. Refights grant no rewards and leave saves unchanged. APKs and native packages bundle a completed save, selected with `[storage] use_completed_save = true`. Disabled by default; uses a separate profile.
+
+- **Unlocked Extras movies**. `[gameplay] unlock_all_videos = true` enables gallery movie playback without changing watched-video save flags. Enabled in the supplied INI.
+
+- **Intro and gameplay toggles**. Skip the intro with mapped A/B, Space, or a mouse click, or disable it with `[gameplay] show_intro = false`. Startup data and GPU heap preparation run during playback to reduce the wait after skipping. `ai_enabled` and `show_time_results` expose the original AI and timing-display controls.
+
+<p>
+  <a href="docs/screenshots/boss-refight.png"><img src="docs/screenshots/boss-refight.png" width="49%" alt="Completed Lynx encounter with the Refight button visible on the campaign map"></a>
+  <a href="docs/screenshots/extras-movies.png"><img src="docs/screenshots/extras-movies.png" width="49%" alt="The unlocked Extras video gallery showing The Beginning and Gates of Shadows"></a>
+</p>
+
+*Completed Lynx encounter with Refight · Unlocked Extras movies.*
+
+### Developer tools
+
+- **Desktop developer console**. Opt in with `[developer] console = true`; **F1** or **backtick** opens the original console with desktop text input, command history and scrolling.
+
+- **Fight trainer and shop cheats**. Optional `[developer] trainer` and `shop_cheats` expose the original fight controls and local shop actions through the console. Disabled by default; currency, items, levels and fight results can be saved by the game.
+
+- **Debug overlays**. Opt in with `[developer] overlays = true`, then use **F2** to toggle the original FPS, memory, build and model/animation displays in supported scenes.
+
+<p>
+  <a href="docs/screenshots/developer-console.png"><img src="docs/screenshots/developer-console.png" width="49%" alt="The desktop developer console displaying available trainer commands"></a>
+  <a href="docs/screenshots/debug-overlays.png"><img src="docs/screenshots/debug-overlays.png" width="49%" alt="An active fight with a trainer command applied and FPS, memory and animation debug overlays visible"></a>
+</p>
+
+*Console and trainer commands · Trainer action and combat debug overlays.*
+
+### LAN Sparring
+
+- **LAN Sparring (experimental)**. Native Normal/LAN and Host/Join menus, local host discovery and persistent two-player sessions. No Python launcher required. See the [LAN guide](docs/lan-sparring.md).
+
+<p>
+  <a href="docs/screenshots/lan-mode.png"><img src="docs/screenshots/lan-mode.png" width="49%" alt="Sparring menu offering Normal and LAN Multiplayer modes"></a>
+  <a href="docs/screenshots/lan-host-join.png"><img src="docs/screenshots/lan-host-join.png" width="49%" alt="LAN Multiplayer menu offering Host, Join and Back"></a>
+</p>
+
+*Normal and LAN choices · Native Host and Join menu.*
+
+### Android touch controls
+
+The Android build uses the retained mobile joystick and action buttons, with
+simultaneous movement and attacks. Sparring characters with a special ability
+also get a boss-power button. Keyboard and controller input remain available.
+See [Android development](#android-development) for setup and device requirements.
+
+[![Lynx versus Corsair on Android, with touch controls and the boss-power button ready](docs/screenshots/android-sparring.png)](docs/screenshots/android-sparring.png)
+
+*Android Sparring with touch controls and Lynx's boss power ready.*
+
+### Saves and offline settings
+
+- **Game network blocking**. `[network] enabled = false` is the default and blocks game connections, DNS, uploads, online multiplayer, external web links and the remote developer listener. Offline Sparring remains available. Enabling networking does not implement missing online services.
+
+- **Configurable save location and imports**. `[storage] save_directory` selects a portable or custom save folder. Existing `userdata/` backups can be imported under its `save_0/` directory.
 
 See the [settings and controls guide](docs/runtime-guide.md) for setup, commands
 and limitations, and the [supplied INI](sf2recomp.ini) for shipped defaults.
