@@ -889,6 +889,7 @@ int rt_hook(Cpu *c, uint64_t site) {
     if (wide_result >= 0) return wide_result;
     if (network_hook(c, site)) return 1;
     switch (site) {
+    case 0x7000da027cull:
     case 0x7000c99e30ull:
     case 0x7000c9dd50ull:
     case 0x7000ca7c00ull:

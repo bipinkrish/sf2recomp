@@ -198,23 +198,123 @@ int main(int argc, char **argv) {
     ST64((uintptr_t)panel + 0x20, (uintptr_t)title);
     ST64((uintptr_t)panel + 0x28, (uintptr_t)description);
     ST64((uintptr_t)target + 0x118, guest_string(&c, "BOSS_TITAN"));
+    ST8((uintptr_t)panel + 0x10, 1); // reused panel was visible for the previous boss
     c = before; c.x[0] = (uintptr_t)panel; c.x[1] = (uintptr_t)target;
     Cpu vs_before = c;
     assert(sparring_roster_hook(&c, 0x7000e60ba0ull) == 1 && !memcmp(&c, &vs_before, sizeof c));
-    assert(LD8((uintptr_t)panel + 0x10) && LD8((uintptr_t)description + 0x10));
-    assert(LD32((uintptr_t)title + 0x1cc) == 1);
-    assert(sparring_named(LD64((uintptr_t)title + 0x180), "MIND THROW"));
-    assert(sparring_named(LD64((uintptr_t)description + 0x180), "SHIELD: AUTOMATIC"));
-    assert(!LD8((uintptr_t)hint + 0x10)); // no fake Super hint for Titan
+    assert(!LD8((uintptr_t)panel + 0x10)); // hide Titan's entire ability panel
+    assert(!LD64((uintptr_t)title + 0x180) && !LD64((uintptr_t)description + 0x180));
     ST64((uintptr_t)target + 0x118, guest_string(&c, "NAME_LYNX"));
+    ST8((uintptr_t)panel + 0x10, 1); // native boss setup controls visibility again
     assert(sparring_roster_hook(&c, 0x7000e60ba0ull) == 0);
+    assert(LD8((uintptr_t)panel + 0x10) && !memcmp(&c, &vs_before, sizeof c));
     assert(!LD32((uintptr_t)title + 0x1cc) && !LD32((uintptr_t)description + 0x1cc));
     reset_sparring_roster(); assert(!sparring_view.table);
 }
 '''
 
 
+THROWS_HARNESS = r'''
+#include <assert.h>
+#include <sys/mman.h>
+#include "hle/hooks.c"
+
+static unsigned char models[2][0x200], klass[0xc0], fields[0x50];
+static unsigned lookups, additions, rebuilds;
+static bool perk_missing;
+static const uint64_t restricted = 0x123400;
+
+void guest_call(Cpu *c, uint64_t pc) {
+    switch (pc) {
+    case GUEST_STRING_ALLOC:
+        c->x[0] = (uintptr_t)calloc(1, 0x16 + 2 * c->x[1]); return;
+    case 0x7000f72c30ull:
+        assert(c->x[0] == 0x1000 && sparring_named(c->x[1], "PERK_NO_THROWS"));
+        ++lookups; c->x[0] = perk_missing ? 0 : 0x1234; return;
+    case 0x7000e9da00ull:
+        assert(c->x[1] == 0x1234);
+        // ModelParameters.AddPerkInfoItem adds to PerksUser; combat Perks
+        // remain unchanged until ModelParameters.UpdatePerks is called.
+        ST64(c->x[0] + 0x148, restricted); ++additions; return;
+    case 0x7000e9f7d0ull:
+        assert(LD64(c->x[0] + 0x148) == restricted);
+        ST64(c->x[0] + 0x140, restricted + 1); ++rebuilds; return;
+    case 0x7000d96fb0ull:
+        assert(sparring_building_model && c->x[2] < 2);
+        assert(sparring_roster_hook(c, pc) == 0); // recursive native call passes through
+        c->x[0] = (uintptr_t)models[c->x[2]]; return;
+    case 0x7000d17e80ull: c->x[0] = 0; return; // unequipped Shadow
+    default: assert(0);
+    }
+}
+
+static void match(bool titan0, bool titan1) {
+    Cpu c = {.sp = 0x123456}; c.x[19] = 0xabcdef;
+    unsigned previous = lookups;
+    memset(models, 0, sizeof models);
+    // PvpScene.StartFight builds PlayerId.Second before PlayerId.First.
+    const unsigned order[] = {1, 0};
+    for (unsigned n = 0; n < 2; ++n) {
+        unsigned i = order[n];
+        uint64_t m = (uintptr_t)models[i];
+        ST64(m + 0x118, guest_string(&c, (i ? titan1 : titan0) ? "BOSS_TITAN" : "NAME_SHADOW"));
+        ST64(m + 0x148, 0x2000 + i); ST64(m + 0x140, 0x3000 + i);
+        ST64(m + 0xa8, 0x4000 + i); ST64(m + 0x158, 0x5000 + i);
+        c.x[0] = 0x9000; c.x[1] = guest_string(&c, "Random"); c.x[2] = i;
+        Cpu expected = c; expected.x[0] = m;
+        assert(sparring_roster_hook(&c, 0x7000d96fb0ull) == 1);
+        assert(!memcmp(&c, &expected, sizeof c));
+    }
+    for (unsigned i = 0; i < 2; ++i) {
+        uint64_t m = (uintptr_t)models[i];
+        bool blocked = i ? titan0 : titan1;
+        assert(LD64(m + 0x148) == (blocked ? restricted : 0x2000 + i));
+        assert(LD64(m + 0x140) == (blocked ? restricted + 1 : 0x3000 + i));
+        assert(LD64(m + 0xa8) == 0x4000 + i && LD64(m + 0x158) == 0x5000 + i);
+        assert(sparring_models[i] == m); // preserve the already-returned model identity
+    }
+    assert(lookups == previous + titan0 + titan1);
+    assert(additions == lookups && rebuilds == additions);
+}
+
+int main(void) {
+    void *page = mmap((void *)0x7003b37000ull, 4096, PROT_READ | PROT_WRITE,
+                      MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0);
+    assert(page == (void *)0x7003b37000ull);
+    ST64(0x7003b37410ull, (uintptr_t)klass);
+    ST64((uintptr_t)klass + 0xb8, (uintptr_t)fields);
+    ST64((uintptr_t)fields + 0x48, 0x1000);
+    match(true, false);
+    match(false, false); // next match restores ordinary throws
+    match(false, true);
+    match(true, true);
+    match(false, false);
+    Cpu c = {0}, before = c;
+    unsigned char original[sizeof models[0]]; memcpy(original, models[0], sizeof original);
+    perk_missing = true;
+    unsigned previous = rebuilds;
+    sparring_prevent_throws(&c, (uintptr_t)models[0]);
+    assert(rebuilds == previous && !memcmp(original, models[0], sizeof original));
+    assert(!memcmp(&c, &before, sizeof c));
+    ST64((uintptr_t)fields + 0x48, 0);
+    previous = lookups;
+    sparring_prevent_throws(&c, (uintptr_t)models[0]);
+    assert(lookups == previous && !memcmp(&c, &before, sizeof c));
+    reset_sparring_roster();
+    assert(!sparring_models[0] && !sparring_models[1]);
+    munmap(page, 4096);
+}
+'''
+
+
 class SparringRosterTests(unittest.TestCase):
+    def test_titan_opponent_throw_restriction_rebuilds_native_perks(self):
+        with tempfile.TemporaryDirectory(prefix="sf2-titan-throws-") as directory:
+            root = pathlib.Path(directory)
+            (root / "test.c").write_text(THROWS_HARNESS)
+            compile_harness(root / "test.c", root / "test")
+            subprocess.run([str(root / "test")], check=True)
+
     def test_independent_settings_equipment_and_scroll_navigation(self):
         with tempfile.TemporaryDirectory(prefix="sf2-roster-") as directory:
             root = pathlib.Path(directory)
@@ -258,6 +358,9 @@ class SparringRosterTests(unittest.TestCase):
         from test_hook_groups import patches
         from nso import Nso
         nso = Nso(game)
+        # PerkRule.Parse loads GameUtils_TypeInfo through this GOT entry.
+        # The hook must use the metadata slot, not the GOT pointer to that slot.
+        self.assertEqual(nso.u64(0x397ad38), 0x3b37410)
         for site in (0x7000fc8430, 0x7000d11714, 0x7000fc8690, 0x7000e43da0,
                      0x7000d93fd0, 0x7000d94310, 0x7000e46a90, 0x7000e46de0,
                      0x7000d979e0, 0x7000e432a0, 0x7000e44080, 0x7000d96fb0, 0x7000e60ba0):

@@ -77,7 +77,7 @@ NVN(nvnDeviceRegisterFastClearColori) { RET(1); }
 NVN(nvnDeviceRegisterFastClearColorui) { RET(1); }
 NVN(nvnDeviceRegisterFastClearDepth) { RET(1); }
 NVN(nvnDeviceApplyDeferredFinalizes) { (void)c; }
-NVN(nvnDeviceFinalizeCommandHandle) { (void)c; }
+NVN(nvnDeviceFinalizeCommandHandle) { nvn_commands_finalize(A(1)); }
 NVN(nvnDeviceIsExternalDebuggerAttached) { RET(0); }
 NVN(nvnDeviceWalkDebugDatabase) { (void)c; }
 
@@ -126,7 +126,11 @@ NVN(nvnQueueSubmitCommands) {
     uint64_t t0 = plat_now_ns();
     for (int i = 0; i < n; i++) {
         if (rq) rq_submit(handles[i]);  // the render thread translates it (rqueue.c)
-        else backend_execute(handles[i]);
+        else {
+            NvnCommands *commands = nvn_commands_acquire(handles[i]);
+            backend_execute(handles[i]);
+            nvn_commands_release(commands);
+        }
     }
     g_submit_ns += plat_now_ns() - t0;
 }
@@ -423,6 +427,7 @@ NVN(nvnTextureBuilderGetStorageAlignment) { RET(is_linear(A(0)) ? 32 : 512); }
 
 static NvnTexture *texture_from_builder(uint64_t b) {
     NvnTexture *t = calloc(1, sizeof *t);
+    t->refs = 1;
     t->target = G(uint32_t, b, 0xC);
     t->flags = G(uint32_t, b, 8);
     t->width = G(uint32_t, b, 0x10);
@@ -453,11 +458,20 @@ NVN(nvnTextureInitialize) {
     RET(1);
 }
 static void pool_entries_forget(NvnTexture *t);
-// The end of a finalized texture: its texture pool slots emptied (pool_entries_forget), the backend's copy, the host
-// object. With the render thread, it runs there in queue order (rq_destroy_texture): lists queued before the
-// finalize still sample it through its slots, as they did when they were translated at submit; lists queued after
-// it see the slots empty, as without the render thread. (The NvnTexture stays allocated until then, so no other
-// texture can take its address while a slot still names it.)
+// Finalization unregisters descriptor slots in queue order. Direct references in recorded
+// lists keep the object and backend alive until those lists and their executions retire.
+void nvn_texture_retain(NvnTexture *t) {
+    __atomic_add_fetch(&t->refs, 1, __ATOMIC_RELAXED);
+}
+void nvn_texture_release(NvnTexture *t) {
+    if (__atomic_sub_fetch(&t->refs, 1, __ATOMIC_ACQ_REL)) return;
+    if (rq_on() && !rq_current_item()) rq_destroy_texture(t);
+    else nvn_texture_destroy(t);
+}
+void nvn_texture_finalize(NvnTexture *t) {
+    pool_entries_forget(t);
+    nvn_texture_release(t);
+}
 void nvn_texture_destroy(NvnTexture *t) {
     pool_entries_forget(t);
     backend_texture_destroyed(t);
@@ -466,8 +480,8 @@ void nvn_texture_destroy(NvnTexture *t) {
 NVN(nvnTextureFinalize) {
     NvnTexture *t = HOST(NvnTexture, A(0));
     if (t) {
-        if (rq_on()) rq_destroy_texture(t);  // after the queued lists that refer to it
-        else nvn_texture_destroy(t);
+        if (rq_on()) rq_finalize_texture(t);
+        else nvn_texture_finalize(t);
     }
     SET_HOST(A(0), 0);
 }

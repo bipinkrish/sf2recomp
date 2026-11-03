@@ -4,6 +4,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import socket
 import subprocess
 import tempfile
 import unittest
@@ -16,6 +17,7 @@ spec.loader.exec_module(replay)
 
 HARNESS = r'''
 #include <assert.h>
+#include <SDL3/SDL_timer.h>
 #include "replay.c"
 Settings g_settings = {.target_fps=60};
 static int presses, releases, quits, rounds, stances, plays;
@@ -49,6 +51,33 @@ void guest_call(Cpu *c, uint64_t address) {
 int main(int argc,char **argv) {
     replay_init();
     if(argc>1 && !strcmp(argv[1],"init"))return 0;
+    if(argc>1 && !strcmp(argv[1],"loading")) {
+        assert(lan_enabled());selected=true;
+        Cpu c={0};c.x[19]=0x123456;c.x[8]=1;c.nzcv=0x5678;
+        Cpu saved=c;
+        // The native loader calls this only after its own async work finishes.
+        // Hold either peer before that boundary while the other keeps updating.
+        if(lan_player()==(unsigned)atoi(argv[3])) {
+            FILE *marker;
+            while(!(marker=fopen(argv[2],"r")))SDL_Delay(1);
+            fclose(marker);
+        } else {
+            for(unsigned i=0;i<100;++i) {
+                assert(replay_hook(&c,0x7000da027cull)==2);
+                assert(!memcmp(&saved,&c,sizeof c));
+                assert(!preparing && !warmup && !fight && !tick);
+                SDL_Delay(1);
+            }
+            FILE *marker=fopen(argv[2],"w");assert(marker);fclose(marker);
+        }
+        while(replay_hook(&c,0x7000da027cull)==2)SDL_Delay(1);
+        assert(!memcmp(&saved,&c,sizeof c));
+        assert(!replay_hook(&c,0x7000da027cull)); // repeated polls stay complete
+        LanEvent out[LAN_MAX_EVENTS*2];
+        for(unsigned i=0;i<128;++i)assert(!lan_step(i,1000+i,NULL,0,out));
+        lan_finish(128,9999);
+        return 0;
+    }
     unsigned char f[0x200]={0}, list[0x28]={0}, array[0x30]={0}, fl[0x20]={0};
     unsigned char p1[0x300]={0}, p2[0x300]={0};
     unsigned char location[0x80]={0}, name[0x30]={0};
@@ -211,6 +240,30 @@ class RuntimeReplayTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder);(root/'tape.txt').write_text('SF2_REPLAY 1\n0 1 9 1\n')
             subprocess.run([str(self.binary),'human'],env=self.env(root),check=True)
+
+    def test_loading_waits_for_either_slow_peer_before_native_intro(self):
+        for slow_player in (0,1):
+            with self.subTest(slow_player=slow_player), tempfile.TemporaryDirectory() as folder:
+                root=Path(folder)
+                with socket.socket() as s:
+                    s.bind(('127.0.0.1',0));port=str(s.getsockname()[1])
+                processes=[]
+                try:
+                    for player in (0,1):
+                        env={k:v for k,v in os.environ.items() if not k.startswith(('SF2_LAN_','SF2_REPLAY_'))}
+                        env.update(SF2_LAN_PORT=port,SF2_REPLAY_TICKS='128',SF2_REPLAY_TRACE=str(root/f'{player}.jsonl'))
+                        env['SF2_LAN_JOIN' if player else 'SF2_LAN_HOST']='127.0.0.1'
+                        if not player:env['SF2_LAN_SEED']='12345'
+                        processes.append(subprocess.Popen([str(self.binary),'loading',str(root/'loaded'),str(slow_player)],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE))
+                    for process in processes:
+                        _,log=process.communicate(timeout=8)
+                        self.assertEqual(process.returncode,0,log.decode())
+                        self.assertIn(b'both players loaded',log)
+                        self.assertIn(b'completed 128 synchronized',log)
+                finally:
+                    for process in processes:
+                        if process.poll() is None:process.kill()
+                        process.communicate()
 
     def test_fixed_match_uses_original_roster_objects_and_preserves_registers(self):
         with tempfile.TemporaryDirectory() as folder:

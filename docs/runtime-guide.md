@@ -111,8 +111,8 @@ in the campaign. Shadow and Titan do not use the weapon selection carousel.
 Titan uses his giant sword, extendable arm on the ranged input, and Mind Throw
 on the magic input. Headbutts, stomps, sword attacks and throws use the normal
 attack buttons and directional combinations. His shield is automatic; he has no
-separate active boss-power button. The versus screen identifies Mind Throw and
-the automatic shield. His real magic uses the normal magic control on desktop,
+separate active boss-power button. His versus screen has no ability panel.
+His real magic uses the normal magic control on desktop,
 gamepad and mobile.
 
 Sparring remains first to two wins. Titan uses the same combined loadout in every

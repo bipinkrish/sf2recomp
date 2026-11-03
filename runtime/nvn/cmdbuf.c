@@ -16,7 +16,11 @@ NVN(nvnCommandBufferInitialize) {
     SET_HOST(A(0), cb);
     RET(1);
 }
-NVN(nvnCommandBufferFinalize) { free(cb_of(A(0))); SET_HOST(A(0), 0); }
+NVN(nvnCommandBufferFinalize) {
+    NvnCmdBuf *cb = cb_of(A(0));
+    if (cb) { nvn_commands_release(cb->commands); free(cb); }
+    SET_HOST(A(0), 0);
+}
 NVN(nvnCommandBufferSetDebugLabel) { (void)c; }
 
 static CmdRec *raw_rec(uint64_t at, uint32_t op, uint32_t size) {
@@ -77,6 +81,8 @@ static CmdRec *rec(Cpu *c, NvnCmdBuf *cb, uint32_t op, uint32_t extra) {
 
 NVN(nvnCommandBufferBeginRecording) {
     NvnCmdBuf *cb = cb_of(A(0));
+    nvn_commands_release(cb->commands);
+    cb->commands = nvn_commands_begin();
     cb->recording = true;
     rec(c, cb, CMD_BARRIER, 0);  // makes sure memory exists; the list starts here
     cb->start = cb->mem + cb->used - sizeof(CmdRec);
@@ -85,6 +91,8 @@ NVN(nvnCommandBufferEndRecording) {
     NvnCmdBuf *cb = cb_of(A(0));
     rec(c, cb, CMD_END, 0);
     cb->recording = false;
+    nvn_commands_end(cb->commands, cb->start);
+    cb->commands = NULL;
     RET(cb->start);
 }
 NVN(nvnCommandBufferIsRecording) { RET(cb_of(A(0))->recording); }
@@ -208,6 +216,7 @@ NVN(nvnCommandBufferSetRenderTargets) {
     const uint64_t *colors = (const uint64_t *)(uintptr_t)s.x[2], *views = (const uint64_t *)(uintptr_t)s.x[3];
     for (int i = 0; i < n; i++) {
         rt.tex[i] = colors && colors[i] ? (uint64_t)(uintptr_t)HOST(NvnTexture, colors[i]) : 0;
+        nvn_commands_texture(cb_of(s.x[0])->commands, (NvnTexture *)(uintptr_t)rt.tex[i]);
         if (views && views[i]) {
             rt.has_view[i] = 1;
             memcpy(&rt.views[i], (void *)(uintptr_t)views[i], sizeof(NvnTextureView));
@@ -215,6 +224,7 @@ NVN(nvnCommandBufferSetRenderTargets) {
         }
     }
     rt.depth = s.x[4] ? (uint64_t)(uintptr_t)HOST(NvnTexture, s.x[4]) : 0;
+    nvn_commands_texture(cb_of(s.x[0])->commands, (NvnTexture *)(uintptr_t)rt.depth);
     if (s.x[5]) {
         rt.has_dview = 1;
         memcpy(&rt.dview, (void *)(uintptr_t)s.x[5], sizeof(NvnTextureView));
@@ -309,6 +319,7 @@ static void clear_texture(Cpu *c, int kind) {
     Snap s = snap(c);
     ClearTexRec ct = {0};
     ct.tex = (uint64_t)(uintptr_t)HOST(NvnTexture, s.x[1]);
+    nvn_commands_texture(cb_of(s.x[0])->commands, (NvnTexture *)(uintptr_t)ct.tex);
     if (s.x[2]) { ct.has_view = 1; memcpy(&ct.view, (void *)(uintptr_t)s.x[2], sizeof ct.view); nvn_texture_note_view((NvnTexture *)(uintptr_t)ct.tex, &ct.view); }
     if (s.x[3]) memcpy(ct.region, (void *)(uintptr_t)s.x[3], sizeof ct.region);
     if (s.x[4]) memcpy(ct.color, (void *)(uintptr_t)s.x[4], 16);
@@ -391,30 +402,31 @@ NVN(nvnCommandBufferResumeTransformFeedback) { (void)c; }
 
 // ---- copies
 typedef struct { uint64_t tex; NvnTextureView view; uint8_t has_view; int32_t region[6]; } TexRef;
-static void tex_ref(TexRef *t, uint64_t tex, uint64_t view, uint64_t region) {
+static void tex_ref(NvnCmdBuf *cb, TexRef *t, uint64_t tex, uint64_t view, uint64_t region) {
     t->tex = tex ? (uint64_t)(uintptr_t)HOST(NvnTexture, tex) : 0;
+    nvn_commands_texture(cb->commands, (NvnTexture *)(uintptr_t)t->tex);
     if (view) { t->has_view = 1; memcpy(&t->view, (void *)(uintptr_t)view, sizeof t->view); nvn_texture_note_view((NvnTexture *)(uintptr_t)t->tex, &t->view); }
     if (region) memcpy(t->region, (void *)(uintptr_t)region, sizeof t->region);
 }
 NVN(nvnCommandBufferCopyBufferToTexture) {  // (cmd, src, dst, dstView, dstRegion, flags)
     Snap s = snap(c);
     TexRef t = {0};
-    tex_ref(&t, s.x[2], s.x[3], s.x[4]);
+    tex_ref(cb_of(s.x[0]), &t, s.x[2], s.x[3], s.x[4]);
     CmdRec *r = record(c, CMD_COPY_BUFFER_TO_TEXTURE, sizeof t, &s);
     memcpy(r->extra, &t, sizeof t);
 }
 NVN(nvnCommandBufferCopyTextureToBuffer) {  // (cmd, src, srcView, srcRegion, dst, flags)
     Snap s = snap(c);
     TexRef t = {0};
-    tex_ref(&t, s.x[1], s.x[2], s.x[3]);
+    tex_ref(cb_of(s.x[0]), &t, s.x[1], s.x[2], s.x[3]);
     CmdRec *r = record(c, CMD_COPY_TEXTURE_TO_BUFFER, sizeof t, &s);
     memcpy(r->extra, &t, sizeof t);
 }
 NVN(nvnCommandBufferCopyTextureToTexture) {  // (cmd, src, srcView, srcRegion, dst, dstView, dstRegion, flags)
     Snap s = snap(c);
     TexRef t[2] = {{0}};
-    tex_ref(&t[0], s.x[1], s.x[2], s.x[3]);
-    tex_ref(&t[1], s.x[4], s.x[5], s.x[6]);
+    tex_ref(cb_of(s.x[0]), &t[0], s.x[1], s.x[2], s.x[3]);
+    tex_ref(cb_of(s.x[0]), &t[1], s.x[4], s.x[5], s.x[6]);
     CmdRec *r = record(c, CMD_COPY_TEXTURE_TO_TEXTURE, sizeof t, &s);
     memcpy(r->extra, t, sizeof t);
 }
@@ -422,16 +434,16 @@ PLAIN(nvnCommandBufferCopyBufferToBuffer, CMD_COPY_BUFFER_TO_BUFFER)
 NVN(nvnCommandBufferDownsample) {
     Snap s = snap(c);
     TexRef t[2] = {{0}};
-    tex_ref(&t[0], s.x[1], 0, 0);
-    tex_ref(&t[1], s.x[2], 0, 0);
+    tex_ref(cb_of(s.x[0]), &t[0], s.x[1], 0, 0);
+    tex_ref(cb_of(s.x[0]), &t[1], s.x[2], 0, 0);
     CmdRec *r = record(c, CMD_DOWNSAMPLE, sizeof t, &s);
     memcpy(r->extra, t, sizeof t);
 }
 NVN(nvnCommandBufferDownsampleTextureView) {
     Snap s = snap(c);
     TexRef t[2] = {{0}};
-    tex_ref(&t[0], s.x[1], s.x[2], 0);
-    tex_ref(&t[1], s.x[3], s.x[4], 0);
+    tex_ref(cb_of(s.x[0]), &t[0], s.x[1], s.x[2], 0);
+    tex_ref(cb_of(s.x[0]), &t[1], s.x[3], s.x[4], 0);
     CmdRec *r = record(c, CMD_DOWNSAMPLE, sizeof t, &s);
     memcpy(r->extra, t, sizeof t);
 }
@@ -454,8 +466,14 @@ PLAIN(nvnCommandBufferWaitEvent, CMD_WAIT_EVENT)
 PLAIN(nvnCommandBufferReportCounter, CMD_REPORT_COUNTER)
 NVN(nvnCommandBufferReportValue) { (void)c; }
 NVN(nvnCommandBufferResetCounter) { (void)c; }
-NVN(nvnCommandBufferCallCommands) { record_copy(c, CMD_CALL, 2, (uint32_t)A(1) * 8); }
-NVN(nvnCommandBufferCopyCommands) { record_copy(c, CMD_CALL, 2, (uint32_t)A(1) * 8); }
+static void call_commands(Cpu *c) {
+    NvnCmdBuf *cb = cb_of(A(0));
+    const uint64_t *handles = AP(2);
+    for (uint64_t i = 0; i < A(1); ++i) nvn_commands_call(cb->commands, handles[i]);
+    record_copy(c, CMD_CALL, 2, (uint32_t)A(1) * 8);
+}
+NVN(nvnCommandBufferCallCommands) { call_commands(c); }
+NVN(nvnCommandBufferCopyCommands) { call_commands(c); }
 NVN(nvnCommandBufferInsertDebugMarker) { (void)c; }
 NVN(nvnCommandBufferInsertDebugMarkerDynamic) { (void)c; }
 NVN(nvnCommandBufferInsertDebugMarkerStatic) { (void)c; }

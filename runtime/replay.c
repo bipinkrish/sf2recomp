@@ -498,6 +498,13 @@ static void begin_step(Cpu *c, uint64_t current) {
 }
 int replay_hook(Cpu *c, uint64_t site) {
     if (!trace) return 0;
+    if(site==0x7000da027cull && lan_enabled() && selected) {
+        // LoadFightScene's coroutine has completed its own async loading.
+        // Keep its native yield path until both peers can dismiss the loader,
+        // before StartFight starts VS, round text and the 240-step stance.
+        if(lan_loaded_poll())return 0;
+        return lan_enabled()?2:3; // native yield, or end the coroutine on disconnect
+    }
     if(lan_enabled() && selected && !injecting && (site==0x7000ff7af0ull || site==0x7000ff7c40ull)) {
         // Each machine uses its ordinary P1 keyboard/controller. Ownership on
         // the wire assigns it to host P1 or joined P2, never to both fighters.

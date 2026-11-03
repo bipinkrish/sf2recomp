@@ -15,6 +15,7 @@ void rq_present(NvnTexture *t, uint64_t frame, bool advance);  // show t (the pr
                                                               // a new game frame (false: repeat or movie-only present)
 bool rq_try_present(NvnTexture *t, uint64_t frame);  // nonblocking movie-only present; false if the queue is busy
 void rq_destroy_texture(NvnTexture *t);                  // backend_texture_destroyed + free(t), in queue order
+void rq_finalize_texture(NvnTexture *t);                 // unregister and release guest ownership, in queue order
 enum { RQ_UPLOAD_RGBA, RQ_UPLOAD_NV12 };
 void rq_upload(NvnTexture *t, int kind, void *data, uint32_t w, uint32_t h, uint32_t stride, uint32_t uv_off);  // takes data
 

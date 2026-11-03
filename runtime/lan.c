@@ -33,11 +33,11 @@ static bool would_block(void) { return errno==EAGAIN || errno==EWOULDBLOCK || er
 static bool interrupted(void) { return errno==EINTR; }
 #endif
 
-enum { MAGIC=0x5346324c, VERSION=1, HELLO=1, CONFIG=2, FRAME=3, END=4, READY=5, HEADER=32, MAX_PAYLOAD=LAN_MAX_EVENTS*2 };
+enum { MAGIC=0x5346324c, VERSION=1, HELLO=1, CONFIG=2, FRAME=3, END=4, READY=5, LOADED=8, HEADER=32, MAX_PAYLOAD=LAN_MAX_EVENTS*2 };
 // Change on incompatible simulation/input/initialization/hash-policy changes.
 // Roster indices depend on both INI switches. Reject unlike rosters before
 // exchanging menu indices, including with older binaries lacking these cells.
-#define SIMULATION_ID (UINT64_C(0x5346320100030007) | \
+#define SIMULATION_ID (UINT64_C(0x5346320100030008) | \
     ((uint64_t)g_settings.enable_shadow_in_sparring << 12) | \
     ((uint64_t)g_settings.enable_titan_in_sparring << 13))
 static LanSocket peer=BAD_SOCKET, listener=BAD_SOCKET;
@@ -242,43 +242,45 @@ void lan_init(void) {
     g_settings.developer_console=false;g_settings.developer_trainer=false;g_settings.developer_shop_cheats=false;
     fprintf(stderr,"[lan] connected: player %u, seed %u, match %u,%u,%u, delay %u steps\n",player+1,config.seed,config.match[0],config.match[1],config.match[2],config.delay);
 }
-static bool ready;
-static struct { uint8_t outgoing[HEADER],incoming[HEADER];size_t sent,received;uint64_t until; } readiness;
-bool lan_ready_poll(uint64_t state) {
+typedef struct { uint8_t outgoing[HEADER],incoming[HEADER];size_t sent,received;uint64_t until;bool complete; } LanBarrier;
+static LanBarrier loading, readiness;
+static bool barrier_poll(LanBarrier *barrier,unsigned type,uint64_t state) {
     if(gui_mode) { if(setjmp(gui_escape)) { gui_guard=false;return false; }gui_guard=true; }
-    if(ready) { gui_guard=false;return true; }
-    if(!readiness.until) {
-        readiness.until=deadline(120);
-        put(readiness.outgoing,MAGIC);put(readiness.outgoing+4,VERSION);put(readiness.outgoing+8,READY);put(readiness.outgoing+12,0);
-        put(readiness.outgoing+16,0);put(readiness.outgoing+20,(uint32_t)(state>>32));put(readiness.outgoing+24,(uint32_t)state);put(readiness.outgoing+28,player);
-        fprintf(stderr,"[lan] combat prepared; waiting for peer readiness\n");
+    if(barrier->complete) { gui_guard=false;return true; }
+    if(!barrier->until) {
+        barrier->until=deadline(120);
+        put(barrier->outgoing,MAGIC);put(barrier->outgoing+4,VERSION);put(barrier->outgoing+8,type);put(barrier->outgoing+12,0);
+        put(barrier->outgoing+16,0);put(barrier->outgoing+20,(uint32_t)(state>>32));put(barrier->outgoing+24,(uint32_t)state);put(barrier->outgoing+28,player);
+        fprintf(stderr,type==LOADED?"[lan] local loading complete; waiting for other player\n":"[lan] combat prepared; waiting for peer readiness\n");
     }
-    if(menu_quit_requested() || SDL_GetTicksNS()>=readiness.until)fail("peer did not become ready");
-    if(readiness.sent<HEADER) {
+    if(menu_quit_requested() || SDL_GetTicksNS()>=barrier->until)fail("peer did not become ready");
+    if(barrier->sent<HEADER) {
 #ifdef MSG_NOSIGNAL
         int flags=MSG_NOSIGNAL;
 #else
         int flags=0;
 #endif
-        int n=send(peer,(const char *)readiness.outgoing+readiness.sent,(int)(HEADER-readiness.sent),flags);
-        if(n>0)readiness.sent+=(size_t)n;
+        int n=send(peer,(const char *)barrier->outgoing+barrier->sent,(int)(HEADER-barrier->sent),flags);
+        if(n>0)barrier->sent+=(size_t)n;
         else if(n==0 || (!would_block() && !interrupted()))fail("peer disconnected during readiness");
     }
-    if(gui_mode && !readiness.received && !gui_ready_input()) { gui_guard=false;return false; }
-    if(readiness.received<HEADER) {
-        int n=recv(peer,(char *)readiness.incoming+readiness.received,(int)(HEADER-readiness.received),0);
-        if(n>0)readiness.received+=(size_t)n;
+    if(gui_mode && !barrier->received && !gui_ready_input()) { gui_guard=false;return false; }
+    if(barrier->received<HEADER) {
+        int n=recv(peer,(char *)barrier->incoming+barrier->received,(int)(HEADER-barrier->received),0);
+        if(n>0)barrier->received+=(size_t)n;
         else if(n==0 || (!would_block() && !interrupted()))fail("peer disconnected during readiness");
     }
-    if(readiness.sent<HEADER || readiness.received<HEADER) { gui_guard=false;return false; }
-    uint64_t remote=(uint64_t)get(readiness.incoming+20)<<32|get(readiness.incoming+24);
-    if(get(readiness.incoming)!=MAGIC || get(readiness.incoming+4)!=VERSION || get(readiness.incoming+8)!=READY ||
-       get(readiness.incoming+12)!=0 || get(readiness.incoming+16)!=0 || get(readiness.incoming+28)!=1-player || remote!=state)
+    if(barrier->sent<HEADER || barrier->received<HEADER) { gui_guard=false;return false; }
+    uint64_t remote=(uint64_t)get(barrier->incoming+20)<<32|get(barrier->incoming+24);
+    if(get(barrier->incoming)!=MAGIC || get(barrier->incoming+4)!=VERSION || get(barrier->incoming+8)!=type ||
+       get(barrier->incoming+12)!=0 || get(barrier->incoming+16)!=0 || get(barrier->incoming+28)!=1-player || remote!=state)
         fail("initial combat state/setup mismatch");
-    bytes_sent+=HEADER;bytes_received+=HEADER;ready=true;
-    fprintf(stderr,"[lan] both fighters ready; starting synchronized combat\n");
+    bytes_sent+=HEADER;bytes_received+=HEADER;barrier->complete=true;
+    fprintf(stderr,type==LOADED?"[lan] both players loaded; starting fight intro\n":"[lan] both fighters ready; starting synchronized combat\n");
     gui_guard=false;return true;
 }
+bool lan_loaded_poll(void) { return barrier_poll(&loading,LOADED,0); }
+bool lan_ready_poll(uint64_t state) { return barrier_poll(&readiness,READY,state); }
 static void receive_frame(uint64_t until) {
     uint32_t expected=remote_next_tick;
     unsigned slot=expected%(LAN_MAX_DELAY+1),other=1-player;
@@ -369,7 +371,7 @@ void lan_gui_leave(void) {
     enabled=gui_mode=gui_combat=gui_match=false;gui_status=LAN_GUI_OFF;
     menu_read=menu_write=menu_sent=menu_received=0;
     discovered_count=0;query_at=0;match_serial=0;
-    memset(&readiness,0,sizeof readiness);ready=false;
+    memset(&loading,0,sizeof loading);memset(&readiness,0,sizeof readiness);
     next_tick=remote_next_tick=0;memset(pipeline,0,sizeof pipeline);
     gui_restore();
 }
@@ -587,7 +589,7 @@ bool lan_gui_send_match(const uint32_t match[3]) {
 bool lan_gui_take_match(void) { bool value=gui_match;gui_match=false;return value; }
 void lan_gui_begin_match(void) {
     gui_combat=true;next_tick=remote_next_tick=0;
-    memset(&readiness,0,sizeof readiness);ready=false;
+    memset(&loading,0,sizeof loading);memset(&readiness,0,sizeof readiness);
     memset(pipeline,0,sizeof pipeline);menu_read=menu_write=0;
 }
 

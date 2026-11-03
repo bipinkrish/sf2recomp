@@ -104,7 +104,8 @@ class LanTransportTests(unittest.TestCase):
         a,b,al,bl=self.pair('close');self.assertEqual((a,b),(3,0));self.assertIn(b'combat stopped',al)
     def test_oversized_packet_and_old_rng_policy_are_rejected_before_payload(self):
         for size,policy,message in [(0xffffffff,0x00030004,b'oversized peer packet'),
-                                    (0,0x00030003,b'state/setup mismatch')]:
+                                    (0,0x00030003,b'state/setup mismatch'),
+                                    (0,0x00030007,b'state/setup mismatch')]:
             with self.subTest(policy=policy,size=size):
                 port=self.port();env=self.base_env();env.update(SF2_LAN_HOST='127.0.0.1',SF2_LAN_PORT=port,SF2_LAN_SEED='12345')
                 p=subprocess.Popen([str(self.binary)],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE)

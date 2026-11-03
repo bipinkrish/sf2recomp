@@ -35,11 +35,12 @@ __thread uint64_t g_rq_lock_ns;
 __thread uint64_t g_present_ns, g_hooks_ns;  // (the backends' backend_present)
 extern __thread uint64_t g_blocked_ns;  // kernel.c: idle time of the presenting thread (frame pacing)
 
-enum { IT_EXEC, IT_PRESENT, IT_DESTROY, IT_UPLOAD, IT_FLUSH };
-static const char *const kind_name[] = {"exec", "present", "destroy", "upload", "flush"};
+enum { IT_EXEC, IT_PRESENT, IT_DESTROY, IT_UPLOAD, IT_FLUSH, IT_FINALIZE, IT_COUNT };
+static const char *const kind_name[] = {"exec", "present", "destroy", "upload", "flush", "finalize"};
 typedef struct {
     int kind;
     uint64_t handle;  // EXEC
+    NvnCommands *commands;  // EXEC: owns captured textures until translation completes
     NvnTexture *tex;  // PRESENT / DESTROY / UPLOAD
     uint64_t frame;   // PRESENT
     bool advance;     // PRESENT: a new frame (false: the last one again, backend_represent)
@@ -274,11 +275,12 @@ static void *run(void *arg) {
         if (trace) LOG("[rq] item %llu kind=%d (%s) starting (handle=%llx)\n",
                        (unsigned long long)q, it.kind, kind_name[it.kind], (unsigned long long)it.handle);
         switch (it.kind) {
-        case IT_EXEC: backend_execute(it.handle); break;
+        case IT_EXEC: backend_execute(it.handle); nvn_commands_release(it.commands); break;
         case IT_PRESENT: backend_present_now(it.tex, it.frame, it.advance); break;
         case IT_DESTROY: { extern void nvn_texture_destroy(NvnTexture *t); nvn_texture_destroy(it.tex); break; }
         case IT_UPLOAD: backend_upload_now(it.tex, it.up_kind, it.data, it.w, it.h, it.stride, it.uv_off); break;
         case IT_FLUSH: { extern void renderer_flush(void); renderer_flush(); break; }
+        case IT_FINALIZE: nvn_texture_finalize(it.tex); break;
         }
         if (trace) LOG("[rq] item %llu kind=%d (%s) finished\n", (unsigned long long)q, it.kind, kind_name[it.kind]);
         atomic_store(&rq_tid, 0);  // (clearly not running while waiting: alive probes then see the idle loop)
@@ -286,11 +288,11 @@ static void *run(void *arg) {
         uint64_t gs = renderer_issued_seq(), c1 = plat_thread_cpu_ns();  // (its last submission; renderer_wait_seq waits for it)
         atomic_store_explicit(&render_cpu_ns, c1, memory_order_relaxed);  // (LARECOMP_LOG_PACE: pace.c)
         if (stats) {
-            static uint64_t n[5], wall[5], cpu[5], items;
-            int k = it.kind % 5;
+            static uint64_t n[IT_COUNT], wall[IT_COUNT], cpu[IT_COUNT], items;
+            int k = it.kind;
             n[k]++, wall[k] += plat_now_ns() - w0, cpu[k] += c1 - c0;
             if (++items % 1200 == 0) {
-                for (int i = 0; i < 5; i++)
+                for (int i = 0; i < IT_COUNT; i++)
                     if (n[i]) LOG("[rq] render thread %s items: %llu, avg %.3f ms wall, %.3f ms CPU\n", kind_name[i],
                                   (unsigned long long)n[i], wall[i] / 1e6 / n[i], cpu[i] / 1e6 / n[i]);
                 memset(n, 0, sizeof n), memset(wall, 0, sizeof wall), memset(cpu, 0, sizeof cpu);
@@ -362,10 +364,11 @@ static void prescan(uint64_t handle, Fences *f, int depth) {
 }
 
 uint64_t rq_submit(uint64_t handle) {
+    NvnCommands *commands = nvn_commands_acquire(handle);
     Fences f = {.n = 0, .cap = 32};
     f.p = f.v;
     prescan(handle, &f, 0);
-    Item it = {.kind = IT_EXEC, .handle = handle};
+    Item it = {.kind = IT_EXEC, .handle = handle, .commands = commands};
     uint64_t q = enqueue(&it, f.p, f.n);
     if (f.p != f.v) free(f.p);
     return q;
@@ -395,6 +398,11 @@ bool rq_try_present(NvnTexture *t, uint64_t frame) {
 
 void rq_destroy_texture(NvnTexture *t) {
     Item it = {.kind = IT_DESTROY, .tex = t};
+    enqueue(&it, NULL, 0);
+}
+
+void rq_finalize_texture(NvnTexture *t) {
+    Item it = {.kind = IT_FINALIZE, .tex = t};
     enqueue(&it, NULL, 0);
 }
 
@@ -503,7 +511,7 @@ static void hang_state(const char *pfx) {
     LOG("%s render thread %s; queued %llu, done %llu, running %llu%s%s (for %llu ms), presents pending %d, "
         "presents done %llu, game frames %llu, backend submissions %llu%s\n", pfx,
         atomic_load(&on) > 0 ? "on" : "off", (unsigned long long)enq, (unsigned long long)done, (unsigned long long)cur,
-        cur ? " " : "", cur ? kind_name[kind_of[cur % RQ_HIST] % 5] : "",
+        cur ? " " : "", cur ? kind_name[kind_of[cur % RQ_HIST] % IT_COUNT] : "",
         cur && cs < now ? (unsigned long long)((now - cs) / 1000000) : 0ull, pp,
         (unsigned long long)atomic_load(&presents_done), (unsigned long long)renderer_present_count(),
         (unsigned long long)renderer_submit_seq(), locked ? "" : " (queue lock held 100+ ms: read without it)");
@@ -512,7 +520,7 @@ static void hang_state(const char *pfx) {
         int n = 0;
         uint64_t from = enq > 24 ? enq - 23 : 1;
         for (uint64_t q = from; q <= enq && n < (int)sizeof b - 32; q++)
-            n += snprintf(b + n, sizeof b - (size_t)n, " %llu:%s", (unsigned long long)q, kind_name[kind_of[q % RQ_HIST] % 5]);
+            n += snprintf(b + n, sizeof b - (size_t)n, " %llu:%s", (unsigned long long)q, kind_name[kind_of[q % RQ_HIST] % IT_COUNT]);
         LOG("%s render queue, last items:%s\n", pfx, b);
     }
     int nw = atomic_load(&nwatch);

@@ -15,8 +15,13 @@ HARNESS=r"""
 #include "settings.h"
 #include "lan.h"
 #include "lan_random.h"
+#include "replay.c"
 Settings g_settings={.network_enabled=true,.ai_enabled=true,.player_setup=PLAYER_SETUP_TWO_CONTROLLERS};
 bool menu_quit_requested(void) { return false; }
+void menu_request_quit(void) { assert(false); }
+void guest_call(Cpu *c,uint64_t site) { assert(false); }
+uint64_t renderer_present_count(void) { return 0; }
+uint64_t plat_now_ns(void) { return SDL_GetTicksNS(); }
 static void pump_until_connected(bool host) {
     uint64_t until=SDL_GetTicksNS()+10000000000ull;
     while(lan_gui_status()!=LAN_GUI_CONNECTED) {
@@ -74,6 +79,19 @@ int main(int argc,char **argv) {
         while(!lan_gui_take_match()) { assert(SDL_GetTicksNS()<until);lan_gui_poll();SDL_Delay(1); }
         assert(!memcmp(lan_config()->match,expected,sizeof expected));
         lan_gui_begin_match();
+        char marker_path[1024];snprintf(marker_path,sizeof marker_path,"%s/loaded-%u",argv[3],game);
+        if(lan_player()==game) {
+            FILE *marker;
+            while(!(marker=fopen(marker_path,"r")))SDL_Delay(1);
+            fclose(marker);
+        } else {
+            // A different peer loads slowly on each match. Every poll yields
+            // while waiting, including after reusing the same TCP connection.
+            for(unsigned i=0;i<100;++i) { assert(!lan_loaded_poll());SDL_Delay(1); }
+            FILE *marker=fopen(marker_path,"w");assert(marker);fclose(marker);
+        }
+        while(!lan_loaded_poll()) { assert(lan_enabled());SDL_Delay(1); }
+        assert(lan_loaded_poll());
         for(unsigned tick=0;tick<128;++tick) {
             LanEvent local={99,(tick+lan_player())%15,tick%2},out[LAN_MAX_EVENTS*2];
             unsigned n=lan_step(tick,UINT64_C(1000)+tick+((uint64_t)lan_config()->seed<<24)+((uint64_t)expected[0]<<16)+((uint64_t)expected[1]<<8)+expected[2],&local,1,out);
@@ -85,13 +103,26 @@ int main(int argc,char **argv) {
         assert(lan_enabled() && lan_gui_status()==LAN_GUI_CONNECTED);
         fprintf(stderr,"native match %u complete; connection retained\n",game);
     }
-    if(host) {
+    bool close_loading=argc>4;
+    if(close_loading)lan_gui_begin_match();
+    if(host!=close_loading) {
+        if(close_loading)SDL_Delay(100);
         lan_gui_leave();assert(!lan_enabled() && !lan_gui_active());
         assert(g_settings.network_enabled && g_settings.ai_enabled && g_settings.player_setup==PLAYER_SETUP_TWO_CONTROLLERS);
     } else {
         uint64_t until=SDL_GetTicksNS()+3000000000ull;
-        while(lan_gui_status()!=LAN_GUI_ERROR) { assert(SDL_GetTicksNS()<until);lan_gui_poll();SDL_Delay(1); }
-        assert(!lan_enabled());assert(strstr(lan_gui_error(),"left Sparring"));
+        Cpu c={0};
+        if(close_loading) { trace=tmpfile();assert(trace);selected=true; }
+        while(lan_gui_status()!=LAN_GUI_ERROR) {
+            assert(SDL_GetTicksNS()<until);
+            if(close_loading) {
+                int result=replay_hook(&c,0x7000da027cull);
+                assert(result==(lan_enabled()?2:3)); // yield, then terminate the native coroutine
+            } else lan_gui_poll();
+            SDL_Delay(1);
+        }
+        if(close_loading) { fclose(trace);trace=NULL; }
+        assert(!lan_enabled());assert(strstr(lan_gui_error(),close_loading?"loading combat":"left Sparring"));
         assert(g_settings.network_enabled && g_settings.ai_enabled);
         lan_gui_leave();assert(lan_gui_search());lan_gui_leave();
     }
@@ -99,14 +130,19 @@ int main(int argc,char **argv) {
 """
 class NativeLanTests(unittest.TestCase):
     def test_discovery_two_matches_disconnect_and_reentry(self):
+        self.run_session(False)
+    def test_disconnect_while_waiting_for_loading_is_recoverable(self):
+        self.run_session(True)
+    def run_session(self,close_loading):
         with tempfile.TemporaryDirectory(prefix='sf2-native-lan-') as directory:
             work=Path(directory);source=work/'test.c';source.write_text('#include <string.h>\n'+HARNESS)
             cflags,libs=sdl_flags()
-            subprocess.run(['clang','-O2','-I'+str(ROOT/'runtime'),*cflags,str(source),str(ROOT/'runtime/lan.c'),*libs,'-o',str(work/'test')],check=True)
+            subprocess.run(['clang','-O2','-I'+str(ROOT/'runtime'),*cflags,str(source),str(ROOT/'runtime/lan.c'),*libs,'-lm','-o',str(work/'test')],check=True)
             with socket.socket() as s:s.bind(('127.0.0.1',0));port=str(s.getsockname()[1])
             env={k:v for k,v in os.environ.items() if not k.startswith(('SF2_LAN_','SF2_REPLAY_'))}
-            host=subprocess.Popen([str(work/'test'),'host',port],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-            join=subprocess.Popen([str(work/'test'),'join',port],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+            args=[port,str(work)]+(['close-loading'] if close_loading else [])
+            host=subprocess.Popen([str(work/'test'),'host',*args],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+            join=subprocess.Popen([str(work/'test'),'join',*args],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
             try:
                 _,jl=join.communicate(timeout=15);_,hl=host.communicate(timeout=15)
                 self.assertEqual((host.returncode,join.returncode),(0,0),(hl+jl).decode())

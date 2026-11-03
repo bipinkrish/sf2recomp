@@ -35,7 +35,24 @@ typedef struct NvnTexture {
     uint32_t pool_refs;  // texture pool entries that name it (cleared when it is finalized: runtime/nvn/objects.c)
     bool format_views;   // named through a view in a format the backend can only give with a flag (Metal: PixelFormatView)
     char label[64];
+    unsigned refs;  // guest object, recorded command lists, and queued users
 } NvnTexture;
+
+void nvn_texture_retain(NvnTexture *t);
+void nvn_texture_release(NvnTexture *t);
+void nvn_texture_finalize(NvnTexture *t);  // render thread: unregister, release guest ownership
+void nvn_texture_destroy(NvnTexture *t);   // render thread: last owner has released it
+
+// Command handles own the textures captured while recording, even before submission.
+// A queued execution holds its own reference if the guest finalizes the handle meanwhile.
+typedef struct NvnCommands NvnCommands;
+NvnCommands *nvn_commands_begin(void);
+void nvn_commands_texture(NvnCommands *commands, NvnTexture *texture);
+void nvn_commands_call(NvnCommands *commands, uint64_t handle);
+void nvn_commands_end(NvnCommands *commands, uint64_t handle);
+NvnCommands *nvn_commands_acquire(uint64_t handle);
+void nvn_commands_release(NvnCommands *commands);
+void nvn_commands_finalize(uint64_t handle);
 
 typedef struct {
     uint32_t min_filter, mag_filter, wrap[3], compare_mode, compare_func, reduction;
@@ -109,6 +126,7 @@ typedef struct {
     uint64_t callback, callback_data;
     bool recording;
     uint64_t guest;  // the guest NVNcommandBuffer*
+    NvnCommands *commands;
 } NvnCmdBuf;
 
 // One recorded command: header, the call's integer and float arguments, then copied data.

@@ -89,6 +89,7 @@ int main(void) {
         self.assertTrue(all(patches.HOOKS[site][3] == "RT_HOOK_KEYBOARD_PROMPTS" for site in optional))
         replay_sites = {site for site, hook in patches.HOOKS.items() if len(hook) == 4 and hook[3] in ("2u", "6u")}
         self.assertEqual(replay_sites, {
+            0x7000da027c,
             0x7000ca7e80, 0x7000ca6df0, 0x7000c99e30, 0x7000c9dd50,
             0x7000ca7c00, 0x7001177d10, 0x7001177d20, 0x7001237b50,
             0x7001237bc0, 0x70010ed6a0, 0x70010f1450, 0x70010f1550,

@@ -240,12 +240,17 @@ static bool sparring_roster_cell_visible(uint64_t table, unsigned index) {
 }
 
 static void sparring_prevent_throws(Cpu *c, uint64_t model) {
-    uint64_t list = guest_invoke2(c, 0x7000cf9830ull, 0, 0);
-    uint64_t node = sparring_xml(c, "<Warrior><Perks><Perk Name=\"PERK_NO_THROWS\"/></Perks></Warrior>");
-    uint64_t copy = guest_invoke4(c, 0x7000d14ba0ull, list, node, model, 0);
-    // Keep the already-returned model object when the other fighter was built
-    // first. This also handles Random resolving to Titan in either slot.
-    if (copy) ST64(model + 0x140, LD64(copy + 0x140));
+    // Resolve the campaign perk through GameUtils.PerkItems, as PerkRule does.
+    // Sparse ParseUser XML skips perk loading; add it to this match's owned
+    // PerksUser list and rebuild combat Perks on the already-returned model.
+    uint64_t klass = LD64(0x7003b37410ull); // GameUtils_TypeInfo
+    uint64_t fields = klass ? LD64(klass + 0xb8) : 0;
+    uint64_t items = fields ? LD64(fields + 0x48) : 0;
+    if (!items) return;
+    uint64_t perk = guest_invoke2(c, 0x7000f72c30ull, items, guest_string(c, "PERK_NO_THROWS"));
+    if (!perk) return;
+    guest_invoke2(c, 0x7000e9da00ull, model, perk);
+    guest_invoke2(c, 0x7000e9f7d0ull, model, 0);
 }
 
 static void sparring_release_portraits(Cpu *c) {
@@ -422,7 +427,9 @@ static int sparring_roster_hook(Cpu *c, uint64_t site) {
         if (sparring_building_model) return 0;
         uint64_t scene = c->x[0], name = c->x[1];
         unsigned player = c->x[2];
-        if (!player) memset(sparring_models, 0, sizeof sparring_models);
+        // PvpScene.StartFight constructs Second (1) before First (0).
+        // Clear the previous match before the first native construction.
+        if (player == 1) memset(sparring_models, 0, sizeof sparring_models);
         sparring_building_model = true;
         uint64_t model = guest_invoke4(c, site, scene, name, player, 0);
         sparring_building_model = false;
@@ -442,23 +449,10 @@ static int sparring_roster_hook(Cpu *c, uint64_t site) {
     }
     case 0x7000e60ba0ull: { // Versus-screen ability panel, reused for each match.
         uint64_t panel = c->x[0], model = c->x[1];
-        uint64_t title = LD64(panel + 0x20), description = LD64(panel + 0x28);
-        // Restore localization when the panel is reused by an original boss.
-        guest_invoke2(c, 0x7000e73b90ull, title, 0);
-        guest_invoke2(c, 0x7000e73b90ull, description, 0);
         if (!sparring_named(LD64(model + 0x118), "BOSS_TITAN")) return 0;
-        guest_invoke2(c, 0x7001226480ull, guest_invoke2(c, 0x700121e720ull, panel, 0), 1);
-        // This hidden campaign item has no localization word in the original
-        // assets. Use literal text rather than displaying %%ERROR%%.
-        guest_invoke2(c, 0x7000e73b90ull, title, 1);
-        guest_invoke2(c, 0x7000e72a50ull, title, guest_string(c, "MIND THROW"));
-        guest_invoke2(c, 0x7001226480ull, guest_invoke2(c, 0x700121e720ull, description, 0), 1);
-        guest_invoke2(c, 0x7000e73b90ull, description, 1);
-        guest_invoke2(c, 0x7000e72a50ull, description, guest_string(c, "SHIELD: AUTOMATIC"));
-        // This image is a Super-button legend. Titan casts through Magic and
-        // his shield activates itself, so showing Super here would be false.
+        // Titan has no active boss-power button or versus-screen ability panel.
         guest_invoke2(c, 0x7001226480ull,
-            guest_invoke2(c, 0x700121e720ull, LD64(panel + 0x18), 0), 0);
+            guest_invoke2(c, 0x700121e720ull, panel, 0), 0);
         return 1;
     }
     default: return -1;

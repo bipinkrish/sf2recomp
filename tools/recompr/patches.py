@@ -103,6 +103,7 @@ HOOKS = {
 
     0x7000c99e30: (0xd10303ff, (), "replay: scope combat construction", "2u"),
     0x7000c9dd50: (0xf81c0ff7, (), "replay: initialize native round and scope combat draw", "2u"),
+    0x7000da027c: (0x39408268, (0x7000da01c8, 0x7000da005c), "LAN: keep native loading yield until both players loaded", "2u"),
     0x7000ca7c00: (0xa9be4ff4, (), "replay: scope active transition", "2u"),
     0x7001177d10: (0x29020401, (), "replay: controlled Nekki seed", "2u"),
     0x7001177d20: (0xb9401008, (), "replay: controlled Nekki LCG", "2u"),
@@ -169,7 +170,7 @@ HOOKS = {
     0x7000e432a0: (0xa9bd57f6, (), "refresh Shadow's campaign equipment in Sparring"),
     0x7000e44080: (0xa9bb67fa, (), "fixed Shadow/Titan Sparring weapons"),
     0x7000d96fb0: (0xa9bc5ff8, (), "isolated Shadow/Titan Sparring fighter parameters"),
-    0x7000e60ba0: (0xd101c3ff, (), "Titan versus panel shows real magic and automatic shield"),
+    0x7000e60ba0: (0xd101c3ff, (), "hide Titan versus-screen ability panel"),
     0x7000e6b820: (0xa9bd57f6, (), "native desktop exit menu item"),
     0x7000e6ef20: (0xf81e0ff3, (), "exit to desktop from the game menu"),
     0x700011efb0: (0xf81c0ff7, (), "native UI circle meshes", "(RT_HOOK_KEYBOARD_PROMPTS | RT_HOOK_MOBILE_UI)"),

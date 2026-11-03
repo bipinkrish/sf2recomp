@@ -10,6 +10,7 @@ bool lan_enabled(void);
 unsigned lan_player(void); // host 0, join 1; both use their local P1 controls
 void lan_init(void);       // before guest threads; negotiate the host's config
 const LanConfig *lan_config(void);
+bool lan_loaded_poll(void); // both native loaders finished; release the fight intro
 bool lan_ready_poll(uint64_t state); // nonblocking: keep rendering while the peer loads
 unsigned lan_step(uint32_t tick, uint64_t state, const LanEvent *local, unsigned count, LanEvent out[LAN_MAX_EVENTS * 2]);
 void lan_finish(uint32_t tick, uint64_t state);

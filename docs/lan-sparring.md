@@ -31,6 +31,12 @@ Graphics remain local, including FPS, aspect ratio, internal resolution,
 upscaler and antialiasing. The transport uses two steps of input delay at a
 60-step combat clock. It uses lockstep without prediction or rollback.
 
+Both players must finish loading before either leaves the loading screen and
+starts the fight intro. The faster computer keeps rendering while it waits.
+This check runs again for every rematch. A separate combat-state check still
+runs before the first playable step. Both computers need the updated build;
+older LAN versions cannot join this session.
+
 ## Configuration
 
 The supplied INI contains:
