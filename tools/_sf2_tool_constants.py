@@ -644,6 +644,12 @@ class GAME_METADATA:
 
 
 class HOST_TOOLS:
+    BASH_COMMAND = 'bash'
+    MSYS_PATH_CONVERTER = 'cygpath'
+    MSYS_NATIVE_PATH_OPTION = '-m'
+    MSYS_BASH_PATH = '/usr/bin/bash.exe'
+    MSYS_PATH_CONVERTER_MISSING = 'MSYS2 cygpath is missing; run source builds in the UCRT64 shell.'
+    MSYS_BASH_MISSING = 'MSYS2 bash is missing; repair the UCRT64 installation before building.'
     N_8_2C62 = 8  # tools/host_tools.py:72
     N_4_4B22 = 4  # tools/host_tools.py:39
     S_THE_NET_8_SDK_IS_REQUIRED_A__3461 = 'The .NET 8+ SDK is required; a runtime-only install cannot build the input tools.'  # tools/host_tools.py:72
@@ -1040,7 +1046,6 @@ class SETUP_FFMPEG:
     S_JOBS_MUST_BE_A_POSITIVE_INTE_A57D = 'JOBS must be a positive integer'  # tools/setup_ffmpeg.py:104
     S_JOBS_ABED = 'JOBS'  # tools/setup_ffmpeg.py:102
     S_CONFIGURE_3A7A = 'configure'  # tools/setup_ffmpeg.py:101
-    S_BASH_ABAD = 'bash'  # tools/setup_ffmpeg.py:101
     S_NASM_YASM_NOT_FOUND_BUILDING_E91C = 'nasm/yasm not found; building FFmpeg without x86 assembly optimizations.'  # tools/setup_ffmpeg.py:100
     S_DISABLE_X86ASM_69DD = '--disable-x86asm'  # tools/setup_ffmpeg.py:99
     S_YASM_D323 = 'yasm'  # tools/setup_ffmpeg.py:98
@@ -2146,7 +2151,6 @@ class CONVERT:
     S_TOOLS_SETUP_FFMPEG_PY_88E9 = 'tools/setup_ffmpeg.py'  # tools/convert.py:337
     S_ENSURE_C475 = '--ensure'  # tools/convert.py:335
     S_TOOLS_SETUP_RUNTIME_SH_9A82 = 'tools/setup_runtime.sh'  # tools/convert.py:335
-    S_BASH_ABAD = 'bash'  # tools/convert.py:335
     S_INSTALL_BUILD_DEPENDENCIES_P_DFAC = 'Install build dependencies: python3 -m pip install -r tools/requirements.txt'  # tools/convert.py:331
     S_PIL_17DB = 'PIL'  # tools/convert.py:328
     S_CRYPTOGRAPHY_DE2A = 'cryptography'  # tools/convert.py:328

@@ -23,6 +23,21 @@ def require_host(target):
         raise ValueError(K.S_USE_NATIVE_WINDOWS_PYTHON_FR_5ABC)
 
 
+def build_bash():
+    """Select MSYS2 explicitly: Windows searches System32 before PATH."""
+    if host_target() != K.S_WINDOWS_F2ED:
+        return K.BASH_COMMAND
+    require_host(K.S_WINDOWS_F2ED)
+    cygpath = shutil.which(K.MSYS_PATH_CONVERTER)
+    if not cygpath:
+        raise ValueError(K.MSYS_PATH_CONVERTER_MISSING)
+    shell = Path(subprocess.check_output(
+        [cygpath, K.MSYS_NATIVE_PATH_OPTION, K.MSYS_BASH_PATH], text=True).strip())
+    if not shell.is_file():
+        raise ValueError(K.MSYS_BASH_MISSING)
+    return str(shell)
+
+
 def tool_directory(target=None):
     target = target or host_target()
     return ROOT / K.S_TOOLS_BIN_16A3 / target if target != K.S_LINUX_09D1 else ROOT / K.S_TOOLS_BIN_16A3

@@ -8,7 +8,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
-from host_tools import host_target, require_host
+from host_tools import build_bash, host_target, require_host
 from downloads import unpack
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -75,6 +75,7 @@ def build(prefix, work, force=False, target=K.S_LINUX_09D1):
         print(f"Bundled FFmpeg {VERSION} is ready: {prefix}")
         return
 
+    shell = build_bash()
     for command in (K.S_CLANG_5CE7, K.S_MAKE_D1F9):
         if not shutil.which(command):
             raise RuntimeError(f"Missing build tool: {command}")
@@ -97,7 +98,7 @@ def build(prefix, work, force=False, target=K.S_LINUX_09D1):
     if not shutil.which(K.S_NASM_114F) and not shutil.which(K.S_YASM_D323):
         config.append(K.S_DISABLE_X86ASM_69DD)
         print(K.S_NASM_YASM_NOT_FOUND_BUILDING_E91C)
-    subprocess.run([K.S_BASH_ABAD, (source / K.S_CONFIGURE_3A7A).as_posix(), *config], cwd=source, check=True)
+    subprocess.run([shell, (source / K.S_CONFIGURE_3A7A).as_posix(), *config], cwd=source, check=True)
     jobs = int(os.environ.get(K.S_JOBS_ABED, str(min(os.cpu_count() or 1, K.N_8_2C62))))
     if jobs < 1:
         raise ValueError(K.S_JOBS_MUST_BE_A_POSITIVE_INTE_A57D)

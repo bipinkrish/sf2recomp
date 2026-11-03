@@ -94,6 +94,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: |
+          export PATH="$MINGW_PREFIX/bin:/usr/bin:$PATH"
           release_python=$(cygpath -u "$SF2_RELEASE_PYTHON")
           "$release_python" tools/ci_release.py build
       - uses: actions/upload-artifact@v4

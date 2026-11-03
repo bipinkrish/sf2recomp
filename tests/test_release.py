@@ -4,6 +4,7 @@ import ast
 import io
 import json
 import os
+import shutil
 from pathlib import Path
 import sys
 import tempfile
@@ -21,6 +22,7 @@ import release
 import setup_android
 import setup_ffmpeg
 import centralize_literals
+import host_tools
 
 
 class DownloadTests(unittest.TestCase):
@@ -61,6 +63,48 @@ class DownloadTests(unittest.TestCase):
 
 
 class ReleaseBoundaryTests(unittest.TestCase):
+    @unittest.skipIf(os.name == 'nt', 'exercises POSIX shell forwarding')
+    def test_windows_dependency_script_reuses_its_selected_bash(self):
+        shell = shutil.which('bash')
+        self.assertIsNotNone(shell)
+        with tempfile.TemporaryDirectory(prefix='sf2 shadow bash ') as temporary:
+            shadow = Path(temporary) / 'bash'
+            shadow.write_text('#!/bin/sh\nexit 97\n')
+            shadow.chmod(0o755)
+            env = {**os.environ, 'TARGET': 'windows', 'PATH': temporary + os.pathsep + os.environ['PATH']}
+            result = subprocess.run([shell, str(ROOT / 'tools/setup_runtime.sh'), '--help'],
+                                    env=env, check=True, capture_output=True, text=True)
+            self.assertIn('Use MSYS2 UCRT64', result.stdout)
+
+    def test_windows_build_shell_uses_msys2_even_when_wsl_bash_is_on_path(self):
+        with tempfile.TemporaryDirectory(prefix='sf2 Windows shell ') as temporary:
+            root = Path(temporary)
+            shell = root / 'MSYS2/usr/bin/bash.exe'
+            shell.parent.mkdir(parents=True)
+            shell.write_bytes(b'MSYS2 bash fixture')
+            cygpath = str(shell.with_name('cygpath.exe'))
+            def which(name):
+                return cygpath if name == 'cygpath' else str(root / 'Windows/System32/bash.exe')
+            with patch.object(host_tools, 'host_target', return_value='windows'), \
+                    patch.dict(os.environ, {'MSYSTEM': 'UCRT64'}), \
+                    patch.object(host_tools.shutil, 'which', side_effect=which), \
+                    patch.object(host_tools.subprocess, 'check_output', return_value=str(shell) + '\n') as query:
+                self.assertEqual(host_tools.build_bash(), str(shell))
+            query.assert_called_once_with([cygpath, '-m', '/usr/bin/bash.exe'], text=True)
+
+    def test_windows_build_shell_fails_instead_of_falling_back_to_wsl(self):
+        with patch.object(host_tools, 'host_target', return_value='windows'), \
+                patch.dict(os.environ, {'MSYSTEM': 'UCRT64'}), \
+                patch.object(host_tools.shutil, 'which', return_value=None):
+            with self.assertRaisesRegex(ValueError, 'cygpath is missing'):
+                host_tools.build_bash()
+        with patch.object(host_tools, 'host_target', return_value='windows'), \
+                patch.dict(os.environ, {'MSYSTEM': 'UCRT64'}), \
+                patch.object(host_tools.shutil, 'which', return_value='cygpath.exe'), \
+                patch.object(host_tools.subprocess, 'check_output', return_value='missing/bash.exe\n'):
+            with self.assertRaisesRegex(ValueError, 'bash is missing'):
+                host_tools.build_bash()
+
     def test_ffmpeg_source_extraction_does_not_depend_on_the_host_tar_command(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -72,12 +116,13 @@ class ReleaseBoundaryTests(unittest.TestCase):
                     output.addfile(entry, io.BytesIO(b'fixture'))
             with patch.object(setup_ffmpeg, 'source_archive', return_value=archive), \
                     patch.object(setup_ffmpeg, 'installed', side_effect=[False, True]), \
+                    patch.object(setup_ffmpeg, 'build_bash', return_value='verified-msys-bash.exe'), \
                     patch.object(setup_ffmpeg.shutil, 'which', return_value='build-tool'), \
                     patch.object(setup_ffmpeg.subprocess, 'run') as run:
                 setup_ffmpeg.build(root / 'installed decoder', root / 'build work', target='windows')
             source = root / f'build work/ffmpeg-{setup_ffmpeg.VERSION}-windows-source'
             self.assertEqual((source / 'configure').read_bytes(), b'fixture')
-            self.assertEqual([call.args[0][0] for call in run.call_args_list], ['bash', 'make', 'make'])
+            self.assertEqual([call.args[0][0] for call in run.call_args_list], ['verified-msys-bash.exe', 'make', 'make'])
 
     def test_archive_audit_rejects_keys_game_inputs_and_external_links(self):
         with tempfile.TemporaryDirectory() as temporary:

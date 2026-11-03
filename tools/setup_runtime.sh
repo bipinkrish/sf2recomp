@@ -3,7 +3,7 @@
 set -euo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 if [[ ${TARGET:-} == windows || ${OS:-} == Windows_NT ]]; then
-    exec bash "$root/tools/setup_windows.sh" "$@"
+    exec "$BASH" "$root/tools/setup_windows.sh" "$@"
 fi
 python=${PYTHON:-python3}
 macos=false

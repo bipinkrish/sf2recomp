@@ -17,7 +17,7 @@ from setup_ffmpeg import ARCHIVE_NAME as FFMPEG_ARCHIVE_NAME, VERSION as FFMPEG_
 from setup_fonts import FONT_DIRECTORY, prepare as prepare_fonts
 from windows_dlls import dependency_closure
 from analyze_il2cpp import prepare_symbols
-from host_tools import host_target, require_host
+from host_tools import build_bash, host_target, require_host
 from macos_dylibs import relocate as relocate_macos
 from release_support import manifest as release_manifest, compile_sources
 
@@ -333,7 +333,7 @@ def main(argv=None):
         if not args.package_only and not release:
             environment = os.environ.copy()
             environment.update(TARGET=args.target, SDL_DIR=sdl_dir.as_posix(), PYTHON=Path(sys.executable).as_posix())
-            run(K.S_BASH_ABAD, ROOT / K.S_TOOLS_SETUP_RUNTIME_SH_9A82, K.S_ENSURE_C475, env=environment)
+            run(build_bash(), ROOT / K.S_TOOLS_SETUP_RUNTIME_SH_9A82, K.S_ENSURE_C475, env=environment)
         if not release:
             run(sys.executable, ROOT / K.S_TOOLS_SETUP_FFMPEG_PY_88E9, K.S_ENSURE_C475, K.S_TARGET_2BBE, args.target)
         if not args.package_only and not args.skip_generation:
