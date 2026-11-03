@@ -1,3 +1,4 @@
+#include "../constants/nvn.h"
 // Tegra X1 texture layout: formats and block-linear (GOB) swizzling.
 #pragma once
 #include <stdbool.h>
@@ -10,7 +11,7 @@ typedef struct {
     const char *name;
 } FormatInfo;
 
-enum { FMT_COLOR = 0, FMT_DEPTH = 1, FMT_STENCIL = 2, FMT_DEPTH_STENCIL = 3, FMT_COMPRESSED = 4 };
+enum { FMT_COLOR = 0, FMT_DEPTH = 1, FMT_STENCIL = SF2C_TEGRA_N_2_D473, FMT_DEPTH_STENCIL = SF2C_TEGRA_N_3_4E07, FMT_COMPRESSED = SF2C_TEGRA_N_4_4B22 };
 
 const FormatInfo *nvn_format_info(uint32_t nvn_format);
 

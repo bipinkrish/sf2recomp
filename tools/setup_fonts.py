@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Prepare checksum-pinned, OFL-licensed shared-font substitutes."""
+from _sf2_tool_constants import SETUP_FONTS as K
 import argparse
 import hashlib
 import os
@@ -9,20 +10,20 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-FONT_DIRECTORY = ROOT / "deps/share/fonts"
-SANS_REV = "ffebf8c1ee449e544955a7e813c54f9b73848eac"
-CJK_REV = "523d033d6cb47f4a80c58a35753646f5c3608a78"
+FONT_DIRECTORY = ROOT / K.S_DEPS_SHARE_FONTS_5A92
+SANS_REV = K.SANS_REV
+CJK_REV = K.CJK_REV
 SANS_URL = f"https://raw.githubusercontent.com/notofonts/noto-fonts/{SANS_REV}"
 CJK_URL = f"https://raw.githubusercontent.com/notofonts/noto-cjk/{CJK_REV}"
 FILES = {
-    "NotoSans-Regular.ttf": (f"{SANS_URL}/hinted/ttf/NotoSans/NotoSans-Regular.ttf",
-                             "b85c38ecea8a7cfb39c24e395a4007474fa5a4fc864f6ee33309eb4948d232d5"),
-    "NotoSans-LICENSE.txt": (f"{SANS_URL}/LICENSE",
-                             "0dab92d0544f7b233403f14b84a663bdbfa746982eda629e7f4f9ffe1b036feb"),
-    "NotoSansCJKsc-Regular.otf": (f"{CJK_URL}/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf",
-                                "2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b"),
-    "NotoSansCJK-LICENSE.txt": (f"{CJK_URL}/LICENSE",
-                                "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2"),
+    K.S_NOTOSANS_REGULAR_TTF_8737: (f"{SANS_URL}/hinted/ttf/NotoSans/NotoSans-Regular.ttf",
+                             K.S_B85C38ECEA8A7CFB39C24E395A40_248B),
+    K.S_NOTOSANS_LICENSE_TXT_5F00: (f"{SANS_URL}/LICENSE",
+                             K.S_0DAB92D0544F7B233403F14B84A6_35C0),
+    K.S_NOTOSANSCJKSC_REGULAR_OTF_5E25: (f"{CJK_URL}/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf",
+                                K.S_2C76254F6FC379FDDFCE0A7E84FB_D58D),
+    K.S_NOTOSANSCJK_LICENSE_TXT_6796: (f"{CJK_URL}/LICENSE",
+                                K.S_6A73F9541C2DE74158C0E7CF6B0A_95A5),
 }
 
 
@@ -32,13 +33,13 @@ def verified(path, digest):
 
 def prepare(output=FONT_DIRECTORY, check=False):
     if check:
-        if (not (output / "SOURCE.txt").is_file() or
+        if (not (output / K.S_SOURCE_TXT_5804).is_file() or
                 not all(verified(output / name, digest) for name, (_, digest) in FILES.items())):
-            raise ValueError("Bundled fonts missing or changed; run tools/setup_fonts.py")
+            raise ValueError(K.S_BUNDLED_FONTS_MISSING_OR_CHA_B366)
         return
     output.parent.mkdir(parents=True, exist_ok=True)
-    source = Path(os.environ["SF2_FONT_SOURCE_DIR"]) if os.environ.get("SF2_FONT_SOURCE_DIR") else FONT_DIRECTORY
-    with tempfile.TemporaryDirectory(prefix=".fonts-", dir=output.parent) as temporary:
+    source = Path(os.environ[K.S_SF2_FONT_SOURCE_DIR_3992]) if os.environ.get(K.S_SF2_FONT_SOURCE_DIR_3992) else FONT_DIRECTORY
+    with tempfile.TemporaryDirectory(prefix=K.S_FONTS_8685, dir=output.parent) as temporary:
         stage = Path(temporary)
         for name, (url, digest) in FILES.items():
             target = stage / name
@@ -46,16 +47,16 @@ def prepare(output=FONT_DIRECTORY, check=False):
                 shutil.copyfile(output / name, target)
             elif verified(source / name, digest):
                 shutil.copyfile(source / name, target)
-            elif os.environ.get("SF2_FONT_SOURCE_DIR"):
+            elif os.environ.get(K.S_SF2_FONT_SOURCE_DIR_3992):
                 raise ValueError(f"Font checksum mismatch or missing offline source: {name}")
             else:
-                subprocess.run(["curl", "--fail", "--silent", "--show-error", "--location",
-                                "--proto", "=https", "--tlsv1.2", "--connect-timeout", "20",
-                                "--max-time", "180", "--retry", "2", url, "-o", str(target)], check=True)
+                subprocess.run([K.S_CURL_F8AE, K.S_FAIL_91BC, K.S_SILENT_90C6, K.S_SHOW_ERROR_194D, K.S_LOCATION_CAAB,
+                                K.S_PROTO_0ADB, K.S_HTTPS_0B80, K.S_TLSV1_2_EC63, K.S_CONNECT_TIMEOUT_A6CF, K.S_20_1C3F,
+                                K.S_MAX_TIME_7021, K.S_180_38B2, K.S_RETRY_04A1, K.S_2_5283, url, K.S_O_010C, str(target)], check=True)
             if not verified(target, digest):
                 raise ValueError(f"Font checksum mismatch: {name}")
-        (stage / "SOURCE.txt").write_text("Open-licensed fallback fonts (SIL OFL 1.1)\n" +
-            "".join(f"{name}\n{url}\nSHA256 {digest}\n" for name, (url, digest) in FILES.items()))
+        (stage / K.S_SOURCE_TXT_5804).write_text(K.S_OPEN_LICENSED_FALLBACK_FONTS_DDFC +
+            K.S_EMPTY_6F49.join(f"{name}\n{url}\nSHA256 {digest}\n" for name, (url, digest) in FILES.items()))
         output.mkdir(parents=True, exist_ok=True)
         for path in stage.iterdir():
             target = output / path.name
@@ -65,15 +66,15 @@ def prepare(output=FONT_DIRECTORY, check=False):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, default=FONT_DIRECTORY)
-    parser.add_argument("--check", action="store_true", help="verify local files without downloads")
+    parser.add_argument(K.S_OUTPUT_3033, type=Path, default=FONT_DIRECTORY)
+    parser.add_argument(K.S_CHECK_464A, action=K.S_STORE_TRUE_2C29, help=K.S_VERIFY_LOCAL_FILES_WITHOUT_D_6012)
     args = parser.parse_args()
     try:
         prepare(args.output, args.check)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         parser.exit(1, f"Font setup failed: {error}\n")
-    print("Bundled Noto fallback fonts verified")
+    print(K.S_BUNDLED_NOTO_FALLBACK_FONTS__2659)
 
 
-if __name__ == "__main__":
+if __name__ == K.S_MAIN_ACB5:
     main()

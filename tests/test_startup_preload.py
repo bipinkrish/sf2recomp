@@ -1,4 +1,5 @@
 """Background startup imports preserve renderer ownership and reset lifetimes."""
+from source_values import read_source
 from pathlib import Path
 import subprocess
 import tempfile
@@ -9,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class StartupPreloadTests(unittest.TestCase):
     def test_async_import_adoption_fallback_and_reset(self):
-        source = (ROOT / "runtime/nvn/vulkan/exec.c").read_text()
+        source = read_source(ROOT / "runtime/nvn/vulkan/exec.c")
         start = source.index("static struct {\n    pthread_t thread;", source.index("static bool whole_import_probe_oom"))
         end = source.index("// Linux, AMD (RADV)", start)
         harness = r'''

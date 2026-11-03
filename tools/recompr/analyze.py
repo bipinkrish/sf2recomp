@@ -1,4 +1,5 @@
 """Function discovery and instruction census for an NSO module."""
+from _sf2_recompiler_constants import ANALYZE as K
 import struct
 import sys
 from collections import Counter
@@ -9,19 +10,19 @@ from nso import (Nso, R_AARCH64_ABS64, R_AARCH64_GLOB_DAT,
 
 
 def read_encoded(img, off, enc, pc_base):
-    fmt = enc & 0x0F
-    app = enc & 0x70
-    if fmt == 0x0B:      # sdata4
-        v, size = struct.unpack_from('<i', img, off)[0], 4
-    elif fmt == 0x03:    # udata4
-        v, size = struct.unpack_from('<I', img, off)[0], 4
-    elif fmt in (0x0C, 0x04):
-        v, size = struct.unpack_from('<q' if fmt == 0x0C else '<Q', img, off)[0], 8
+    fmt = enc & K.N_15_E629
+    app = enc & K.N_112_B155
+    if fmt == K.N_11_4FC8:      # sdata4
+        v, size = struct.unpack_from(K.S_I_BA5E, img, off)[0], K.N_4_4B22
+    elif fmt == K.N_3_4E07:    # udata4
+        v, size = struct.unpack_from(K.S_I_833B, img, off)[0], K.N_4_4B22
+    elif fmt in (K.N_12_6B51, K.N_4_4B22):
+        v, size = struct.unpack_from(K.S_Q_D6E3 if fmt == K.N_12_6B51 else K.S_Q_C5AE, img, off)[0], K.N_8_2C62
     else:
         raise ValueError(f'unsupported encoding {enc:#x}')
-    if app == 0x10:
+    if app == K.N_16_B17E:
         v += off
-    elif app == 0x30:
+    elif app == K.N_48_9801:
         v += pc_base
     return v, size
 
@@ -36,8 +37,8 @@ def eh_frame_table(n):
     img, hdr = n.image, n.eh_start
     if not hdr or hdr >= len(img):
         return []
-    ver, ptr_enc, cnt_enc, tbl_enc = img[hdr:hdr + 4]
-    off = hdr + 4
+    ver, ptr_enc, cnt_enc, tbl_enc = img[hdr:hdr + K.N_4_4B22]
+    off = hdr + K.N_4_4B22
     _, sz = read_encoded(img, off, ptr_enc, hdr)
     off += sz
     count, sz = read_encoded(img, off, cnt_enc, hdr)
@@ -57,13 +58,13 @@ def _uleb(img, off):
     while off < len(img):
         b = img[off]
         off += 1
-        value |= (b & 0x7f) << shift
-        if b < 0x80:
+        value |= (b & K.N_127_922C) << shift
+        if b < K.N_128_2747:
             return value, off
-        shift += 7
-        if shift > 70:
+        shift += K.N_7_7902
+        if shift > K.N_70_FF5A:
             break
-    raise ValueError('bad ULEB128')
+    raise ValueError(K.S_BAD_ULEB128_C6C1)
 
 
 def _sleb(img, off):
@@ -71,62 +72,62 @@ def _sleb(img, off):
     while off < len(img):
         b = img[off]
         off += 1
-        value |= (b & 0x7f) << shift
-        shift += 7
-        if b < 0x80:
-            if b & 0x40:
+        value |= (b & K.N_127_922C) << shift
+        shift += K.N_7_7902
+        if b < K.N_128_2747:
+            if b & K.N_64_A68B:
                 value -= 1 << shift
             return value, off
-        if shift > 70:
+        if shift > K.N_70_FF5A:
             break
-    raise ValueError('bad SLEB128')
+    raise ValueError(K.S_BAD_SLEB128_82EC)
 
 
 def _encoded_size(enc):
-    fmt = enc & 0x0f
-    return {0x00: 8, 0x02: 2, 0x03: 4, 0x04: 8,
-            0x0a: 2, 0x0b: 4, 0x0c: 8}.get(fmt)
+    fmt = enc & K.N_15_E629
+    return {0x00: K.N_8_2C62, K.N_2_D473: K.N_2_D473, K.N_3_4E07: K.N_4_4B22, K.N_4_4B22: K.N_8_2C62,
+            K.N_10_4A44: K.N_2_D473, K.N_11_4FC8: K.N_4_4B22, K.N_12_6B51: K.N_8_2C62}.get(fmt)
 
 
 def _encoded(img, off, enc, data_base=0, func_base=0):
     """Read a DW_EH_PE value and return (value, next offset, indirect)."""
-    if enc == 0xff:
-        raise ValueError('omitted DW_EH_PE value')
-    fmt, app = enc & 0x0f, enc & 0x70
-    if app == 0x50:  # aligned native pointer in this 64-bit image
-        off = (off + 7) & ~7
+    if enc == K.N_255_9556:
+        raise ValueError(K.S_OMITTED_DW_EH_PE_VALUE_93FB)
+    fmt, app = enc & K.N_15_E629, enc & K.N_112_B155
+    if app == K.N_80_4844:  # aligned native pointer in this 64-bit image
+        off = (off + K.N_7_7902) & ~K.N_7_7902
     if off < 0:
-        raise ValueError('negative DW_EH_PE offset')
+        raise ValueError(K.S_NEGATIVE_DW_EH_PE_OFFSET_E1CB)
     if fmt == 0x01:
         value, end = _uleb(img, off)
-    elif fmt == 0x09:
+    elif fmt == K.N_9_1958:
         value, end = _sleb(img, off)
     else:
         size = _encoded_size(enc)
         if size is None or off + size > len(img):
             raise ValueError(f'unsupported DW_EH_PE encoding {enc:#x}')
-        signed = fmt in (0x0a, 0x0b, 0x0c)
-        value = int.from_bytes(img[off:off + size], 'little', signed=signed)
+        signed = fmt in (K.N_10_4A44, K.N_11_4FC8, K.N_12_6B51)
+        value = int.from_bytes(img[off:off + size], K.S_LITTLE_7BA5, signed=signed)
         end = off + size
     # A null encoded pointer stays null even with a relative application.
     if value == 0:
-        return 0, end, bool(enc & 0x80)
-    if app == 0x10:       # pcrel
+        return 0, end, bool(enc & K.N_128_2747)
+    if app == K.N_16_B17E:       # pcrel
         value += off
-    elif app == 0x20:     # textrel (the NSO text segment starts at image offset zero)
+    elif app == K.N_32_E29C:     # textrel (the NSO text segment starts at image offset zero)
         pass
-    elif app == 0x30:     # datarel
+    elif app == K.N_48_9801:     # datarel
         value += data_base
-    elif app == 0x40:     # funcrel
+    elif app == K.N_64_A68B:     # funcrel
         value += func_base
-    elif app not in (0, 0x50):
+    elif app not in (0, K.N_80_4844):
         raise ValueError(f'unsupported DW_EH_PE application {app:#x}')
-    return value, end, bool(enc & 0x80)
+    return value, end, bool(enc & K.N_128_2747)
 
 
 def _relocated_pointer(n, off, base):
     """Resolve a pointer slot in the unrelocated NSO image to its guest address."""
-    relocs = getattr(n, '_eh_relocs', None)
+    relocs = getattr(n, K.S_EH_RELOCS_3A99, None)
     if relocs is None:
         relocs = {r[0]: r for r in n.relocs}
         n._eh_relocs = relocs
@@ -145,9 +146,9 @@ def _relocated_pointer(n, off, base):
                 return base + value
         # An unresolved symbol is not the null type entry used by catch (...).
         return None
-    if off < 0 or off + 8 > len(n.image):
+    if off < 0 or off + K.N_8_2C62 > len(n.image):
         return None
-    raw = int.from_bytes(n.image[off:off + 8], 'little')
+    raw = int.from_bytes(n.image[off:off + K.N_8_2C62], K.S_LITTLE_7BA5)
     if raw == 0:
         return 0
     if raw >= base:
@@ -171,51 +172,51 @@ def _pointer_value(n, off, enc, value, indirect, base, data_base=0, func_base=0)
 
 def _cie_info(n, cie_off, base):
     img = n.image
-    length = int.from_bytes(img[cie_off:cie_off + 4], 'little')
-    if length == 0xffffffff:
-        length = int.from_bytes(img[cie_off + 4:cie_off + 12], 'little')
-        p, id_size = cie_off + 12, 8
+    length = int.from_bytes(img[cie_off:cie_off + K.N_4_4B22], K.S_LITTLE_7BA5)
+    if length == K.N_4294967295_F807:
+        length = int.from_bytes(img[cie_off + K.N_4_4B22:cie_off + K.N_12_6B51], K.S_LITTLE_7BA5)
+        p, id_size = cie_off + K.N_12_6B51, K.N_8_2C62
     else:
-        p, id_size = cie_off + 4, 4
+        p, id_size = cie_off + K.N_4_4B22, K.N_4_4B22
     cie_end = p + length
-    cie_id = int.from_bytes(img[p:p + id_size], 'little')
+    cie_id = int.from_bytes(img[p:p + id_size], K.S_LITTLE_7BA5)
     if cie_id != 0:
-        raise ValueError('FDE points to a non-CIE record')
+        raise ValueError(K.S_FDE_POINTS_TO_A_NON_CIE_RECO_1A4F)
     p += id_size
     version = img[p]
     p += 1
     aug_end = img.index(0, p, cie_end)
-    augmentation = img[p:aug_end].decode('ascii', 'replace')
+    augmentation = img[p:aug_end].decode(K.S_ASCII_0C02, K.S_REPLACE_71A6)
     p = aug_end + 1
-    if version == 4:
-        p += 2  # address size and segment-selector size
+    if version == K.N_4_4B22:
+        p += K.N_2_D473  # address size and segment-selector size
     _, p = _uleb(img, p)  # code alignment
     _, p = _sleb(img, p)  # data alignment
     if version == 1:
         p += 1
     else:
         _, p = _uleb(img, p)  # return register
-    fde_enc, lsda_enc = 0x00, 0xff
-    if augmentation.startswith('z'):
+    fde_enc, lsda_enc = 0x00, K.N_255_9556
+    if augmentation.startswith(K.S_Z_0DF4):
         aug_len, p = _uleb(img, p)
         aug_end = p + aug_len
         for ch in augmentation[1:]:
-            if ch == 'P':
+            if ch == K.S_P_2E20:
                 enc = img[p]
                 p += 1
                 _, p, _ = _encoded(img, p, enc, data_base=n.eh_start, func_base=base)
-            elif ch == 'L':
+            elif ch == K.S_L_F18E:
                 lsda_enc = img[p]
                 p += 1
-            elif ch == 'R':
+            elif ch == K.S_R_501C:
                 fde_enc = img[p]
                 p += 1
-            elif ch == 'S':
+            elif ch == K.S_S_657E:
                 pass
             else:
                 raise ValueError(f'unsupported CIE augmentation {ch!r}')
         p = aug_end
-    return fde_enc, lsda_enc, augmentation.startswith('z'), id_size
+    return fde_enc, lsda_enc, augmentation.startswith(K.S_Z_0DF4), id_size
 
 
 def _lsda_handlers(n, lsda, func_start, base):
@@ -224,7 +225,7 @@ def _lsda_handlers(n, lsda, func_start, base):
     p = lsda
     lp_enc = img[p]
     p += 1
-    if lp_enc == 0xff:
+    if lp_enc == K.N_255_9556:
         lp_start = func_start
     else:
         lp_value, p, indirect = _encoded(img, p, lp_enc, data_base=n.eh_start,
@@ -232,13 +233,13 @@ def _lsda_handlers(n, lsda, func_start, base):
         lp_start = _pointer_value(n, p, lp_enc, lp_value, indirect, base,
                                   n.eh_start, func_start)
         if lp_start is None:
-            raise ValueError('unresolved LSDA landing-pad base')
+            raise ValueError(K.S_UNRESOLVED_LSDA_LANDING_PAD__E0A1)
         lp_start -= base if lp_start >= base else 0
 
     ttype_enc = img[p]
     p += 1
     ttype_base = None
-    if ttype_enc != 0xff:
+    if ttype_enc != K.N_255_9556:
         ttype_offset, p = _uleb(img, p)
         ttype_base = p + ttype_offset
     callsite_enc = img[p]
@@ -246,7 +247,7 @@ def _lsda_handlers(n, lsda, func_start, base):
     callsite_len, p = _uleb(img, p)
     callsite_end = p + callsite_len
     if callsite_end > len(img):
-        raise ValueError('LSDA call-site table exceeds image')
+        raise ValueError(K.S_LSDA_CALL_SITE_TABLE_EXCEEDS_AEB6)
     action_base = callsite_end
     result = []
     while p < callsite_end:
@@ -258,12 +259,12 @@ def _lsda_handlers(n, lsda, func_start, base):
                              func_base=func_start)
         action, p = _uleb(img, p)
         if p > callsite_end:
-            raise ValueError('truncated LSDA call-site entry')
+            raise ValueError(K.S_TRUNCATED_LSDA_CALL_SITE_ENT_E1BF)
         if not pad or not action or not ttype_base:
             continue
         handlers, seen = [], set()
         action_off = action_base + action - 1
-        for _ in range(128):
+        for _ in range(K.N_128_2747):
             if action_off in seen or not action_base <= action_off < len(img):
                 break
             seen.add(action_off)
@@ -303,18 +304,18 @@ def eh_frame_handlers(n, base):
     result = []
     cie_cache = {}
     for func_start, fde_off in eh_frame_table(n):
-        if fde_off < 0 or fde_off + 8 > len(img):
+        if fde_off < 0 or fde_off + K.N_8_2C62 > len(img):
             continue
-        length = int.from_bytes(img[fde_off:fde_off + 4], 'little')
-        if length == 0xffffffff:
-            length = int.from_bytes(img[fde_off + 4:fde_off + 12], 'little')
-            p, id_size = fde_off + 12, 8
+        length = int.from_bytes(img[fde_off:fde_off + K.N_4_4B22], K.S_LITTLE_7BA5)
+        if length == K.N_4294967295_F807:
+            length = int.from_bytes(img[fde_off + K.N_4_4B22:fde_off + K.N_12_6B51], K.S_LITTLE_7BA5)
+            p, id_size = fde_off + K.N_12_6B51, K.N_8_2C62
         else:
-            p, id_size = fde_off + 4, 4
-        if not length or fde_off + (12 if id_size == 8 else 4) + length > len(img):
+            p, id_size = fde_off + K.N_4_4B22, K.N_4_4B22
+        if not length or fde_off + (K.N_12_6B51 if id_size == K.N_8_2C62 else K.N_4_4B22) + length > len(img):
             continue
-        cie_field = fde_off + (12 if id_size == 8 else 4)
-        cie_ptr = int.from_bytes(img[cie_field:cie_field + id_size], 'little')
+        cie_field = fde_off + (K.N_12_6B51 if id_size == K.N_8_2C62 else K.N_4_4B22)
+        cie_ptr = int.from_bytes(img[cie_field:cie_field + id_size], K.S_LITTLE_7BA5)
         cie_off = cie_field - cie_ptr
         try:
             info = cie_cache.get(cie_off)
@@ -325,12 +326,12 @@ def eh_frame_handlers(n, base):
             p = cie_field + id_size
             start, p, _ = _encoded(img, p, fde_enc, data_base=n.eh_start,
                                    func_base=base)
-            range_enc = fde_enc & 0x0f
+            range_enc = fde_enc & K.N_15_E629
             extent, p, _ = _encoded(img, p, range_enc)
             if has_z_aug:
                 aug_len, p = _uleb(img, p)
                 aug_end = p + aug_len
-                if lsda_enc != 0xff and p < aug_end:
+                if lsda_enc != K.N_255_9556 and p < aug_end:
                     lsda_value, _, indirect = _encoded(img, p, lsda_enc,
                                                        data_base=n.eh_start,
                                                        func_base=start)
@@ -349,32 +350,32 @@ def eh_frame_handlers(n, base):
 
 def discover(n):
     text_lo, text_hi = n.text[0], n.text[0] + n.text[1]
-    in_text = lambda a: text_lo <= a < text_hi and a % 4 == 0
+    in_text = lambda a: text_lo <= a < text_hi and a % K.N_4_4B22 == 0
     funcs = {}
     for a in eh_frame_functions(n):
         if in_text(a):
-            funcs[a] = 'eh'
+            funcs[a] = K.S_EH_5A38
     for name, info, shndx, value, size in n.syms:
-        if shndx and in_text(value) and (info & 0xF) == 2:
-            funcs.setdefault(value, 'sym')
+        if shndx and in_text(value) and (info & K.N_15_E629) == K.N_2_D473:
+            funcs.setdefault(value, K.S_SYM_A8A8)
     # Code pointers stored in data (vtables, callbacks)
     ptr_targets = set()
     for off, typ, sym, add in n.relocs:
         if typ == R_AARCH64_RELATIVE and in_text(add):
             ptr_targets.add(add)
     for a in ptr_targets:
-        funcs.setdefault(a, 'ptr')
+        funcs.setdefault(a, K.S_PTR_1BEB)
     # BL targets
     code = bytes(n.image[text_lo:text_hi])
-    words = struct.unpack(f'<{len(code) // 4}I', code)
+    words = struct.unpack(f'<{len(code) // K.N_4_4B22}I', code)
     for i, w in enumerate(words):
-        if (w & 0xFC000000) == 0x94000000:
-            imm = w & 0x03FFFFFF
-            if imm & 0x02000000:
-                imm -= 0x04000000
-            t = text_lo + i * 4 + imm * 4
+        if (w & K.N_4227858432_1BBE) == K.N_2483027968_26C3:
+            imm = w & K.N_67108863_97F6
+            if imm & K.N_33554432_B589:
+                imm -= K.N_67108864_2B3C
+            t = text_lo + i * K.N_4_4B22 + imm * K.N_4_4B22
             if in_text(t):
-                funcs.setdefault(t, 'bl')
+                funcs.setdefault(t, K.S_BL_4BCD)
     return funcs, words
 
 
@@ -387,20 +388,20 @@ def census(n, words):
     while off < len(code):
         got = False
         for ins in md.disasm_lite(code[off:], n.text[0] + off):
-            c[ins[2]] += 1
-            off += 4
+            c[ins[K.N_2_D473]] += 1
+            off += K.N_4_4B22
             got = True
         if off < len(code):   # undecodable word: skip it
             bad += 1
-            off += 4
+            off += K.N_4_4B22
     return c, bad
 
 
-if __name__ == '__main__':
+if __name__ == K.S_MAIN_ACB5:
     n = Nso(sys.argv[1])
     funcs, words = discover(n)
     print(f'functions: {len(funcs)}  by source: {dict(Counter(funcs.values()))}')
-    if '--census' in sys.argv:
+    if K.S_CENSUS_7499 in sys.argv:
         c, bad = census(n, words)
         print(f'instructions: {sum(c.values())}  undecodable words: {bad}  distinct mnemonics: {len(c)}')
-        print(' '.join(f'{m}:{k}' for m, k in c.most_common()))
+        print(K.S_EMPTY_730D.join(f'{m}:{k}' for m, k in c.most_common()))

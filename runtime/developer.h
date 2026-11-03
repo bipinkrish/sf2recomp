@@ -1,3 +1,4 @@
+#include "constants/core.h"
 #pragma once
 #include <stdbool.h>
 
@@ -7,7 +8,7 @@ enum {
     DEV_SUBMIT, DEV_HISTORY_PREV, DEV_HISTORY_NEXT, DEV_CONSOLE_CLOSE,
     DEV_SCROLL_UP, DEV_SCROLL_DOWN
 };
-typedef struct { int action; char text[256]; } DeveloperEvent;
+typedef struct { int action; char text[SF2C_DEVELOPER_N_256_51E8]; } DeveloperEvent;
 
 bool developer_handle_event(const SDL_Event *event);
 bool developer_poll_event(DeveloperEvent *event);

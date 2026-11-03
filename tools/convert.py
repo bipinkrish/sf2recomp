@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Build a native Linux, macOS or Windows SF2 folder from local game files."""
+from _sf2_tool_constants import CONVERT as K
 import argparse
 import importlib.util
 import json
@@ -10,7 +11,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "tools"))
+sys.path.insert(0, str(ROOT / K.S_TOOLS_F83E))
 from game_metadata import APP_ID, parse_nacp
 from setup_ffmpeg import ARCHIVE_NAME as FFMPEG_ARCHIVE_NAME, VERSION as FFMPEG_VERSION
 from setup_fonts import FONT_DIRECTORY, prepare as prepare_fonts
@@ -18,26 +19,27 @@ from windows_dlls import dependency_closure
 from analyze_il2cpp import prepare_symbols
 from host_tools import host_target, require_host
 from macos_dylibs import relocate as relocate_macos
+from release_support import manifest as release_manifest, compile_sources
 
 
 def run(*command, env=None):
     subprocess.run([part.as_posix() if isinstance(part, Path) else str(part) for part in command],
-                   cwd=ROOT, check=True, **({"env": env} if env is not None else {}))
+                   cwd=ROOT, check=True, **({K.S_ENV_4706: env} if env is not None else {}))
 
 
 def source_ids(game):
     ids = {}
-    for name in ("main", "sdk"):
-        with (game / "exefs" / name).open("rb") as stream:
-            header = stream.read(0x60)
-        if len(header) != 0x60 or header[:4] != b"NSO0":
+    for name in (K.S_MAIN_13FD, K.S_SDK_0065):
+        with (game / K.S_EXEFS_00A0 / name).open(K.S_RB_81FE) as stream:
+            header = stream.read(K.N_96_7B1A)
+        if len(header) != K.N_96_7B1A or header[:K.N_4_4B22] != K.B_B_NSO0_4F90:
             raise ValueError(f"exefs/{name} is not a valid NSO")
-        ids[name] = header[0x40:0x60].hex()
+        ids[name] = header[K.N_64_A68B:K.N_96_7B1A].hex()
     # Hooks and IL2CPP metadata layout have only been validated for this update.
-    if ids["main"] != "e15fc665ec42684aa6edd1ae03624d96".ljust(64, "0"):
-        raise ValueError("Supported input: Shadow Fight 2 update v131072.")
-    if not (game / "romfs/Data/Managed/Metadata/global-metadata.dat").is_file():
-        raise ValueError("The extracted updated RomFS/IL2CPP metadata is missing.")
+    if ids[K.S_MAIN_13FD] != K.S_E15FC665EC42684AA6EDD1AE0362_06CD.ljust(K.N_64_A68B, K.S_0_59A9):
+        raise ValueError(K.S_SUPPORTED_INPUT_SHADOW_FIGHT_FB57)
+    if not (game / K.S_ROMFS_DATA_MANAGED_METADATA__F282).is_file():
+        raise ValueError(K.S_THE_EXTRACTED_UPDATED_ROMFS__BB88)
     return ids
 
 
@@ -45,120 +47,121 @@ def source_ids(game):
 
 def desktop_text(text):
     """Escape the desktop-entry string format independently of command quoting."""
-    return str(text).replace("\\", "\\\\").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+    return str(text).replace(K.S_EMPTY_6672, K.S_EMPTY_0AC2).replace(K.S_N_AD65, K.S_N_631B).replace(K.S_R_4859, K.S_R_2D02).replace(K.S_T_27AE, K.S_T_8CDA)
 
 
 def desktop_exec(path):
     # Exec has a second quoting layer; percent signs are field-code escapes.
-    if "=" in str(path):
-        raise ValueError("desktop executable paths cannot contain '='; choose another output path")
-    quoted = "".join("\\" + c if c in '\\"`$' else c for c in str(path))
-    return desktop_text('"' + quoted.replace("%", "%%") + '"')
+    if K.S_EMPTY_C874 in str(path):
+        raise ValueError(K.S_DESKTOP_EXECUTABLE_PATHS_CAN_9851)
+    quoted = K.S_EMPTY_6F49.join(K.S_EMPTY_6672 + c if c in K.S_EMPTY_5F0D else c for c in str(path))
+    return desktop_text(K.S_EMPTY_3251 + quoted.replace(K.S_EMPTY_D77D, K.S_EMPTY_E9B8) + K.S_EMPTY_3251)
 
 
 def write_desktop(output, info):
-    desktop = output / (APP_ID + ".desktop")
+    desktop = output / (APP_ID + K.S_DESKTOP_5B29)
     desktop.write_text(
         "[Desktop Entry]\nVersion=1.0\nType=Application\n"
         "Name=Shadow Fight 2 (sf2recomp)\n"
-        f"Exec={desktop_exec(output / 'sf2')}\n"
-        f"Path={desktop_text(output)}\nIcon={desktop_text(output / 'icon.png')}\n"
+        f"Exec={desktop_exec(output / K.S_SF2_4CDA)}\n"
+        f"Path={desktop_text(output)}\nIcon={desktop_text(output / K.S_ICON_PNG_9A4E)}\n"
         "Terminal=false\nCategories=Game;\n"
-        f"StartupWMClass={APP_ID}\nX-AppVersion={desktop_text(info['display_version'])}\n")
-    desktop.chmod(0o755)
+        f"StartupWMClass={APP_ID}\nX-AppVersion={desktop_text(info[K.S_DISPLAY_VERSION_3D6E])}\n")
+    desktop.chmod(K.N_493_560A)
     return desktop
 
 
 def install_desktop(output):
     """Explicit opt-in: register this local output in the user's application menu."""
-    data = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share"))
+    data = Path(os.environ.get(K.S_XDG_DATA_HOME_06D3, Path.home() / K.S_LOCAL_SHARE_288D))
     if not data.is_absolute():
-        raise ValueError("XDG_DATA_HOME must be an absolute path")
-    applications = data / "applications"
+        raise ValueError(K.S_XDG_DATA_HOME_MUST_BE_AN_ABS_F571)
+    applications = data / K.S_APPLICATIONS_1408
     applications.mkdir(parents=True, exist_ok=True)
-    target = applications / (APP_ID + ".desktop")
-    shutil.copy2(output.resolve() / (APP_ID + ".desktop"), target)
+    target = applications / (APP_ID + K.S_DESKTOP_5B29)
+    shutil.copy2(output.resolve() / (APP_ID + K.S_DESKTOP_5B29), target)
     print(f"Registered user application: {target}")
     return target
 
 
-def package_game(game, output, executable, sdl_dir, ffmpeg_dir, target="linux"):
+def package_game(game, output, executable, sdl_dir, ffmpeg_dir, target=K.S_LINUX_09D1):
     """Copy only runtime inputs; keys, tickets, compiler outputs and tools stay out."""
-    if target not in {"linux", "windows", "macos"}:
+    if target not in {K.S_LINUX_09D1, K.S_WINDOWS_F2ED, K.S_MACOS_91E2}:
         raise ValueError(f"Unsupported package target: {target}")
-    windows = target == "windows"
-    macos = target == "macos"
-    exe_name = "sf2.exe" if windows else "sf2"
-    decoder_name = "ffmpeg.exe" if windows else "ffmpeg"
+    windows = target == K.S_WINDOWS_F2ED
+    macos = target == K.S_MACOS_91E2
+    exe_name = K.S_SF2_EXE_6245 if windows else K.S_SF2_4CDA
+    decoder_name = K.S_FFMPEG_EXE_762F if windows else K.S_FFMPEG_5ADA
     source_ids(game)
     output = output.resolve()
     if output == ROOT or ROOT.is_relative_to(output) or game.is_relative_to(output) or output.is_relative_to(game):
-        raise ValueError("Output must not overlap the source repository or extracted game directory.")
-    if not (game / "control.nacp").is_file() or not (game / "icon.png").is_file():
-        raise ValueError("Official control.nacp/icon.png are missing; rerun tools/extract.sh with your NSP and keys.")
-    info = parse_nacp((game / "control.nacp").read_bytes())
-    if target == "linux":
-        desktop_exec(output / "sf2")  # Validate launcher compatibility before copying files.
+        raise ValueError(K.S_OUTPUT_MUST_NOT_OVERLAP_THE__352D)
+    if not (game / K.S_CONTROL_NACP_C2FD).is_file() or not (game / K.S_ICON_PNG_9A4E).is_file():
+        raise ValueError(K.S_OFFICIAL_CONTROL_NACP_ICON_P_F9D1)
+    info = parse_nacp((game / K.S_CONTROL_NACP_C2FD).read_bytes())
+    if target == K.S_LINUX_09D1:
+        desktop_exec(output / K.S_SF2_4CDA)  # Validate launcher compatibility before copying files.
     # This checks the actual linked build IDs without opening a graphical window.
-    run(executable, "--check-game", game)
-    ffmpeg_executable = ffmpeg_dir / "bin" / decoder_name
-    ffmpeg_build = ffmpeg_dir / "share/ffmpeg/BUILD.txt"
-    ffmpeg_source = ffmpeg_dir / "share/ffmpeg" / FFMPEG_ARCHIVE_NAME
-    ffmpeg_license = ffmpeg_dir / "share/licenses/FFmpeg"
-    ffmpeg_libraries = (sorted(ffmpeg_dir.glob("bin/*.dll")) if windows else
-                        sorted({*ffmpeg_dir.glob("lib/libav*.dylib"), *ffmpeg_dir.glob("lib/libsw*.dylib")}) if macos else
-                        sorted({*ffmpeg_dir.glob("lib/libav*.so*"), *ffmpeg_dir.glob("lib/libsw*.so*")}))
+    run(executable, K.S_CHECK_GAME_D4C1, game)
+    ffmpeg_executable = ffmpeg_dir / K.S_BIN_0955 / decoder_name
+    ffmpeg_build = ffmpeg_dir / K.S_SHARE_FFMPEG_BUILD_TXT_C10B
+    ffmpeg_source = ffmpeg_dir / K.S_SHARE_FFMPEG_F670 / FFMPEG_ARCHIVE_NAME
+    ffmpeg_license = ffmpeg_dir / K.S_SHARE_LICENSES_FFMPEG_760A
+    ffmpeg_libraries = (sorted(ffmpeg_dir.glob(K.S_BIN_DLL_AD63)) if windows else
+                        sorted({*ffmpeg_dir.glob(K.S_LIB_LIBAV_DYLIB_9D98), *ffmpeg_dir.glob(K.S_LIB_LIBSW_DYLIB_1411)}) if macos else
+                        sorted({*ffmpeg_dir.glob(K.S_LIB_LIBAV_SO_E292), *ffmpeg_dir.glob(K.S_LIB_LIBSW_SO_F6B9)}))
     if (not ffmpeg_executable.is_file() or not ffmpeg_build.is_file() or not ffmpeg_source.is_file()
             or not ffmpeg_license.is_dir() or not ffmpeg_libraries):
-        raise ValueError("The bundled FFmpeg build is incomplete; run tools/setup_ffmpeg.py --build.")
+        raise ValueError(K.S_THE_BUNDLED_FFMPEG_BUILD_IS__274D)
     prepare_fonts(FONT_DIRECTORY, check=True)
     # Resolve the complete PE import graph before touching an existing output.
     # Each executable has its own DLL search directory; decoder DLLs stay beside
     # ffmpeg.exe, and application DLLs stay beside sf2.exe.
     game_dlls, decoder_dlls = {}, {}
-    if windows:
-        search = [executable.parent, sdl_dir / "bin"]
+    release = release_manifest()
+    if windows and not release:
+        search = [executable.parent, sdl_dir / K.S_BIN_0955]
         game_dlls = dependency_closure([executable], search)
-        decoder_dlls = dependency_closure([ffmpeg_executable], [ffmpeg_dir / "bin", *search])
+        decoder_dlls = dependency_closure([ffmpeg_executable], [ffmpeg_dir / K.S_BIN_0955, *search])
     output.mkdir(parents=True, exist_ok=True)
-    exefs = output / "extracted/exefs"
+    exefs = output / K.S_EXTRACTED_EXEFS_FE8A
     exefs.mkdir(parents=True, exist_ok=True)
-    for name in ("main", "sdk", "main.npdm"):
-        shutil.copy2(game / "exefs" / name, exefs / name)
-    shutil.copytree(game / "romfs", output / "extracted/romfs", dirs_exist_ok=True)
+    for name in (K.S_MAIN_13FD, K.S_SDK_0065, K.S_MAIN_NPDM_478C):
+        shutil.copy2(game / K.S_EXEFS_00A0 / name, exefs / name)
+    shutil.copytree(game / K.S_ROMFS_0A7E, output / K.S_EXTRACTED_ROMFS_A728, dirs_exist_ok=True)
     # Install the executable after its data. Existing user settings and saves stay.
     shutil.copy2(executable, output / exe_name)
     # Earlier conversions used the compiler project's name for the game binary.
     # Remove that generated file when refreshing an existing converted folder.
-    legacy = output / "sf2recomp"
+    legacy = output / K.S_SF2RECOMP_14FD
     if legacy.is_file() and not legacy.is_symlink():
         legacy.unlink()
-    for name in ("control.nacp", "icon.png"):
+    for name in (K.S_CONTROL_NACP_C2FD, K.S_ICON_PNG_9A4E):
         shutil.copy2(game / name, output / name)
-    (output / "game-info.json").write_text(json.dumps(info, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    if target == "linux":
+    (output / K.S_GAME_INFO_JSON_44B1).write_text(json.dumps(info, ensure_ascii=False, indent=K.N_2_D473) + K.S_N_AD65, encoding=K.S_UTF_8_5383)
+    if target == K.S_LINUX_09D1:
         write_desktop(output, info)
-    config = output / "sf2recomp.ini"
+    config = output / K.S_SF2RECOMP_INI_8714
     if not config.exists():
-        shutil.copy2(ROOT / "sf2recomp.ini", config)
-    shutil.copytree(ROOT / "profiles/completed", output / "profiles/completed", dirs_exist_ok=True)
-    notices = output / "licenses"
+        shutil.copy2(ROOT / K.S_SF2RECOMP_INI_8714, config)
+    shutil.copytree(ROOT / K.S_PROFILES_COMPLETED_A426, output / K.S_PROFILES_COMPLETED_A426, dirs_exist_ok=True)
+    notices = output / K.S_LICENSES_A26A
     notices.mkdir(exist_ok=True)
     for name, path in {
-        "PROJECT-LICENSE.txt": ROOT / "LICENSE",
-        "THIRD_PARTY_NOTICES.txt": ROOT / "THIRD_PARTY_NOTICES",
+        K.S_PROJECT_LICENSE_TXT_6AD3: ROOT / K.S_LICENSE_6485,
+        K.S_THIRD_PARTY_NOTICES_TXT_8B60: ROOT / K.S_THIRD_PARTY_NOTICES_F9CA,
     }.items():
         shutil.copy2(path, notices / name)
-    for path in (ROOT / "licenses").glob("*.txt"):
+    for path in (ROOT / K.S_LICENSES_A26A).glob(K.S_TXT_2E63):
         shutil.copy2(path, notices / path.name)
     # Retire duplicate filenames written before license texts were centralized.
-    for old_name in ("LAS-RUNTIME-LICENSE.txt", "SMAA-LICENSE.txt"):
+    for old_name in (K.S_LAS_RUNTIME_LICENSE_TXT_DE07, K.S_SMAA_LICENSE_TXT_879F):
         (notices / old_name).unlink(missing_ok=True)
     # Local shared SDL is needed alongside the executable; OS/driver libraries
     # remain supplied by the user's Linux installation. Static SDL needs no copy.
-    libraries = [] if windows else list((sdl_dir / "lib").glob("libSDL3*.dylib" if macos else "libSDL3.so*"))
+    libraries = [] if windows else list((sdl_dir / K.S_LIB_427F).glob(K.S_LIBSDL3_DYLIB_666A if macos else K.S_LIBSDL3_SO_9A8B))
     if libraries:
-        lib = output / "lib"
+        lib = output / K.S_LIB_427F
         lib.mkdir(exist_ok=True)
         for path in libraries:
             destination = lib / path.name
@@ -174,11 +177,11 @@ def package_game(game, output, executable, sdl_dir, ffmpeg_dir, target="linux"):
                 shutil.copy2(path, destination)
     # Converted outputs carry the small LGPL-only decoder and its matching shared libraries. The game never asks the
     # player to install FFmpeg or find it on PATH.
-    ffmpeg_bundle = output / "lib/ffmpeg"
+    ffmpeg_bundle = output / K.S_LIB_FFMPEG_12A4
     if ffmpeg_bundle.exists():
         shutil.rmtree(ffmpeg_bundle)
-    ffmpeg_bin = ffmpeg_bundle / "bin"
-    ffmpeg_lib = ffmpeg_bundle / "lib"
+    ffmpeg_bin = ffmpeg_bundle / K.S_BIN_0955
+    ffmpeg_lib = ffmpeg_bundle / K.S_LIB_427F
     ffmpeg_bin.mkdir(parents=True)
     ffmpeg_lib.mkdir(parents=True)
     shutil.copy2(ffmpeg_executable, ffmpeg_bin / decoder_name)
@@ -193,61 +196,64 @@ def package_game(game, output, executable, sdl_dir, ffmpeg_dir, target="linux"):
             destination.symlink_to(path.resolve().name)
         else:
             shutil.copy2(path, destination)
-    ffmpeg_notices = notices / "FFmpeg"
+    ffmpeg_notices = notices / K.S_FFMPEG_B4B8
     if ffmpeg_notices.exists():
         shutil.rmtree(ffmpeg_notices)
     shutil.copytree(ffmpeg_license, ffmpeg_notices)
     shutil.copy2(ffmpeg_source, ffmpeg_notices / f"ffmpeg-{FFMPEG_VERSION}-source.tar.xz")
-    shutil.copy2(ffmpeg_build, ffmpeg_notices / "BUILD.txt")
-    if macos:
+    shutil.copy2(ffmpeg_build, ffmpeg_notices / K.S_BUILD_TXT_B4AC)
+    if macos and not release:
         relocate_macos([output / exe_name, ffmpeg_bin / decoder_name],
-                       [*(output / "lib" / p.name for p in libraries),
+                       [*(output / K.S_LIB_427F / p.name for p in libraries),
                         *(ffmpeg_lib / p.name for p in ffmpeg_libraries)])
-    shutil.copytree(FONT_DIRECTORY, output / "lib/fonts", dirs_exist_ok=True)
-    font_notices = notices / "Noto"
+    shutil.copytree(FONT_DIRECTORY, output / K.S_LIB_FONTS_BD4E, dirs_exist_ok=True)
+    if release:
+        destination = output if windows else output / K.S_LIB_427F
+        destination.mkdir(exist_ok=True)
+        for path in (ROOT / K.S_NATIVE_LIB_601C).iterdir():
+            if path.is_file() and (K.S_SO_FD8B in path.name or path.suffix in (K.S_DLL_E982, K.S_DYLIB_CB5B)):
+                shutil.copy2(path, destination / path.name)
+                if windows:
+                    shutil.copy2(path, ffmpeg_bin / path.name)
+        if macos:
+            # The loader resolves this ICD relative to itself, after conversion.
+            shutil.copy2(ROOT / K.S_NATIVE_MOLTENVK_ICD_JSON_4F2D, output / K.S_MOLTENVK_ICD_JSON_8F3A)
+        if (ROOT / K.S_NATIVE_LICENSES_9EA2).is_dir():
+            shutil.copytree(ROOT / K.S_NATIVE_LICENSES_9EA2, notices / K.S_RUNTIME_DEPENDENCIES_0145, dirs_exist_ok=True)
+    font_notices = notices / K.S_NOTO_FABF
     font_notices.mkdir(exist_ok=True)
-    for name in ("NotoSans-LICENSE.txt", "NotoSansCJK-LICENSE.txt", "SOURCE.txt"):
+    for name in (K.S_NOTOSANS_LICENSE_TXT_5F00, K.S_NOTOSANSCJK_LICENSE_TXT_6796, K.S_SOURCE_TXT_5804):
         shutil.copy2(FONT_DIRECTORY / name, font_notices / name)
-    (output / "build.json").write_text(json.dumps({
-        "target": target, "executable": exe_name, "source_build_ids": source_ids(game),
-        "windows_validation": "experimental; hardware playtesting required" if windows else None,
-        "macos_validation": "experimental; native build and hardware playtesting required" if macos else None,
-        "official_title": info["title"], "official_display_version": info["display_version"],
-        "configuration": "sf2recomp.ini (read at runtime)",
-        "cutscene_decoder": f"FFmpeg {FFMPEG_VERSION} (bundled, LGPL-only build)",
-    }, indent=2) + "\n")
+    from version import read as tool_version
+    (output / K.S_BUILD_JSON_4596).write_text(json.dumps({
+        K.S_SF2RECOMP_14FD: tool_version(),
+        K.S_TARGET_0B9D: target, K.S_EXECUTABLE_1A15: exe_name, K.S_SOURCE_BUILD_IDS_8451: source_ids(game),
+        K.S_WINDOWS_VALIDATION_FBEC: K.S_EXPERIMENTAL_HARDWARE_PLAYTE_5310 if windows else None,
+        K.S_MACOS_VALIDATION_BAB2: K.S_EXPERIMENTAL_NATIVE_BUILD_AN_3F04 if macos else None,
+        K.S_OFFICIAL_TITLE_E5A2: info[K.S_TITLE_BED6], K.S_OFFICIAL_DISPLAY_VERSION_6A1E: info[K.S_DISPLAY_VERSION_3D6E],
+        K.S_CONFIGURATION_52DE: K.S_SF2RECOMP_INI_READ_AT_RUNTIM_B87B,
+        K.S_CUTSCENE_DECODER_9E30: f"FFmpeg {FFMPEG_VERSION} (bundled, LGPL-only build)",
+    }, indent=K.N_2_D473) + K.S_N_AD65)
     if windows:
         # Keep dependency notices from the exact installed build prefix.
-        native_notices = sdl_dir / "share/licenses"
+        native_notices = sdl_dir / K.S_SHARE_LICENSES_384B
         if native_notices.is_dir():
-            shutil.copytree(native_notices, notices / "windows-dependencies", dirs_exist_ok=True)
-        (output / "windows-dlls.json").write_text(json.dumps({
-            "application": sorted(game_dlls), "decoder": sorted(decoder_dlls),
-            "system_vulkan_loader": "provided by the installed GPU driver",
-        }, indent=2) + "\n")
-        (output / "RUN.txt").write_text(
-            "Run sf2.exe. Keep extracted/, lib/, and the packaged DLLs beside it.\n"
-            "Edit sf2recomp.ini, then restart to apply settings. Saves/config are preserved on rebuild.\n"
-            "Requirements: Windows 10 1903+ x64 or Windows 11; x64 CPU with CMPXCHG16B; Vulkan 1.3 GPU driver.\n"
-            "Integrated and dedicated GPUs use the same Vulkan renderer; Windows GPU compatibility needs testing.\n"
-            "MSYS2, Python and build tools are only needed for conversion, not to run this folder.\n"
-            "Cutscene decoder, matching source/licenses and fallback fonts are bundled.\n"
-            "This Windows port is experimental and has not yet been validated on Windows hardware.\n"
+            shutil.copytree(native_notices, notices / K.S_WINDOWS_DEPENDENCIES_7270, dirs_exist_ok=True)
+        (output / K.S_WINDOWS_DLLS_JSON_ABAE).write_text(json.dumps({
+            K.S_APPLICATION_35A1: sorted(game_dlls), K.S_DECODER_4738: sorted(decoder_dlls),
+            K.S_SYSTEM_VULKAN_LOADER_B2D3: K.S_PROVIDED_BY_THE_INSTALLED_GP_525D,
+        }, indent=K.N_2_D473) + K.S_N_AD65)
+        (output / K.S_RUN_TXT_0818).write_text(
+            K.S_RUN_SF2_EXE_KEEP_EXTRACTED_L_EC47
         )
     elif macos:
-        (output / "RUN.txt").write_text(
-            "Run ./sf2 from Terminal. Keep extracted/, lib/ and sf2recomp.ini beside it.\n"
-            "This is a native folder build for the conversion host's architecture, not a universal app.\n"
-            "Requires macOS 13+ (or the minimum required by your installed dependencies), "
-            "Vulkan 1.3+ loader, MoltenVK and shaderc from the build's Homebrew/SDK installation.\n"
-            "SDL and the LGPL-only FFmpeg decoder/source/licenses are bundled when built locally.\n"
-            "Saves/config are preserved on rebuild. No Python/.NET SDK is needed to play.\n"
-            "Experimental port: native compilation and GPU/gameplay compatibility remain unverified.\n"
+        (output / K.S_RUN_TXT_0818).write_text(
+            K.S_RUN_SF2_FROM_TERMINAL_KEEP_E_5755
         )
     else:
-        (output / "RUN.txt").write_text(
+        (output / K.S_RUN_TXT_0818).write_text(
             "Run ./sf2 from this folder or any working directory.\n"
-            f"Official game: {info['title']} {info['display_version']}.\n"
+            f"Official game: {info[K.S_TITLE_BED6]} {info[K.S_DISPLAY_VERSION_3D6E]}.\n"
             f"Desktop launcher: {APP_ID}.desktop (local paths; regenerate if moved).\n"
             "Edit sf2recomp.ini for language/audio/video/keyboard/gamepad mappings; restart to apply.\n"
             "Keep extracted/ beside the executable. This output contains your local game-derived files.\n"
@@ -257,84 +263,97 @@ def package_game(game, output, executable, sdl_dir, ffmpeg_dir, target="linux"):
             "Software fallback: SDL_VIDEODRIVER=x11 LARECOMP_VK_NO_GMEM=1 "
             "VK_DRIVER_FILES=/usr/share/vulkan/icd.d/lvp_icd.json ./sf2\n"
             "Combat and hardware-driver compatibility remain incomplete.\n")
-    with (output / "RUN.txt").open("a") as instructions:
+    if release:
+        requirements = {K.S_LINUX_09D1: K.S_LINUX_X86_64_GLIBC_2_39_AVX2_4470,
+                        K.S_WINDOWS_F2ED: K.S_WINDOWS_10_11_X64_CMPXCHG16B_C9BD,
+                        K.S_MACOS_91E2: K.S_MACOS_15_ON_THIS_BUILD_S_CPU_54A4}
+        (output / K.S_RUN_TXT_0818).write_text(
+            f"Run {exe_name}. Keep extracted/, lib/, licenses/ and the packaged libraries together.\n"
+            f"SF2Recomp {release[K.S_VERSION_25EB]}; original game {info[K.S_DISPLAY_VERSION_3D6E]}.\n"
+            f"Requirements: {requirements[target]}\n"
+            "No Python, .NET SDK, compiler, Homebrew or Android SDK installation is needed to play this folder.\n"
+            "Edit sf2recomp.ini and restart to apply settings. Saves are in save/ by default.\n")
+    with (output / K.S_RUN_TXT_0818).open(K.S_A_D749) as instructions:
         instructions.write(
-            "LAN Sparring: start the same build on both computers on the same local network.\n"
-            "Choose Sparring > LAN Multiplayer > Host on one and Join on the other; select the discovered host.\n"
-            "Each player uses their normal local player-1 controls. Restart keeps the connection; leaving Sparring closes it.\n"
-            "No Python or pip packages are required to play LAN. Native LAN is enabled by default; "
-            "[gameplay] allow_sparring_lan_multiplayer=false restores direct Normal Sparring.\n")
+            K.S_LAN_SPARRING_START_THE_SAME__C79B)
     print(f"Native game folder: {output}")
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__)
     source = ap.add_mutually_exclusive_group(required=True)
-    source.add_argument("--nsp", type=Path, help="supported combined base + update v131072 NSP")
-    source.add_argument("--game", type=Path, help="already extracted updated game directory")
-    ap.add_argument("--keys", type=Path, help="your local prod.keys, required with --nsp")
-    ap.add_argument("--target", choices=("linux", "windows", "macos"), default=host_target())
-    ap.add_argument("--output", type=Path)
-    ap.add_argument("--symbols", type=Path, help="reuse an existing sym_main.txt instead of running local analysis")
-    ap.add_argument("--skip-generation", action="store_true", help="compile existing game/gen files; build identity is still checked")
-    ap.add_argument("--jobs", type=int, default=min(os.cpu_count() or 1, 8))
-    ap.add_argument("--package-only", action="store_true", help="package an existing matching local build")
-    ap.add_argument("--install-desktop", action="store_true",
-                    help="explicitly register the output launcher in your user application menu")
+    source.add_argument(K.S_NSP_C95D, type=Path, help=K.S_SUPPORTED_COMBINED_BASE_UPDA_9680)
+    source.add_argument(K.S_GAME_1AB6, type=Path, help=K.S_ALREADY_EXTRACTED_UPDATED_GA_F336)
+    ap.add_argument(K.S_KEYS_B749, type=Path, help=K.S_YOUR_LOCAL_PROD_KEYS_REQUIRE_ECFE)
+    ap.add_argument(K.S_TARGET_2BBE, choices=(K.S_LINUX_09D1, K.S_WINDOWS_F2ED, K.S_MACOS_91E2), default=host_target())
+    ap.add_argument(K.S_OUTPUT_3033, type=Path)
+    ap.add_argument(K.S_SYMBOLS_1344, type=Path, help=K.S_REUSE_AN_EXISTING_SYM_MAIN_T_4B1A)
+    ap.add_argument(K.S_SKIP_GENERATION_DC48, action=K.S_STORE_TRUE_2C29, help=K.S_COMPILE_EXISTING_GAME_GEN_FI_5F51)
+    ap.add_argument(K.S_JOBS_0E7C, type=int, default=min(os.cpu_count() or 1, K.N_8_2C62))
+    ap.add_argument(K.S_PACKAGE_ONLY_049B, action=K.S_STORE_TRUE_2C29, help=K.S_PACKAGE_AN_EXISTING_MATCHING_D111)
+    ap.add_argument(K.S_INSTALL_DESKTOP_D4E9, action=K.S_STORE_TRUE_2C29,
+                    help=K.S_EXPLICITLY_REGISTER_THE_OUTP_DE51)
     args = ap.parse_args(argv)
     try:
-        windows = args.target == "windows"
+        windows = args.target == K.S_WINDOWS_F2ED
         require_host(args.target)
-        if args.target != "linux" and args.install_desktop:
-            raise ValueError("--install-desktop is a Linux option.")
+        if args.target != K.S_LINUX_09D1 and args.install_desktop:
+            raise ValueError(K.S_INSTALL_DESKTOP_IS_A_LINUX_O_947A)
         if args.package_only and args.skip_generation:
-            raise ValueError("--skip-generation is unnecessary with --package-only")
+            raise ValueError(K.S_SKIP_GENERATION_IS_UNNECESSA_CC4B)
         if args.output is None:
             args.output = ROOT / f"out/shadow-fight-2-{args.target}"
         if args.jobs < 1:
-            raise ValueError("--jobs must be positive")
+            raise ValueError(K.S_JOBS_MUST_BE_POSITIVE_A3BA)
         if args.nsp:
             if not args.keys:
-                raise ValueError("--nsp requires --keys pointing to your locally obtained prod.keys")
+                raise ValueError(K.S_NSP_REQUIRES_KEYS_POINTING_T_B937)
             if args.package_only:
-                raise ValueError("--package-only requires --game")
-            run(sys.executable, ROOT / "tools/extract.py", args.nsp.resolve(), args.keys.resolve(), "--validate-only")
-            run(sys.executable, ROOT / "tools/extract.py", args.nsp.resolve(), args.keys.resolve())
-            game = ROOT / "game/extracted/update"
+                raise ValueError(K.S_PACKAGE_ONLY_REQUIRES_GAME_7CAF)
+            run(sys.executable, ROOT / K.S_TOOLS_EXTRACT_PY_B0D4, args.nsp.resolve(), args.keys.resolve(), K.S_VALIDATE_ONLY_9863)
+            run(sys.executable, ROOT / K.S_TOOLS_EXTRACT_PY_B0D4, args.nsp.resolve(), args.keys.resolve())
+            game = ROOT / K.S_GAME_EXTRACTED_UPDATE_E969
         else:
             game = args.game.resolve(strict=True)
         source_ids(game)
-        prefix = os.environ.get("SDL_DIR")
-        if windows and not prefix:
-            prefix = subprocess.check_output(["cygpath", "-m", os.environ.get("MINGW_PREFIX", "/ucrt64")], text=True).strip()
-        sdl_dir = Path(prefix or ROOT / ("deps/macos" if args.target == "macos" else "deps")).resolve()
-        ffmpeg_dir = Path(os.environ.get("FFMPEG_DIR", ROOT / (
-            "deps/ffmpeg" if args.target == "linux" else f"deps/ffmpeg-{args.target}"))).resolve()
+        release = release_manifest()
+        prefix = None if release else os.environ.get(K.S_SDL_DIR_2C71)
+        if windows and not prefix and not release:
+            prefix = subprocess.check_output([K.S_CYGPATH_26B1, K.S_M_705B, os.environ.get(K.S_MINGW_PREFIX_49B8, K.S_UCRT64_3FD8)], text=True).strip()
+        sdl_dir = Path(prefix or ROOT / (K.S_DEPS_MACOS_FBC7 if args.target == K.S_MACOS_91E2 else K.S_DEPS_3548)).resolve()
+        ffmpeg_dir = Path(os.environ.get(K.S_FFMPEG_DIR_7F8C, ROOT / (
+            K.S_DEPS_FFMPEG_660D if args.target == K.S_LINUX_09D1 else f"deps/ffmpeg-{args.target}"))).resolve()
+        if release:
+            ffmpeg_dir = ROOT / (K.S_DEPS_FFMPEG_660D if args.target == K.S_LINUX_09D1 else f"deps/ffmpeg-{args.target}")
         if not args.package_only and not args.skip_generation:
-            missing = [name for name in ("capstone", "unicorn", "lz4", "cryptography", "PIL")
+            missing = [name for name in (K.S_CAPSTONE_C514, K.S_UNICORN_D491, K.S_LZ4_7811, K.S_CRYPTOGRAPHY_DE2A, K.S_PIL_17DB)
                        if importlib.util.find_spec(name) is None]
             if missing:
-                raise ValueError("Install build dependencies: python3 -m pip install -r tools/requirements.txt")
-        if not args.package_only:
+                raise ValueError(K.S_INSTALL_BUILD_DEPENDENCIES_P_DFAC)
+        if not args.package_only and not release:
             environment = os.environ.copy()
             environment.update(TARGET=args.target, SDL_DIR=sdl_dir.as_posix(), PYTHON=Path(sys.executable).as_posix())
-            run("bash", ROOT / "tools/setup_runtime.sh", "--ensure", env=environment)
-        run(sys.executable, ROOT / "tools/setup_ffmpeg.py", "--ensure", "--target", args.target)
+            run(K.S_BASH_ABAD, ROOT / K.S_TOOLS_SETUP_RUNTIME_SH_9A82, K.S_ENSURE_C475, env=environment)
+        if not release:
+            run(sys.executable, ROOT / K.S_TOOLS_SETUP_FFMPEG_PY_88E9, K.S_ENSURE_C475, K.S_TARGET_2BBE, args.target)
         if not args.package_only and not args.skip_generation:
             if args.symbols:
                 symbols = args.symbols.resolve(strict=True)
             else:
                 symbols = prepare_symbols(game)
-            run(sys.executable, ROOT / "tools/recompr/gen.py", "main", game / "exefs/main",
-                "0x7000000000", ROOT / "game/gen/main", "--symbols", symbols)
-            run(sys.executable, ROOT / "tools/recompr/gen.py", "sdk", game / "exefs/sdk",
-                "0x7004000000", ROOT / "game/gen/sdk")
-        if not args.package_only:
-            make = "gmake" if args.target == "macos" else "make"
+            run(sys.executable, ROOT / K.S_TOOLS_RECOMPR_GEN_PY_1453, K.S_MAIN_13FD, game / K.S_EXEFS_MAIN_8CC5,
+                K.S_0X7000000000_2DF4, ROOT / K.S_GAME_GEN_MAIN_DE2C, K.S_SYMBOLS_1344, symbols)
+            run(sys.executable, ROOT / K.S_TOOLS_RECOMPR_GEN_PY_1453, K.S_SDK_0065, game / K.S_EXEFS_SDK_9162,
+                K.S_0X7004000000_DDC3, ROOT / K.S_GAME_GEN_SDK_7AA1)
+        if not args.package_only and not release:
+            make = K.S_GMAKE_E81C if args.target == K.S_MACOS_91E2 else K.S_MAKE_D1F9
             run(make, f"-j{args.jobs}", f"TARGET={args.target}", f"SDL_DIR={sdl_dir.as_posix()}",
                 f"PYTHON={Path(sys.executable).as_posix()}")
-        executable = ROOT / ("build/windows/sf2.exe" if windows else
-                             "build/macos/sf2" if args.target == "macos" else "build/sf2")
+        executable = ROOT / (K.S_BUILD_WINDOWS_SF2_EXE_9B1B if windows else
+                             K.S_BUILD_MACOS_SF2_D728 if args.target == K.S_MACOS_91E2 else K.S_BUILD_SF2_ECEA)
+        if release and not args.package_only:
+            sources = list((ROOT / K.S_GAME_GEN_45C5).glob(K.S_C_E03C))
+            compile_sources(sources, executable, args.jobs)
         package_game(game, args.output, executable, sdl_dir, ffmpeg_dir, args.target)
         if args.install_desktop:
             install_desktop(args.output)
@@ -344,5 +363,5 @@ def main(argv=None):
         return 1
 
 
-if __name__ == "__main__":
+if __name__ == K.S_MAIN_ACB5:
     raise SystemExit(main())

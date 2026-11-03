@@ -7,12 +7,12 @@ def gameMetadata = gameMetadataFile.isFile() ? new groovy.json.JsonSlurper().par
 
 android {
     namespace 'org.sf2recomp.app'
-    compileSdk 35
-    ndkVersion '28.2.13676358'
+    compileSdk rootProject.ext.sf2Toolchain.getProperty('compile_sdk').toInteger()
+    ndkVersion rootProject.ext.sf2Toolchain.getProperty('ndk')
     defaultConfig {
         applicationId 'org.sf2recomp.app'
-        minSdk 33
-        targetSdk 35
+        minSdk rootProject.ext.sf2Toolchain.getProperty('min_sdk').toInteger()
+        targetSdk rootProject.ext.sf2Toolchain.getProperty('target_sdk').toInteger()
         versionCode 2
         versionName(gameMetadata.display_version ?: '1.1.0')
         resValue 'string', 'app_name', (gameMetadata.title ?: 'Shadow Fight 2').toString()
@@ -25,12 +25,15 @@ android {
         externalNativeBuild {
             cmake {
                 arguments '-DANDROID_STL=c++_shared'
+                if (project.hasProperty('sf2Python')) {
+                    arguments "-DPython3_EXECUTABLE=${project.property('sf2Python')}", "-DPYTHON_EXECUTABLE=${project.property('sf2Python')}"
+                }
                 targets 'main', 'SDL3-shared'
             }
         }
     }
     externalNativeBuild {
-        cmake { path '../CMakeLists.txt'; version '3.22.1' }
+        cmake { path '../CMakeLists.txt'; version rootProject.ext.sf2Toolchain.getProperty('cmake') }
     }
     sourceSets.main {
         java.srcDir new File(sdlSource, 'android-project/app/src/main/java')

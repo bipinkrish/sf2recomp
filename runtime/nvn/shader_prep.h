@@ -1,3 +1,4 @@
+#include "../constants/nvn.h"
 // Live shader identities, diagnostic variant records, and persistent cache helpers.
 // Shader instructions come from the running game's buffers and are translated on
 // demand. There is no offline asset-format scanner or shipped game shader list.
@@ -6,26 +7,26 @@
 #include <stddef.h>
 #include <stdint.h>
 
-enum { SR_FLIP_Y = 1, SR_DEPTH_MINUS_ONE = 2 };
+enum { SR_FLIP_Y = 1, SR_DEPTH_MINUS_ONE = SF2C_SHADER_PREP_N_2_D473 };
 
 typedef struct {
     char kind;               // 'G' graphics pipeline, 'C' compute program
     uint64_t vs, fs;         // code hashes (shader_code_hash); compute: vs
     uint8_t flags;           // SR_*: lower-left window origin, NVN depth mode [-1, 1]
     uint8_t nattrib, nstream, ncolor;
-    uint32_t attrib[16];     // NVN vertex attribute state: format | stream << 8 | offset << 13
-    uint32_t stream[16][2];  // vertex stream stride, divisor
-    uint32_t color[8];       // render target texture formats (0: no target)
-    uint32_t cview[8];       // render target view formats (0: the texture's own)
+    uint32_t attrib[SF2C_SHADER_PREP_N_16_B17E];     // NVN vertex attribute state: format | stream << 8 | offset << 13
+    uint32_t stream[SF2C_SHADER_PREP_N_16_B17E][SF2C_SHADER_PREP_N_2_D473];  // vertex stream stride, divisor
+    uint32_t color[SF2C_SHADER_PREP_N_8_2C62];       // render target texture formats (0: no target)
+    uint32_t cview[SF2C_SHADER_PREP_N_8_2C62];       // render target view formats (0: the texture's own)
     uint32_t depth;          // depth / stencil target format (0: none)
     uint32_t samples;        // samples of the targets (1: single-sampled)
     uint32_t channel_mask;   // color write masks, 4 bits per target
     uint8_t blend_on;        // blending enabled, 1 bit per target
-    uint8_t blend[8][8];     // NVN blend state per target (zero where blending is off)
+    uint8_t blend[SF2C_SHADER_PREP_N_8_2C62][SF2C_SHADER_PREP_N_8_2C62];     // NVN blend state per target (zero where blending is off)
     uint8_t a2c;             // alpha to coverage
     uint8_t topo;            // primitive class: 0 points, 1 lines, 2 triangles
     uint8_t poly_fill;       // filled polygons (0: lines)
-    uint32_t local[3];       // compute: local size
+    uint32_t local[SF2C_SHADER_PREP_N_3_4E07];       // compute: local size
 } ShaderRec;
 
 // The record's text form (one line, no newline) and back
@@ -46,7 +47,7 @@ uint8_t shader_topo_class(uint32_t mode);                     // NVN draw mode -
 typedef struct ShaderFp {
     uint64_t hash;   // shader_stage_hash when taken
     uint32_t len;    // bytes hashed (code up to the end of its constants)
-    uint32_t w[4];   // sampled words
+    uint32_t w[SF2C_SHADER_PREP_N_4_4B22];   // sampled words
     uint8_t state;   // 0 not taken, 1 checking, 2 off (no constants to bound the code, or already reported)
 } ShaderFp;
 // Takes the fingerprint on first use, compares it after that. stage: "vs", "fs", "cs" (for the log)
@@ -83,7 +84,7 @@ void renderer_prepare_end(void);  // all builds done (e.g. keep the pipeline cac
 
 // ---- the shader caches' tag: this build, the translator, the prepared
 // objects' format and the GPU / driver; a cache with another tag is discarded (rebuilt as the game runs)
-#define SHADER_CACHE_VERSION 2  // (bump when what goes into the caches changes meaning)
+#define SHADER_CACHE_VERSION SF2C_SHADER_PREP_N_2_D473  // (bump when what goes into the caches changes meaning)
 void shader_cache_tag(char *out, size_t n, const char *gpu);       // gpu: device name, driver / OS version
 bool shader_cache_tag_ok(const char *tag_path, const char *tag);   // the cache's tag file says tag
 void shader_cache_tag_write(const char *tag_path, const char *tag);  // (written atomically)

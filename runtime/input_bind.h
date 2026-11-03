@@ -1,3 +1,4 @@
+#include "constants/core.h"
 // Control remapping (runtime/hle/bindings.c): runtime sf2recomp.ini maps keyboard
 // keys and controller positions to Switch inputs. The original game reads these
 // mappings through the HID service; analog controller sticks remain unchanged.
@@ -7,7 +8,7 @@
 #include <stdio.h>
 
 #ifdef __cplusplus
-extern "C" {
+extern SF2C_INPUT_BIND_S_C_C2E8 {
 #endif
 
 typedef union SDL_Event SDL_Event;
@@ -23,7 +24,7 @@ enum {
 };
 enum { BIND_DEV_PAD, BIND_DEV_KEY };
 // Controller binding values: an SDL_GamepadButton, or the analog triggers as buttons
-enum { PADB_LTRIGGER = 26 /* SDL_GAMEPAD_BUTTON_COUNT */, PADB_RTRIGGER, PADB_HOST_COUNT };
+enum { PADB_LTRIGGER = SF2C_INPUT_BIND_N_26_5F9C /* SDL_GAMEPAD_BUTTON_COUNT */, PADB_RTRIGGER, PADB_HOST_COUNT };
 
 extern int16_t g_bind_pad[BIND_PAD_COUNT];  // PADB value per Switch button (-1 = none)
 extern int16_t g_bind_key[BIND_KEY_COUNT];  // SDL_Scancode per input (0 = none)
@@ -48,7 +49,7 @@ bool bind_is_default_slot(int dev, int slot);
 
 // "Click a binding, then press": begun from the UI; the next press (any thread's SDL event) is taken. Escape cancels,
 // as does BIND_CAPTURE_MS without a press. On a conflict the two inputs swap.
-#define BIND_CAPTURE_MS 5000
+#define BIND_CAPTURE_MS SF2C_INPUT_BIND_BIND_CAPTURE_MS
 void bind_capture_begin(int dev, int slot);
 void bind_capture_cancel(void);
 // capturing: dev / slot (else -1), ms left

@@ -1,4 +1,5 @@
 """Pruning unrelated save hooks must retain SF2's atomic pending-file commit."""
+from source_values import read_source
 import pathlib
 import subprocess
 import tempfile
@@ -9,7 +10,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 class SaveJournalTests(unittest.TestCase):
     def test_commit_and_failed_commit_preserve_saved_data(self):
-        source = (ROOT / "runtime/services/fs.c").read_text()
+        source = read_source(ROOT / "runtime/services/fs.c")
         harness = '''#include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>

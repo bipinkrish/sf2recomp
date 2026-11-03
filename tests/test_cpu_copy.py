@@ -1,4 +1,5 @@
 """CPU buffer copies preserve staging snapshots and mapped-heap synchronization."""
+from source_values import read_source
 import pathlib
 import subprocess
 import tempfile
@@ -9,7 +10,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 class CpuCopyTests(unittest.TestCase):
     def test_copy_cache_and_synchronization_guards(self):
-        source = (ROOT / "runtime/nvn/vulkan/exec.c").read_text()
+        source = read_source(ROOT / "runtime/nvn/vulkan/exec.c")
 
         def function(signature):
             start = source.index(signature)

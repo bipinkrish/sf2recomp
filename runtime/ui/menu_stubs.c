@@ -1,6 +1,8 @@
+#include "../constants/ui.h"
 #include "menu.h"
 #include "lan_menu.h"
 #include "../developer.h"
+#include "../version.h"
 #include <SDL3/SDL.h>
 #include <stdatomic.h>
 
@@ -18,13 +20,13 @@ void menu_apply_window_requests(void *sdl_window) {
     // Scripted resize requests still need the UI thread after removing ImGui.
     extern uint32_t g_window_resize_request;
     uint32_t size = __atomic_exchange_n(&g_window_resize_request, 0, __ATOMIC_RELAXED);
-    if (size) SDL_SetWindowSize(sdl_window, size >> 16, size & 0xffff);
+    if (size) SDL_SetWindowSize(sdl_window, size >> SF2C_MENU_STUBS_N_16_B17E, size & SF2C_MENU_STUBS_N_0XFFFF_B111);
 }
 void menu_render(void *cmd, uint32_t target_w, uint32_t target_h) {
     (void)cmd; (void)target_w; (void)target_h;
 }
 
-const char *larecomp_version(void) { return "1.0.0"; }
+const char *larecomp_version(void) { return SF2RECOMP_VERSION; }
 int game_in_play(void) { return 1; }
-const char *game_level_name(void) { return ""; }
+const char *game_level_name(void) { return SF2C_MENU_STUBS_S_EMPTY_12AE; }
 void menu_test_open(void) {}

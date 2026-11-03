@@ -1,10 +1,12 @@
+#include "constants/core.h"
 // Opt-in host transport; original game networking remains disabled.
 #pragma once
+#include "lan_protocol.h"
 #include <stdbool.h>
 #include <stdint.h>
 
-enum { LAN_MAX_EVENTS = 64, LAN_MAX_DELAY = 6 };
-typedef struct { uint32_t seed, match[3], delay, limit; } LanConfig;
+enum { LAN_MAX_EVENTS = SF2C_LAN_N_64_A68B, LAN_MAX_DELAY = SF2C_LAN_N_6_E7F6 };
+typedef struct { uint32_t seed, match[SF2C_LAN_N_3_4E07], delay, limit; } LanConfig;
 typedef struct { uint8_t player, code, down; } LanEvent;
 bool lan_enabled(void);
 unsigned lan_player(void); // host 0, join 1; both use their local P1 controls
@@ -12,27 +14,27 @@ void lan_init(void);       // before guest threads; negotiate the host's config
 const LanConfig *lan_config(void);
 bool lan_loaded_poll(void); // both native loaders finished; release the fight intro
 bool lan_ready_poll(uint64_t state); // nonblocking: keep rendering while the peer loads
-unsigned lan_step(uint32_t tick, uint64_t state, const LanEvent *local, unsigned count, LanEvent out[LAN_MAX_EVENTS * 2]);
+unsigned lan_step(uint32_t tick, uint64_t state, const LanEvent *local, unsigned count, LanEvent out[LAN_MAX_EVENTS * SF2C_LAN_N_2_D473]);
 void lan_finish(uint32_t tick, uint64_t state);
 void lan_close(void);
 
 // In-game LAN browser/session API. Called only on the guest update thread.
 enum { LAN_GUI_OFF, LAN_GUI_HOSTING, LAN_GUI_SEARCHING, LAN_GUI_CONNECTING,
        LAN_GUI_HELLO, LAN_GUI_CONFIG, LAN_GUI_CONNECTED, LAN_GUI_ERROR };
-typedef struct { char address[16], name[64]; uint16_t port; uint64_t id, seen; } LanHost;
+typedef struct { char address[SF2C_LAN_N_16_B17E], name[SF2C_LAN_N_64_A68B]; uint16_t port; uint64_t id, seen; } LanHost;
 typedef struct { uint8_t player, module, down, event, input_type; } LanMenuEvent;
 bool lan_gui_active(void);
 int lan_gui_status(void);
 const char *lan_gui_error(void);
 bool lan_gui_host(uint16_t port);
-unsigned lan_local_addresses(char out[8][16]);
+unsigned lan_local_addresses(char out[SF2C_LAN_N_8_2C62][SF2C_LAN_N_16_B17E]);
 bool lan_gui_search(void);
 bool lan_gui_join(const LanHost *host);
 void lan_gui_poll(void);
-unsigned lan_gui_hosts(LanHost out[12]);
+unsigned lan_gui_hosts(LanHost out[SF2C_LAN_N_12_6B51]);
 bool lan_gui_send_menu(unsigned module, unsigned down, unsigned event, unsigned input_type);
 bool lan_gui_pop_menu(LanMenuEvent *event, unsigned module);
-bool lan_gui_send_match(const uint32_t match[3]);
+bool lan_gui_send_match(const uint32_t match[SF2C_LAN_N_3_4E07]);
 bool lan_gui_take_match(void);
 void lan_gui_begin_match(void);
 void lan_gui_leave(void);

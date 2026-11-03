@@ -92,6 +92,7 @@ class AnalysisTests(unittest.TestCase):
         (self.root / "tools/il2cpp").mkdir(parents=True)
         (self.root / "tools/il2cpp/config.json").write_text('{"RequireAnyKey":false,"GenerateStruct":true}')
         shutil.copy2(ROOT / "tools/il2cpp_map.py", self.root / "tools/il2cpp_map.py")
+        shutil.copy2(ROOT / "tools/_sf2_tool_constants.py", self.root / "tools/_sf2_tool_constants.py")
         self.output = Path(self.temp.name) / "symbols"
         self.calls = []
         self.empty_output = False

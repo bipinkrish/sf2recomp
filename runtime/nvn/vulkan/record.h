@@ -1,3 +1,4 @@
+#include "../../constants/nvn_vulkan.h"
 // The recorder thread (record.c): every Vulkan call that touches a command buffer, the command pool, the descriptor
 // pools or the queue is made by a thread of its own. The translating thread (the render thread, rqueue.c; the game's
 // GPU thread with LARECOMP_RENDER_THREAD=0; the UI thread for the start screen) keeps every decision and calls the
@@ -14,8 +15,7 @@
 // submissions with the render thread (LARECOMP_CHUNK_PASSES) plus the window's; with the game's frame fence waited
 // one frame late (exec.c overlap_on) two frames are queued, so 8 slots would have had sub() wait for the GPU on
 // every slot reuse within the frame. 24: two frames and a margin.
-#define VK_SUBS 24
-
+#define VK_SUBS SF2C_RECORD_VK_SUBS
 // ---- start / mode (exec.c vk_exec_init, before any command)
 void rec_init(bool prof);
 bool rec_on(void);  // commands go through the recorder thread
@@ -98,7 +98,7 @@ void rec_CmdEndRendering(VkCommandBuffer cb);
 void rec_CmdPipelineBarrier2(VkCommandBuffer cb, const VkDependencyInfo *di);
 void rec_CmdSetViewport(VkCommandBuffer cb, uint32_t first, uint32_t n, const VkViewport *v);
 void rec_CmdSetScissor(VkCommandBuffer cb, uint32_t first, uint32_t n, const VkRect2D *r);
-void rec_CmdSetBlendConstants(VkCommandBuffer cb, const float c[4]);
+void rec_CmdSetBlendConstants(VkCommandBuffer cb, const float c[SF2C_RECORD_N_4_4B22]);
 void rec_CmdSetDepthBias(VkCommandBuffer cb, float constant, float clamp, float slope);
 void rec_CmdSetDepthBiasEnable(VkCommandBuffer cb, VkBool32 on);
 void rec_CmdSetDepthTestEnable(VkCommandBuffer cb, VkBool32 on);

@@ -1,3 +1,4 @@
+#include "constants/core.h"
 // FP helpers for one precision; included twice by simd.h (F = s/float, d/double). No include guard.
 // Scalar entry points take/return T, vector ones VT (all lanes; callers zero the unused half for Q=0).
 
@@ -59,8 +60,8 @@ SN T FN(nan3)(Cpu *c, T a, T b, T d) {
    : (op) == FOP_DIV ? (a) / (b) : (op) == FOP_ABD ? __builtin_elementwise_abs((a) - (b))          \
    : (op) == FOP_SQRT ? __builtin_elementwise_sqrt(a)                                              \
    : (op) == FOP_MADD ? __builtin_elementwise_fma(b, d, a)                                         \
-   : (op) == FOP_RECPS ? __builtin_elementwise_fma(a, b, KK(2))                                    \
-   : (op) == FOP_RSQRTS ? __builtin_elementwise_fma(a, b, KK(3)) * KK(0.5) : (a))
+   : (op) == FOP_RECPS ? __builtin_elementwise_fma(a, b, KK(SF2C_SIMD_FP_N_2_D473))                                    \
+   : (op) == FOP_RSQRTS ? __builtin_elementwise_fma(a, b, KK(SF2C_SIMD_FP_N_3_4E07)) * KK(SF2C_SIMD_FP_N_0_5_D2CB) : (a))
 
 // Lanes whose fast result needs fixing: NaN results (NaN operand or invalid op), RSQRTS overflow.
 #define FBAD(op, r) ((op) == FOP_RSQRTS ? ((r) != (r)) | (__builtin_elementwise_abs(r) == K(INFINITY)) : (r) != (r))
@@ -68,9 +69,9 @@ SN T FN(nan3)(Cpu *c, T a, T b, T d) {
 // (3 + a*b) / 2 with one rounding (a already negated): halve a normal operand first, so a product beyond
 // the format's range (which the fast path rounds to inf, or to the largest normal when rounding down) is exact.
 SN T FN(rsqrts)(T a, T b) {
-    if (__builtin_elementwise_abs(a) >= FN(fv)(2 * MINN)) return __builtin_elementwise_fma(a * K(0.5), b, K(1.5));
-    if (__builtin_elementwise_abs(b) >= FN(fv)(2 * MINN)) return __builtin_elementwise_fma(a, b * K(0.5), K(1.5));
-    return __builtin_elementwise_fma(a, b, K(3)) * K(0.5);
+    if (__builtin_elementwise_abs(a) >= FN(fv)(SF2C_SIMD_FP_N_2_D473 * MINN)) return __builtin_elementwise_fma(a * K(SF2C_SIMD_FP_N_0_5_D2CB), b, K(SF2C_SIMD_FP_N_1_5_9F29));
+    if (__builtin_elementwise_abs(b) >= FN(fv)(SF2C_SIMD_FP_N_2_D473 * MINN)) return __builtin_elementwise_fma(a, b * K(SF2C_SIMD_FP_N_0_5_D2CB), K(SF2C_SIMD_FP_N_1_5_9F29));
+    return __builtin_elementwise_fma(a, b, K(SF2C_SIMD_FP_N_3_4E07)) * K(SF2C_SIMD_FP_N_0_5_D2CB);
 }
 
 // ARM result for a lane flagged by FBAD (operands already flushed).
@@ -87,14 +88,14 @@ SN T FN(fix)(Cpu *c, int op, T a, T b, T d) {
         }
         return FN(fv)(DNAN);
     case FOP_MULX:
-        if (!nan) return FN(fv)(((x ^ y) & SGN) | FN(fb)(K(2)));
+        if (!nan) return FN(fv)(((x ^ y) & SGN) | FN(fb)(K(SF2C_SIMD_FP_N_2_D473)));
         break;
     case FOP_RECPS:
-        if (!nan) return K(2);
+        if (!nan) return K(SF2C_SIMD_FP_N_2_D473);
         break;
     case FOP_RSQRTS:
         if (!nan) {
-            if ((FN(isinf)(x) && FN(iszero)(y)) || (FN(iszero)(x) && FN(isinf)(y))) return K(1.5);
+            if ((FN(isinf)(x) && FN(iszero)(y)) || (FN(iszero)(x) && FN(isinf)(y))) return K(SF2C_SIMD_FP_N_1_5_9F29);
             return FN(rsqrts)(a, b);
         }
         break;
@@ -192,15 +193,15 @@ SI VT FN(vfz)(Cpu *c, VT a) {
 // ---- compares
 SI uint64_t FN(cmp)(Cpu *c, T a, T b) { // FCMP NZCV
     a = FN(fz)(c, a), b = FN(fz)(c, b);
-    return a == b ? 0x60000000ull : a < b ? 0x80000000ull : a > b ? 0x20000000ull : 0x30000000ull;
+    return a == b ? SF2C_SIMD_FP_N_0X60000000ULL_AC90 : a < b ? SF2C_SIMD_FP_N_0X80000000ULL_6840 : a > b ? SF2C_SIMD_FP_N_0X20000000ULL_ADEC : SF2C_SIMD_FP_N_0X30000000ULL_CD09;
 }
 // FCMEQ/FCMGE/FCMGT/FACGE/FACGT (op 0..4)
 SI VTU FN(vcmp)(Cpu *c, int op, VT a, VT b) {
     a = FN(vfz)(c, a), b = FN(vfz)(c, b);
-    if (op >= 3) a = __builtin_elementwise_abs(a), b = __builtin_elementwise_abs(b);
+    if (op >= SF2C_SIMD_FP_N_3_4E07) a = __builtin_elementwise_abs(a), b = __builtin_elementwise_abs(b);
     switch (op) {
     case 0: return (VTU)(a == b);
-    case 1: case 3: return (VTU)(a >= b);
+    case 1: case SF2C_SIMD_FP_N_3_4E07: return (VTU)(a >= b);
     default: return (VTU)(a > b);
     }
 }
@@ -211,27 +212,27 @@ SI T FN(rnd)(T x, int rm) {
     switch (rm) {
     case 0: return __builtin_elementwise_rint(x);
     case 1: return __builtin_elementwise_ceil(x);
-    case 2: return __builtin_elementwise_floor(x);
-    case 3: return __builtin_elementwise_trunc(x);
+    case SF2C_SIMD_FP_N_2_D473: return __builtin_elementwise_floor(x);
+    case SF2C_SIMD_FP_N_3_4E07: return __builtin_elementwise_trunc(x);
     default: return __builtin_elementwise_round(x);
     }
 }
 SI T FN(frint)(Cpu *c, T x, int rm) {
     x = FN(fz)(c, x);
-    if (rm >= 5) rm = (int)((c->fpcr >> 22) & 3);
+    if (rm >= SF2C_SIMD_FP_N_5_EF2D) rm = (int)((c->fpcr >> SF2C_SIMD_FP_N_22_785F) & SF2C_SIMD_FP_N_3_4E07);
     T r = FN(rnd)(x, rm);
     if (__builtin_expect(r != r, 0)) r = FN(nan1)(c, x);
     return r;
 }
 SI VT FN(vfrint)(Cpu *c, VT x, int rm) {
     x = FN(vfz)(c, x);
-    if (rm >= 5) rm = (int)((c->fpcr >> 22) & 3);
+    if (rm >= SF2C_SIMD_FP_N_5_EF2D) rm = (int)((c->fpcr >> SF2C_SIMD_FP_N_22_785F) & SF2C_SIMD_FP_N_3_4E07);
     VT r;
     switch (rm) {
     case 0: r = __builtin_elementwise_rint(x); break;
     case 1: r = __builtin_elementwise_ceil(x); break;
-    case 2: r = __builtin_elementwise_floor(x); break;
-    case 3: r = __builtin_elementwise_trunc(x); break;
+    case SF2C_SIMD_FP_N_2_D473: r = __builtin_elementwise_floor(x); break;
+    case SF2C_SIMD_FP_N_3_4E07: r = __builtin_elementwise_trunc(x); break;
     default: r = __builtin_elementwise_round(x); break;
     }
     if (__builtin_expect(__builtin_reduce_or(r != r) != 0, 0))
@@ -243,16 +244,16 @@ SI VT FN(vfrint)(Cpu *c, VT x, int rm) {
 // ---- FP -> integer (FCVT[NPMZA][SU], fixed point): saturating, NaN -> 0. ib = 32/64.
 SI uint64_t FN(toint)(Cpu *c, T x, int rm, int fbits, int ib, int uns) {
     x = FN(fz)(c, x);
-    if (fbits) x = x * (T)(1ull << (fbits - 1)) * K(2);
+    if (fbits) x = x * (T)(SF2C_SIMD_FP_N_1ULL_622E << (fbits - 1)) * K(SF2C_SIMD_FP_N_2_D473);
     T r = FN(rnd)(x, rm);
     if (r != r) return 0;
     if (uns) {
         if (r <= K(0)) return 0;
-        if (ib == 32) return r >= K(4294967296.0) ? 0xffffffffull : (uint32_t)r;
-        return r >= K(18446744073709551616.0) ? ~0ull : (uint64_t)r;
+        if (ib == SF2C_SIMD_FP_N_32_E29C) return r >= K(SF2C_SIMD_FP_N_4294967296_0_6B53) ? SF2C_SIMD_FP_N_0XFFFFFFFFULL_4EE8 : (uint32_t)r;
+        return r >= K(SF2C_SIMD_FP_N_18446744073709551616_0_CCF7) ? ~SF2C_SIMD_FP_N_0ULL_DF1B : (uint64_t)r;
     }
-    if (ib == 32) return r >= K(2147483648.0) ? 0x7fffffffull : r < K(-2147483648.0) ? 0x80000000ull : (uint32_t)(int32_t)r;
-    return r >= K(9223372036854775808.0) ? 0x7fffffffffffffffull : r < K(-9223372036854775808.0) ? 0x8000000000000000ull
+    if (ib == SF2C_SIMD_FP_N_32_E29C) return r >= K(SF2C_SIMD_FP_N_2147483648_0_1E55) ? SF2C_SIMD_FP_N_0X7FFFFFFFULL_BD13 : r < K(-SF2C_SIMD_FP_N_2147483648_0_1E55) ? SF2C_SIMD_FP_N_0X80000000ULL_6840 : (uint32_t)(int32_t)r;
+    return r >= K(SF2C_SIMD_FP_N_9223372036854775808_0_19A5) ? SF2C_SIMD_FP_N_0X7FFFFFFFFFFFFFFFULL_1E66 : r < K(-SF2C_SIMD_FP_N_9223372036854775808_0_19A5) ? SF2C_SIMD_FP_N_0X8000000000000000ULL_1BED
                                                                                               : (uint64_t)(int64_t)r;
 }
 
@@ -263,19 +264,19 @@ SN T FN(fromint_slow)(Cpu *c, uint64_t v, int ib, int uns, int fbits) {
     simd_set_host_round(simd_fe_mode(c->fpcr));
     volatile uint64_t vv = v;
     volatile T r;
-    if (uns) r = ib == 32 ? (T)(uint32_t)vv : (T)vv;
-    else r = ib == 32 ? (T)(int32_t)vv : (T)(int64_t)vv;
+    if (uns) r = ib == SF2C_SIMD_FP_N_32_E29C ? (T)(uint32_t)vv : (T)vv;
+    else r = ib == SF2C_SIMD_FP_N_32_E29C ? (T)(int32_t)vv : (T)(int64_t)vv;
     simd_set_host_round(old);
     T x = r;
-    if (fbits) x = x / (T)(1ull << (fbits - 1)) / K(2);
+    if (fbits) x = x / (T)(SF2C_SIMD_FP_N_1ULL_622E << (fbits - 1)) / K(SF2C_SIMD_FP_N_2_D473);
     return x;
 }
 SI T FN(fromint)(Cpu *c, uint64_t v, int ib, int uns, int fbits) {
     if (__builtin_expect(c->fpcr & FPCR_RM, 0)) return FN(fromint_slow)(c, v, ib, uns, fbits);
     T r;
-    if (uns) r = ib == 32 ? (T)(uint32_t)v : (T)v;
-    else r = ib == 32 ? (T)(int32_t)v : (T)(int64_t)v;
-    if (fbits) r = r / (T)(1ull << (fbits - 1)) / K(2);
+    if (uns) r = ib == SF2C_SIMD_FP_N_32_E29C ? (T)(uint32_t)v : (T)v;
+    else r = ib == SF2C_SIMD_FP_N_32_E29C ? (T)(int32_t)v : (T)(int64_t)v;
+    if (fbits) r = r / (T)(SF2C_SIMD_FP_N_1ULL_622E << (fbits - 1)) / K(SF2C_SIMD_FP_N_2_D473);
     return r;
 }
 
@@ -286,24 +287,24 @@ SI T FN(recpe)(Cpu *c, T a) {
     if (FN(isinf)(x)) return FN(fv)(s);
     if (FN(iszero)(x)) return FN(fv)(s | EXPM);
     U mag = x & ~SGN;
-    if (mag < ((U)1 << (MB - 2))) { // |x| < 2^(emin - 2): result overflows
-        int rm = (c->fpcr >> 22) & 3;
-        int inf = rm == 0 || (rm == 1 && !s) || (rm == 2 && s);
+    if (mag < ((U)1 << (MB - SF2C_SIMD_FP_N_2_D473))) { // |x| < 2^(emin - 2): result overflows
+        int rm = (c->fpcr >> SF2C_SIMD_FP_N_22_785F) & SF2C_SIMD_FP_N_3_4E07;
+        int inf = rm == 0 || (rm == 1 && !s) || (rm == SF2C_SIMD_FP_N_2_D473 && s);
         return FN(fv)(s | (inf ? EXPM : EXPM - 1));
     }
     int64_t e = (int64_t)(mag >> MB);
     U frac = mag & (((U)1 << MB) - 1);
-    if ((c->fpcr & FPCR_FZ) && e >= (int64_t)((1 << EB) - 3)) return FN(fv)(s); // result would be tiny
+    if ((c->fpcr & FPCR_FZ) && e >= (int64_t)((1 << EB) - SF2C_SIMD_FP_N_3_4E07)) return FN(fv)(s); // result would be tiny
     if (e == 0) {
-        if (!(frac >> (MB - 1))) e = -1, frac = (frac << 2) & (((U)1 << MB) - 1);
+        if (!(frac >> (MB - 1))) e = -1, frac = (frac << SF2C_SIMD_FP_N_2_D473) & (((U)1 << MB) - 1);
         else frac = (frac << 1) & (((U)1 << MB) - 1);
     }
-    int scaled = 256 | (int)(frac >> (MB - 8));
-    int64_t re = (int64_t)((1 << EB) - 3) - e;
-    U est = (U)simd_recip_tab[scaled - 256]; // 8 fraction bits
-    U f = est << (MB - 8);
+    int scaled = SF2C_SIMD_FP_N_256_51E8 | (int)(frac >> (MB - SF2C_SIMD_FP_N_8_2C62));
+    int64_t re = (int64_t)((1 << EB) - SF2C_SIMD_FP_N_3_4E07) - e;
+    U est = (U)simd_recip_tab[scaled - SF2C_SIMD_FP_N_256_51E8]; // 8 fraction bits
+    U f = est << (MB - SF2C_SIMD_FP_N_8_2C62);
     if (re == 0) f = (f >> 1) | ((U)1 << (MB - 1));
-    else if (re == -1) f = (f >> 2) | ((U)1 << (MB - 2)), re = 0;
+    else if (re == -1) f = (f >> SF2C_SIMD_FP_N_2_D473) | ((U)1 << (MB - SF2C_SIMD_FP_N_2_D473)), re = 0;
     return FN(fv)(s | ((U)re << MB) | f);
 }
 SI T FN(rsqrte)(Cpu *c, T a) {
@@ -318,10 +319,10 @@ SI T FN(rsqrte)(Cpu *c, T a) {
         while (!(frac >> (MB - 1))) frac <<= 1, e--;
         frac = (frac << 1) & (((U)1 << MB) - 1);
     }
-    int scaled = (e & 1) ? 128 | (int)(frac >> (MB - 7)) : 256 | (int)(frac >> (MB - 8));
-    int64_t re = ((int64_t)(3 * ((1 << (EB - 1)) - 1) - 1) - e) / 2; // (380 - e) / 2, (3068 - e) / 2
-    U est = (U)simd_rsqrt_tab[scaled - 128];
-    return FN(fv)(((U)re << MB) | (est << (MB - 8)));
+    int scaled = (e & 1) ? SF2C_SIMD_FP_N_128_2747 | (int)(frac >> (MB - SF2C_SIMD_FP_N_7_7902)) : SF2C_SIMD_FP_N_256_51E8 | (int)(frac >> (MB - SF2C_SIMD_FP_N_8_2C62));
+    int64_t re = ((int64_t)(SF2C_SIMD_FP_N_3_4E07 * ((1 << (EB - 1)) - 1) - 1) - e) / SF2C_SIMD_FP_N_2_D473; // (380 - e) / 2, (3068 - e) / 2
+    U est = (U)simd_rsqrt_tab[scaled - SF2C_SIMD_FP_N_128_2747];
+    return FN(fv)(((U)re << MB) | (est << (MB - SF2C_SIMD_FP_N_8_2C62)));
 }
 SI T FN(recpx)(Cpu *c, T a) {
     U x = FN(fb)(FN(fz)(c, a)), s = x & SGN;

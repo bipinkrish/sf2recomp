@@ -7,9 +7,12 @@ import subprocess
 import tempfile
 import time
 import unittest
+import sys
 from test_settings import sdl_flags
 
 ROOT=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(ROOT/'tools'))
+from version import read as tool_version
 HARNESS=r'''
 #include <assert.h>
 #include <SDL3/SDL_timer.h>
@@ -60,12 +63,14 @@ class LanTransportTests(unittest.TestCase):
         source=cls.root/'test.c';source.write_text(HARNESS);cls.binary=cls.root/'test'
         cflags,libs=sdl_flags()
         subprocess.run(['clang','-O2','-Wall','-I'+str(ROOT/'runtime'),*cflags,str(source),str(ROOT/'runtime/lan.c'),*libs,'-o',str(cls.binary)],check=True)
+        cls.other_version=cls.root/'other-version'
+        subprocess.run(['clang','-O2','-Wall','-DSF2RECOMP_VERSION="999.0.0"','-I'+str(ROOT/'runtime'),*cflags,str(source),str(ROOT/'runtime/lan.c'),*libs,'-o',str(cls.other_version)],check=True)
     @classmethod
     def tearDownClass(cls):cls.tmp.cleanup()
     def base_env(self):return {k:v for k,v in os.environ.items() if not k.startswith('SF2_LAN_')}
     def port(self):
         with socket.socket() as s:s.bind(('127.0.0.1',0));return str(s.getsockname()[1])
-    def pair(self,mode='',delay=2,host_limit=None,join_limit=None,host_roster=None,join_roster=None):
+    def pair(self,mode='',delay=2,host_limit=None,join_limit=None,host_roster=None,join_roster=None,join_binary=None):
         port=self.port();host=self.base_env();join=dict(host)
         host.update(SF2_LAN_HOST='127.0.0.1',SF2_LAN_PORT=port,SF2_LAN_SEED='12345',SF2_LAN_DELAY=str(delay))
         join.update(SF2_LAN_JOIN='127.0.0.1',SF2_LAN_PORT=port)
@@ -74,7 +79,7 @@ class LanTransportTests(unittest.TestCase):
         if host_roster is not None:host['SF2_TEST_ROSTER']=str(host_roster)
         if join_roster is not None:join['SF2_TEST_ROSTER']=str(join_roster)
         a=subprocess.Popen([str(self.binary),mode],env=host,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-        b=subprocess.Popen([str(self.binary),mode],env=join,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+        b=subprocess.Popen([str(join_binary or self.binary),mode],env=join,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
         try:
             _,bl=b.communicate(timeout=12);_,al=a.communicate(timeout=12)
             return a.returncode,b.returncode,al,bl
@@ -100,6 +105,9 @@ class LanTransportTests(unittest.TestCase):
 
     def test_divergence_stops_both_peers(self):
         a,b,al,bl=self.pair('diverge');self.assertEqual((a,b),(3,3));self.assertIn(b'divergence at step 10',al+bl)
+    def test_different_tool_releases_are_rejected_before_configuration(self):
+        a,b,al,bl=self.pair(join_binary=self.other_version)
+        self.assertEqual((a,b),(3,3));self.assertIn(b'Different SF2Recomp tool versions',al+bl)
     def test_closed_peer_stops_without_hanging(self):
         a,b,al,bl=self.pair('close');self.assertEqual((a,b),(3,0));self.assertIn(b'combat stopped',al)
     def test_oversized_packet_and_old_rng_policy_are_rejected_before_payload(self):
@@ -116,7 +124,7 @@ class LanTransportTests(unittest.TestCase):
                         except ConnectionRefusedError:
                             if time.monotonic()>end:raise
                             time.sleep(.01)
-                    with s:s.sendall(struct.pack('!8I',0x5346324c,1,1,0,size,0x53463201,policy,1))
+                    with s:s.sendall(struct.pack('!8I',0x5346324c,tool_version()['lan_protocol'],1,0,size,0x53463201,policy,1))
                     _,log=p.communicate(timeout=3);self.assertEqual(p.returncode,3);self.assertIn(message,log)
                 finally:
                     if p.poll() is None:p.kill();p.communicate()

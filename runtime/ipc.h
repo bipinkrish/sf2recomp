@@ -1,3 +1,4 @@
+#include "constants/core.h"
 // HIPC/CMIF message handling for HLE services.
 #pragma once
 #include "kernel.h"
@@ -12,12 +13,12 @@ typedef struct IpcReq {
     const uint8_t *data;  // payload after the SFCI header
     uint32_t data_size;
     uint64_t pid;
-    uint32_t copy_handles[8], move_handles[8];
+    uint32_t copy_handles[SF2C_IPC_N_8_2C62], move_handles[SF2C_IPC_N_8_2C62];
     int ncopy, nmove;
-    IpcBuf x[8], a[8], b[8], c[8];
+    IpcBuf x[SF2C_IPC_N_8_2C62], a[SF2C_IPC_N_8_2C62], b[SF2C_IPC_N_8_2C62], c[SF2C_IPC_N_8_2C62];
     int nx, na, nb, nc;
     uint32_t domain_obj;  // 0 if not a domain message
-    uint32_t domain_in_objs[8];
+    uint32_t domain_in_objs[SF2C_IPC_N_8_2C62];
     int ndomain_in;
 } IpcReq;
 
@@ -25,11 +26,11 @@ typedef struct Service Service;
 
 typedef struct IpcResp {
     uint32_t result;
-    uint8_t data[0x200];
+    uint8_t data[SF2C_IPC_N_0X200_3790];
     uint32_t data_size;
-    uint32_t copy_handles[8], move_handles[8];
+    uint32_t copy_handles[SF2C_IPC_N_8_2C62], move_handles[SF2C_IPC_N_8_2C62];
     int ncopy, nmove;
-    Service *objects[8];  // new service objects to return (move handle or domain object)
+    Service *objects[SF2C_IPC_N_8_2C62];  // new service objects to return (move handle or domain object)
     int nobjects;
 } IpcResp;
 
@@ -44,7 +45,7 @@ struct Service {
 };
 
 typedef struct {
-    Service *objs[256];
+    Service *objs[SF2C_IPC_N_256_51E8];
 } Domain;
 
 typedef struct {
@@ -76,11 +77,11 @@ void ipc_return_object(IpcResp *resp, Service *s);
 
 typedef struct { const char *name; ServiceHandler handler; } ServiceDef;
 #ifdef __APPLE__
-#define SERVICE_SECTION "__DATA,__services"
+#define SERVICE_SECTION SF2C_IPC_SERVICE_SECTION_FB6AB980
 #elif defined(__linux__)
-#define SERVICE_SECTION "services"
+#define SERVICE_SECTION SF2C_IPC_SERVICE_SECTION_521B1F95
 #else
-#define SERVICE_SECTION ".svc$m"  // between the .svc$a / .svc$z markers in runtime/ipc.c
+#define SERVICE_SECTION SF2C_IPC_S_SVC_M_CE49  // between the .svc$a / .svc$z markers in runtime/ipc.c
 #endif
 #define SERVICE(sname, fn)                                                                  \
     static void fn(Service *s, IpcReq *req, IpcResp *resp);                                 \

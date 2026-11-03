@@ -1,0 +1,130 @@
+name: Desktop releases
+
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+    paths:
+      - '.github/workflows/release.yml'
+      - 'tools/**'
+      - 'runtime/**'
+      - 'android/**'
+      - 'Makefile'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: linux-x86_64, os: ubuntu-24.04}
+          - {name: windows-x86_64, os: windows-2022}
+          - {name: macos-arm64, os: macos-15}
+          - {name: macos-x86_64, os: macos-15-intel}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      UV_PYTHON_INSTALL_DIR: ${{ github.workspace }}/build/managed-python
+      UV_PYTHON_INSTALL_BIN: 'false'
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+      MACOS_MIN: '15.0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.9.5'
+      - name: Check release version
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python tools/version.py --json
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            python tools/version.py --check-tag "$RELEASE_TAG"
+          fi
+      - name: Check constants and release boundaries
+        run: |
+          python tools/centralize_literals.py --check
+          python -m unittest discover -s tests -p test_release.py -v
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld llvm make cmake ninja-build pkg-config curl patchelf nasm \
+            libvulkan-dev libshaderc-dev libvulkan-memory-allocator-dev \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev \
+            libxss-dev libxtst-dev libasound2-dev libpulse-dev libudev-dev
+      - name: macOS build dependencies
+        if: runner.os == 'macOS'
+        run: |
+          brew install make cmake ninja pkgconf shaderc vulkan-headers vulkan-loader molten-vk
+          mkdir -p deps/vma/include
+          curl --fail --location https://raw.githubusercontent.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/v3.0.1/include/vk_mem_alloc.h -o deps/vma/include/vk_mem_alloc.h
+      - uses: msys2/setup-msys2@v2
+        if: runner.os == 'Windows'
+        with:
+          msystem: UCRT64
+          update: true
+          path-type: inherit
+          install: >-
+            make curl tar git
+            mingw-w64-ucrt-x86_64-clang mingw-w64-ucrt-x86_64-lld mingw-w64-ucrt-x86_64-llvm
+            mingw-w64-ucrt-x86_64-pkgconf mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-SDL3 mingw-w64-ucrt-x86_64-vulkan-headers
+            mingw-w64-ucrt-x86_64-vulkan-loader mingw-w64-ucrt-x86_64-vulkan-memory-allocator
+            mingw-w64-ucrt-x86_64-shaderc
+      - name: Prepare portable Python
+        run: python tools/ci_release.py prepare-python
+      - name: Build and verify Linux/macOS release
+        if: runner.os != 'Windows'
+        shell: bash
+        run: '"$SF2_RELEASE_PYTHON" tools/ci_release.py build'
+      - name: Build and verify Windows release
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          release_python=$(cygpath -u "$SF2_RELEASE_PYTHON")
+          "$release_python" tools/ci_release.py build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sf2recomp-${{ matrix.name }}
+          path: |
+            build/releases/*.tar.gz
+            build/releases/*.zip
+            build/releases/*.sha256
+          if-no-files-found: error
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Publish verified desktop tools
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" release-assets/* --clobber
+          else
+            gh release create "$RELEASE_TAG" release-assets/* --verify-tag --generate-notes --title "SF2Recomp $RELEASE_TAG"
+          fi

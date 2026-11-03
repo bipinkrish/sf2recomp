@@ -1,3 +1,4 @@
+#include "../../constants/nvn_vulkan.h"
 // Vulkan textures: NVN formats, images, change-detected uploads from guest memory, views and samplers
 // (counterpart of the texture half of metal.m and the view helpers of renderer.m).
 #include <SDL3/SDL_timer.h>
@@ -25,7 +26,7 @@ typedef struct { VkFormat vf; uint8_t expand_rgb, alpha_one; } VkFmt;
 static VkFormat depth24_stencil8(void) {
     static VkFormat f;
     if (!f) {
-        const char *e = getenv("LARECOMP_VK_D24");
+        const char *e = getenv(SF2C_TEXTURES_S_LARECOMP_VK_D24_4C0A);
         VkFormatProperties p;
         vkGetPhysicalDeviceFormatProperties(g_vk.phys, VK_FORMAT_D24_UNORM_S8_UINT, &p);
         VkFormatFeatureFlags want = VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |
@@ -33,134 +34,134 @@ static VkFormat depth24_stencil8(void) {
                                     VK_FORMAT_FEATURE_BLIT_SRC_BIT | VK_FORMAT_FEATURE_BLIT_DST_BIT;
         bool ok = (p.optimalTilingFeatures & want) == want && !(e && !atoi(e));
         f = ok ? VK_FORMAT_D24_UNORM_S8_UINT : VK_FORMAT_D32_SFLOAT_S8_UINT;
-        LOG("[vk] depth24 stencil8: %s\n", ok ? "D24_UNORM_S8_UINT" : "D32_SFLOAT_S8_UINT");
+        LOG(SF2C_TEXTURES_S_VK_DEPTH24_STENCIL8_S_N_2B24, ok ? SF2C_TEXTURES_S_D24_UNORM_S8_UINT_7136 : SF2C_TEXTURES_S_D32_SFLOAT_S8_UINT_0C23);
     }
     return f;
 }
 
 static VkFmt fmt_of(uint32_t f) {
     switch (f) {
-    case 0x01: return (VkFmt){VK_FORMAT_R8_UNORM};
-    case 0x02: return (VkFmt){VK_FORMAT_R8_SNORM};
-    case 0x03: return (VkFmt){VK_FORMAT_R8_UINT};
-    case 0x04: return (VkFmt){VK_FORMAT_R8_SINT};
-    case 0x05: return (VkFmt){VK_FORMAT_R16_SFLOAT};
-    case 0x06: return (VkFmt){VK_FORMAT_R16_UNORM};
-    case 0x07: return (VkFmt){VK_FORMAT_R16_SNORM};
-    case 0x08: return (VkFmt){VK_FORMAT_R16_UINT};
-    case 0x09: return (VkFmt){VK_FORMAT_R16_SINT};
-    case 0x0A: return (VkFmt){VK_FORMAT_R32_SFLOAT};
-    case 0x0B: return (VkFmt){VK_FORMAT_R32_UINT};
-    case 0x0C: return (VkFmt){VK_FORMAT_R32_SINT};
-    case 0x0D: return (VkFmt){VK_FORMAT_R8G8_UNORM};
-    case 0x0E: return (VkFmt){VK_FORMAT_R8G8_SNORM};
-    case 0x0F: return (VkFmt){VK_FORMAT_R8G8_UINT};
-    case 0x10: return (VkFmt){VK_FORMAT_R8G8_SINT};
-    case 0x11: return (VkFmt){VK_FORMAT_R16G16_SFLOAT};
-    case 0x12: return (VkFmt){VK_FORMAT_R16G16_UNORM};
-    case 0x13: return (VkFmt){VK_FORMAT_R16G16_SNORM};
-    case 0x14: return (VkFmt){VK_FORMAT_R16G16_UINT};
-    case 0x15: return (VkFmt){VK_FORMAT_R16G16_SINT};
-    case 0x16: return (VkFmt){VK_FORMAT_R32G32_SFLOAT};
-    case 0x17: return (VkFmt){VK_FORMAT_R32G32_UINT};
-    case 0x18: return (VkFmt){VK_FORMAT_R32G32_SINT};
-    case 0x19: return (VkFmt){VK_FORMAT_R8G8B8A8_UNORM, 1, 1};  // RGB8: expanded on upload
-    case 0x25: return (VkFmt){VK_FORMAT_R8G8B8A8_UNORM};
-    case 0x26: return (VkFmt){VK_FORMAT_R8G8B8A8_SNORM};
-    case 0x27: return (VkFmt){VK_FORMAT_R8G8B8A8_UINT};
-    case 0x28: return (VkFmt){VK_FORMAT_R8G8B8A8_SINT};
-    case 0x29: return (VkFmt){VK_FORMAT_R16G16B16A16_SFLOAT};
-    case 0x2A: return (VkFmt){VK_FORMAT_R16G16B16A16_UNORM};
-    case 0x2B: return (VkFmt){VK_FORMAT_R16G16B16A16_SNORM};
-    case 0x2C: return (VkFmt){VK_FORMAT_R16G16B16A16_UINT};
-    case 0x2D: return (VkFmt){VK_FORMAT_R16G16B16A16_SINT};
-    case 0x2E: return (VkFmt){VK_FORMAT_R32G32B32A32_SFLOAT};
-    case 0x2F: return (VkFmt){VK_FORMAT_R32G32B32A32_UINT};
-    case 0x30: return (VkFmt){VK_FORMAT_R32G32B32A32_SINT};
-    case 0x31: return (VkFmt){VK_FORMAT_S8_UINT};
-    case 0x32: return (VkFmt){VK_FORMAT_D16_UNORM};
-    case 0x33: return (VkFmt){VK_FORMAT_D32_SFLOAT};  // DEPTH24 (as on Metal: no 24-bit depth there)
-    case 0x34: return (VkFmt){VK_FORMAT_D32_SFLOAT};
-    case 0x35: return (VkFmt){depth24_stencil8()};
-    case 0x36: return (VkFmt){VK_FORMAT_D32_SFLOAT_S8_UINT};
-    case 0x37: return (VkFmt){VK_FORMAT_R8G8B8A8_SRGB, 0, 1};
-    case 0x38: return (VkFmt){VK_FORMAT_R8G8B8A8_SRGB};
-    case 0x39: return (VkFmt){VK_FORMAT_R4G4B4A4_UNORM_PACK16};   // Metal ABGR4Unorm
-    case 0x3A: return (VkFmt){VK_FORMAT_R5G6B5_UNORM_PACK16};     // Metal B5G6R5Unorm
-    case 0x3B: return (VkFmt){VK_FORMAT_R5G5B5A1_UNORM_PACK16};   // Metal A1BGR5Unorm
-    case 0x3C: return (VkFmt){VK_FORMAT_R5G6B5_UNORM_PACK16};
-    case 0x3D: return (VkFmt){VK_FORMAT_A2B10G10R10_UNORM_PACK32};
-    case 0x3E: return (VkFmt){VK_FORMAT_A2B10G10R10_UINT_PACK32};
-    case 0x3F: return (VkFmt){VK_FORMAT_B10G11R11_UFLOAT_PACK32};
-    case 0x40: return (VkFmt){VK_FORMAT_E5B9G9R9_UFLOAT_PACK32};
-    case 0x41: case 0x42: return (VkFmt){VK_FORMAT_BC1_RGBA_UNORM_BLOCK};
-    case 0x43: return (VkFmt){VK_FORMAT_BC2_UNORM_BLOCK};
-    case 0x44: return (VkFmt){VK_FORMAT_BC3_UNORM_BLOCK};
-    case 0x45: case 0x46: return (VkFmt){VK_FORMAT_BC1_RGBA_SRGB_BLOCK};
-    case 0x47: return (VkFmt){VK_FORMAT_BC2_SRGB_BLOCK};
-    case 0x48: return (VkFmt){VK_FORMAT_BC3_SRGB_BLOCK};
-    case 0x49: return (VkFmt){VK_FORMAT_BC4_UNORM_BLOCK};
-    case 0x4A: return (VkFmt){VK_FORMAT_BC4_SNORM_BLOCK};
-    case 0x4B: return (VkFmt){VK_FORMAT_BC5_UNORM_BLOCK};
+    case SF2C_TEXTURES_N_0X01_B51C: return (VkFmt){VK_FORMAT_R8_UNORM};
+    case SF2C_TEXTURES_N_0X02_E6BD: return (VkFmt){VK_FORMAT_R8_SNORM};
+    case SF2C_TEXTURES_N_0X03_9D1B: return (VkFmt){VK_FORMAT_R8_UINT};
+    case SF2C_TEXTURES_N_0X04_B03A: return (VkFmt){VK_FORMAT_R8_SINT};
+    case SF2C_TEXTURES_N_0X05_4ED3: return (VkFmt){VK_FORMAT_R16_SFLOAT};
+    case SF2C_TEXTURES_N_0X06_9AE3: return (VkFmt){VK_FORMAT_R16_UNORM};
+    case SF2C_TEXTURES_N_0X07_A022: return (VkFmt){VK_FORMAT_R16_SNORM};
+    case SF2C_TEXTURES_N_0X08_1EC8: return (VkFmt){VK_FORMAT_R16_UINT};
+    case SF2C_TEXTURES_N_0X09_59B7: return (VkFmt){VK_FORMAT_R16_SINT};
+    case SF2C_TEXTURES_N_0X0A_AF2D: return (VkFmt){VK_FORMAT_R32_SFLOAT};
+    case SF2C_TEXTURES_N_0X0B_C106: return (VkFmt){VK_FORMAT_R32_UINT};
+    case SF2C_TEXTURES_N_0X0C_49AA: return (VkFmt){VK_FORMAT_R32_SINT};
+    case SF2C_TEXTURES_N_0X0D_106A: return (VkFmt){VK_FORMAT_R8G8_UNORM};
+    case SF2C_TEXTURES_N_0X0E_D851: return (VkFmt){VK_FORMAT_R8G8_SNORM};
+    case SF2C_TEXTURES_N_0X0F_1F1D: return (VkFmt){VK_FORMAT_R8G8_UINT};
+    case SF2C_TEXTURES_N_0X10_BF9C: return (VkFmt){VK_FORMAT_R8G8_SINT};
+    case SF2C_TEXTURES_N_0X11_A3D6: return (VkFmt){VK_FORMAT_R16G16_SFLOAT};
+    case SF2C_TEXTURES_N_0X12_9AE3: return (VkFmt){VK_FORMAT_R16G16_UNORM};
+    case SF2C_TEXTURES_N_0X13_3ABB: return (VkFmt){VK_FORMAT_R16G16_SNORM};
+    case SF2C_TEXTURES_N_0X14_F942: return (VkFmt){VK_FORMAT_R16G16_UINT};
+    case SF2C_TEXTURES_N_0X15_5FB5: return (VkFmt){VK_FORMAT_R16G16_SINT};
+    case SF2C_TEXTURES_N_0X16_D7D4: return (VkFmt){VK_FORMAT_R32G32_SFLOAT};
+    case SF2C_TEXTURES_N_0X17_A99E: return (VkFmt){VK_FORMAT_R32G32_UINT};
+    case SF2C_TEXTURES_N_0X18_D47C: return (VkFmt){VK_FORMAT_R32G32_SINT};
+    case SF2C_TEXTURES_N_0X19_6E00: return (VkFmt){VK_FORMAT_R8G8B8A8_UNORM, 1, 1};  // RGB8: expanded on upload
+    case SF2C_TEXTURES_N_0X25_2611: return (VkFmt){VK_FORMAT_R8G8B8A8_UNORM};
+    case SF2C_TEXTURES_N_0X26_50D1: return (VkFmt){VK_FORMAT_R8G8B8A8_SNORM};
+    case SF2C_TEXTURES_N_0X27_D7EC: return (VkFmt){VK_FORMAT_R8G8B8A8_UINT};
+    case SF2C_TEXTURES_N_0X28_EAB9: return (VkFmt){VK_FORMAT_R8G8B8A8_SINT};
+    case SF2C_TEXTURES_N_0X29_F941: return (VkFmt){VK_FORMAT_R16G16B16A16_SFLOAT};
+    case SF2C_TEXTURES_N_0X2A_9EC1: return (VkFmt){VK_FORMAT_R16G16B16A16_UNORM};
+    case SF2C_TEXTURES_N_0X2B_28A6: return (VkFmt){VK_FORMAT_R16G16B16A16_SNORM};
+    case SF2C_TEXTURES_N_0X2C_8A63: return (VkFmt){VK_FORMAT_R16G16B16A16_UINT};
+    case SF2C_TEXTURES_N_0X2D_A7B5: return (VkFmt){VK_FORMAT_R16G16B16A16_SINT};
+    case SF2C_TEXTURES_N_0X2E_E0C5: return (VkFmt){VK_FORMAT_R32G32B32A32_SFLOAT};
+    case SF2C_TEXTURES_N_0X2F_21A6: return (VkFmt){VK_FORMAT_R32G32B32A32_UINT};
+    case SF2C_TEXTURES_N_0X30_8BAD: return (VkFmt){VK_FORMAT_R32G32B32A32_SINT};
+    case SF2C_TEXTURES_N_0X31_9121: return (VkFmt){VK_FORMAT_S8_UINT};
+    case SF2C_TEXTURES_N_0X32_8B2B: return (VkFmt){VK_FORMAT_D16_UNORM};
+    case SF2C_TEXTURES_N_0X33_8FFB: return (VkFmt){VK_FORMAT_D32_SFLOAT};  // DEPTH24 (as on Metal: no 24-bit depth there)
+    case SF2C_TEXTURES_N_0X34_806E: return (VkFmt){VK_FORMAT_D32_SFLOAT};
+    case SF2C_TEXTURES_N_0X35_B555: return (VkFmt){depth24_stencil8()};
+    case SF2C_TEXTURES_N_0X36_BBAE: return (VkFmt){VK_FORMAT_D32_SFLOAT_S8_UINT};
+    case SF2C_TEXTURES_N_0X37_031A: return (VkFmt){VK_FORMAT_R8G8B8A8_SRGB, 0, 1};
+    case SF2C_TEXTURES_N_0X38_AE4F: return (VkFmt){VK_FORMAT_R8G8B8A8_SRGB};
+    case SF2C_TEXTURES_N_0X39_F666: return (VkFmt){VK_FORMAT_R4G4B4A4_UNORM_PACK16};   // Metal ABGR4Unorm
+    case SF2C_TEXTURES_N_0X3A_096D: return (VkFmt){VK_FORMAT_R5G6B5_UNORM_PACK16};     // Metal B5G6R5Unorm
+    case SF2C_TEXTURES_N_0X3B_F55A: return (VkFmt){VK_FORMAT_R5G5B5A1_UNORM_PACK16};   // Metal A1BGR5Unorm
+    case SF2C_TEXTURES_N_0X3C_E42C: return (VkFmt){VK_FORMAT_R5G6B5_UNORM_PACK16};
+    case SF2C_TEXTURES_N_0X3D_4B02: return (VkFmt){VK_FORMAT_A2B10G10R10_UNORM_PACK32};
+    case SF2C_TEXTURES_N_0X3E_D948: return (VkFmt){VK_FORMAT_A2B10G10R10_UINT_PACK32};
+    case SF2C_TEXTURES_N_0X3F_AD9F: return (VkFmt){VK_FORMAT_B10G11R11_UFLOAT_PACK32};
+    case SF2C_TEXTURES_N_0X40_1AF3: return (VkFmt){VK_FORMAT_E5B9G9R9_UFLOAT_PACK32};
+    case SF2C_TEXTURES_N_0X41_BE08: case SF2C_TEXTURES_N_0X42_1114: return (VkFmt){VK_FORMAT_BC1_RGBA_UNORM_BLOCK};
+    case SF2C_TEXTURES_N_0X43_6CE1: return (VkFmt){VK_FORMAT_BC2_UNORM_BLOCK};
+    case SF2C_TEXTURES_N_0X44_E723: return (VkFmt){VK_FORMAT_BC3_UNORM_BLOCK};
+    case SF2C_TEXTURES_N_0X45_17A0: case SF2C_TEXTURES_N_0X46_E7C6: return (VkFmt){VK_FORMAT_BC1_RGBA_SRGB_BLOCK};
+    case SF2C_TEXTURES_N_0X47_F559: return (VkFmt){VK_FORMAT_BC2_SRGB_BLOCK};
+    case SF2C_TEXTURES_N_0X48_0EF0: return (VkFmt){VK_FORMAT_BC3_SRGB_BLOCK};
+    case SF2C_TEXTURES_N_0X49_823D: return (VkFmt){VK_FORMAT_BC4_UNORM_BLOCK};
+    case SF2C_TEXTURES_N_0X4A_E097: return (VkFmt){VK_FORMAT_BC4_SNORM_BLOCK};
+    case SF2C_TEXTURES_N_0X4B_6716: return (VkFmt){VK_FORMAT_BC5_UNORM_BLOCK};
     // 0x4C = signed RGTC2; LARECOMP_BC5_UNORM=1 decodes it unsigned (see metal.m / notes/PLAN.md)
-    case 0x4C: {
+    case SF2C_TEXTURES_N_0X4C_CEDB: {
         static int unorm = -1;  // (per texture lookup: getenv scans the environment, notably on Windows)
-        if (unorm < 0) unorm = getenv("LARECOMP_BC5_UNORM") != NULL;
+        if (unorm < 0) unorm = getenv(SF2C_TEXTURES_S_LARECOMP_BC5_UNORM_5171) != NULL;
         return (VkFmt){unorm ? VK_FORMAT_BC5_UNORM_BLOCK : VK_FORMAT_BC5_SNORM_BLOCK};
     }
-    case 0x4D: return (VkFmt){VK_FORMAT_BC7_UNORM_BLOCK};
-    case 0x4E: return (VkFmt){VK_FORMAT_BC7_SRGB_BLOCK};
-    case 0x4F: return (VkFmt){VK_FORMAT_BC6H_SFLOAT_BLOCK};
-    case 0x50: return (VkFmt){VK_FORMAT_BC6H_UFLOAT_BLOCK};
-    case 0x6D: return (VkFmt){VK_FORMAT_R8G8B8A8_UNORM, 0, 1};
-    case 0x71: return (VkFmt){VK_FORMAT_R16G16B16A16_SFLOAT, 0, 1};
-    case 0x76: return (VkFmt){VK_FORMAT_R32G32B32A32_SFLOAT, 0, 1};
-    case 0x79: return (VkFmt){VK_FORMAT_ASTC_4x4_UNORM_BLOCK};
-    case 0x7A: return (VkFmt){VK_FORMAT_ASTC_5x4_UNORM_BLOCK};
-    case 0x7B: return (VkFmt){VK_FORMAT_ASTC_5x5_UNORM_BLOCK};
-    case 0x7C: return (VkFmt){VK_FORMAT_ASTC_6x5_UNORM_BLOCK};
-    case 0x7D: return (VkFmt){VK_FORMAT_ASTC_6x6_UNORM_BLOCK};
-    case 0x7E: return (VkFmt){VK_FORMAT_ASTC_8x5_UNORM_BLOCK};
-    case 0x7F: return (VkFmt){VK_FORMAT_ASTC_8x6_UNORM_BLOCK};
-    case 0x80: return (VkFmt){VK_FORMAT_ASTC_8x8_UNORM_BLOCK};
-    case 0x81: return (VkFmt){VK_FORMAT_ASTC_10x5_UNORM_BLOCK};
-    case 0x82: return (VkFmt){VK_FORMAT_ASTC_10x6_UNORM_BLOCK};
-    case 0x83: return (VkFmt){VK_FORMAT_ASTC_10x8_UNORM_BLOCK};
-    case 0x84: return (VkFmt){VK_FORMAT_ASTC_10x10_UNORM_BLOCK};
-    case 0x85: return (VkFmt){VK_FORMAT_ASTC_12x10_UNORM_BLOCK};
-    case 0x86: return (VkFmt){VK_FORMAT_ASTC_12x12_UNORM_BLOCK};
-    case 0x87: return (VkFmt){VK_FORMAT_ASTC_4x4_SRGB_BLOCK};
-    case 0x88: return (VkFmt){VK_FORMAT_ASTC_5x4_SRGB_BLOCK};
-    case 0x89: return (VkFmt){VK_FORMAT_ASTC_5x5_SRGB_BLOCK};
-    case 0x8A: return (VkFmt){VK_FORMAT_ASTC_6x5_SRGB_BLOCK};
-    case 0x8B: return (VkFmt){VK_FORMAT_ASTC_6x6_SRGB_BLOCK};
-    case 0x8C: return (VkFmt){VK_FORMAT_ASTC_8x5_SRGB_BLOCK};
-    case 0x8D: return (VkFmt){VK_FORMAT_ASTC_8x6_SRGB_BLOCK};
-    case 0x8E: return (VkFmt){VK_FORMAT_ASTC_8x8_SRGB_BLOCK};
-    case 0x8F: return (VkFmt){VK_FORMAT_ASTC_10x5_SRGB_BLOCK};
-    case 0x90: return (VkFmt){VK_FORMAT_ASTC_10x6_SRGB_BLOCK};
-    case 0x91: return (VkFmt){VK_FORMAT_ASTC_10x8_SRGB_BLOCK};
-    case 0x92: return (VkFmt){VK_FORMAT_ASTC_10x10_SRGB_BLOCK};
-    case 0x93: return (VkFmt){VK_FORMAT_ASTC_12x10_SRGB_BLOCK};
-    case 0x94: return (VkFmt){VK_FORMAT_ASTC_12x12_SRGB_BLOCK};
-    case 0x95: case 0x96: case 0x97: return (VkFmt){VK_FORMAT_R5G5B5A1_UNORM_PACK16};
-    case 0x98: return (VkFmt){VK_FORMAT_B8G8R8A8_UNORM, 0, 1};
-    case 0x99: return (VkFmt){VK_FORMAT_B8G8R8A8_UNORM};
-    case 0x9A: return (VkFmt){VK_FORMAT_B8G8R8A8_SRGB, 0, 1};
-    case 0x9B: return (VkFmt){VK_FORMAT_B8G8R8A8_SRGB};
+    case SF2C_TEXTURES_N_0X4D_844B: return (VkFmt){VK_FORMAT_BC7_UNORM_BLOCK};
+    case SF2C_TEXTURES_N_0X4E_20FE: return (VkFmt){VK_FORMAT_BC7_SRGB_BLOCK};
+    case SF2C_TEXTURES_N_0X4F_23E4: return (VkFmt){VK_FORMAT_BC6H_SFLOAT_BLOCK};
+    case SF2C_TEXTURES_N_0X50_4171: return (VkFmt){VK_FORMAT_BC6H_UFLOAT_BLOCK};
+    case SF2C_TEXTURES_N_0X6D_9F92: return (VkFmt){VK_FORMAT_R8G8B8A8_UNORM, 0, 1};
+    case SF2C_TEXTURES_N_0X71_BFAA: return (VkFmt){VK_FORMAT_R16G16B16A16_SFLOAT, 0, 1};
+    case SF2C_TEXTURES_N_0X76_3ABA: return (VkFmt){VK_FORMAT_R32G32B32A32_SFLOAT, 0, 1};
+    case SF2C_TEXTURES_N_0X79_A3F8: return (VkFmt){VK_FORMAT_ASTC_4x4_UNORM_BLOCK};
+    case SF2C_TEXTURES_N_0X7A_61B5: return (VkFmt){VK_FORMAT_ASTC_5x4_UNORM_BLOCK};
+    case SF2C_TEXTURES_N_0X7B_CA99: return (VkFmt){VK_FORMAT_ASTC_5x5_UNORM_BLOCK};
+    case SF2C_TEXTURES_N_0X7C_D6E9: return (VkFmt){VK_FORMAT_ASTC_6x5_UNORM_BLOCK};
+    case SF2C_TEXTURES_N_0X7D_8D40: return (VkFmt){VK_FORMAT_ASTC_6x6_UNORM_BLOCK};
+    case SF2C_TEXTURES_N_0X7E_D4D4: return (VkFmt){VK_FORMAT_ASTC_8x5_UNORM_BLOCK};
+    case SF2C_TEXTURES_N_0X7F_C234: return (VkFmt){VK_FORMAT_ASTC_8x6_UNORM_BLOCK};
+    case SF2C_TEXTURES_N_0X80_D41C: return (VkFmt){VK_FORMAT_ASTC_8x8_UNORM_BLOCK};
+    case SF2C_TEXTURES_N_0X81_C29D: return (VkFmt){VK_FORMAT_ASTC_10x5_UNORM_BLOCK};
+    case SF2C_TEXTURES_N_0X82_09A5: return (VkFmt){VK_FORMAT_ASTC_10x6_UNORM_BLOCK};
+    case SF2C_TEXTURES_N_0X83_7230: return (VkFmt){VK_FORMAT_ASTC_10x8_UNORM_BLOCK};
+    case SF2C_TEXTURES_N_0X84_7CD7: return (VkFmt){VK_FORMAT_ASTC_10x10_UNORM_BLOCK};
+    case SF2C_TEXTURES_N_0X85_124B: return (VkFmt){VK_FORMAT_ASTC_12x10_UNORM_BLOCK};
+    case SF2C_TEXTURES_N_0X86_0DF0: return (VkFmt){VK_FORMAT_ASTC_12x12_UNORM_BLOCK};
+    case SF2C_TEXTURES_N_0X87_1A28: return (VkFmt){VK_FORMAT_ASTC_4x4_SRGB_BLOCK};
+    case SF2C_TEXTURES_N_0X88_AC70: return (VkFmt){VK_FORMAT_ASTC_5x4_SRGB_BLOCK};
+    case SF2C_TEXTURES_N_0X89_72E9: return (VkFmt){VK_FORMAT_ASTC_5x5_SRGB_BLOCK};
+    case SF2C_TEXTURES_N_0X8A_A44A: return (VkFmt){VK_FORMAT_ASTC_6x5_SRGB_BLOCK};
+    case SF2C_TEXTURES_N_0X8B_9798: return (VkFmt){VK_FORMAT_ASTC_6x6_SRGB_BLOCK};
+    case SF2C_TEXTURES_N_0X8C_9F7A: return (VkFmt){VK_FORMAT_ASTC_8x5_SRGB_BLOCK};
+    case SF2C_TEXTURES_N_0X8D_2C22: return (VkFmt){VK_FORMAT_ASTC_8x6_SRGB_BLOCK};
+    case SF2C_TEXTURES_N_0X8E_28A7: return (VkFmt){VK_FORMAT_ASTC_8x8_SRGB_BLOCK};
+    case SF2C_TEXTURES_N_0X8F_00B4: return (VkFmt){VK_FORMAT_ASTC_10x5_SRGB_BLOCK};
+    case SF2C_TEXTURES_N_0X90_4255: return (VkFmt){VK_FORMAT_ASTC_10x6_SRGB_BLOCK};
+    case SF2C_TEXTURES_N_0X91_BC34: return (VkFmt){VK_FORMAT_ASTC_10x8_SRGB_BLOCK};
+    case SF2C_TEXTURES_N_0X92_E9B0: return (VkFmt){VK_FORMAT_ASTC_10x10_SRGB_BLOCK};
+    case SF2C_TEXTURES_N_0X93_ED86: return (VkFmt){VK_FORMAT_ASTC_12x10_SRGB_BLOCK};
+    case SF2C_TEXTURES_N_0X94_EB0B: return (VkFmt){VK_FORMAT_ASTC_12x12_SRGB_BLOCK};
+    case SF2C_TEXTURES_N_0X95_ADEA: case SF2C_TEXTURES_N_0X96_14FD: case SF2C_TEXTURES_N_0X97_6139: return (VkFmt){VK_FORMAT_R5G5B5A1_UNORM_PACK16};
+    case SF2C_TEXTURES_N_0X98_14A1: return (VkFmt){VK_FORMAT_B8G8R8A8_UNORM, 0, 1};
+    case SF2C_TEXTURES_N_0X99_093C: return (VkFmt){VK_FORMAT_B8G8R8A8_UNORM};
+    case SF2C_TEXTURES_N_0X9A_9E72: return (VkFmt){VK_FORMAT_B8G8R8A8_SRGB, 0, 1};
+    case SF2C_TEXTURES_N_0X9B_3373: return (VkFmt){VK_FORMAT_B8G8R8A8_SRGB};
     default: return (VkFmt){VK_FORMAT_R8G8B8A8_UNORM};
     }
 }
 
-bool renderer_format_is_depth(uint32_t f) { return f >= 0x31 && f <= 0x36; }
-bool renderer_format_has_stencil(uint32_t f) { return f == 0x31 || f == 0x35 || f == 0x36; }
+bool renderer_format_is_depth(uint32_t f) { return f >= SF2C_TEXTURES_N_0X31_9121 && f <= SF2C_TEXTURES_N_0X36_BBAE; }
+bool renderer_format_has_stencil(uint32_t f) { return f == SF2C_TEXTURES_N_0X31_9121 || f == SF2C_TEXTURES_N_0X35_B555 || f == SF2C_TEXTURES_N_0X36_BBAE; }
 VkFormat vk_format(uint32_t f) { return fmt_of(f).vf; }
 bool vk_format_alpha_one(uint32_t f) { return fmt_of(f).alpha_one; }
 bool renderer_format_alpha_one(uint32_t f) { return fmt_of(f).alpha_one; }
 
 static VkImageAspectFlags aspect_of(uint32_t f) {
-    if (f == 0x31) return VK_IMAGE_ASPECT_STENCIL_BIT;
-    if (f == 0x35 || f == 0x36) return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+    if (f == SF2C_TEXTURES_N_0X31_9121) return VK_IMAGE_ASPECT_STENCIL_BIT;
+    if (f == SF2C_TEXTURES_N_0X35_B555 || f == SF2C_TEXTURES_N_0X36_BBAE) return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
     if (renderer_format_is_depth(f)) return VK_IMAGE_ASPECT_DEPTH_BIT;
     return VK_IMAGE_ASPECT_COLOR_BIT;
 }
@@ -197,13 +198,13 @@ uint64_t renderer_present_count(void);
 
 static bool tex_scalable(const NvnTexture *t) {
     static int off = -1;  // (per texture lookup: cached)
-    if (off < 0) off = getenv("LARECOMP_NO_SCALE") != NULL;
+    if (off < 0) off = getenv(SF2C_TEXTURES_S_LARECOMP_NO_SCALE_224E) != NULL;
     if (off) return false;
-    if (t->target != 1 || t->samples > 1 || !(t->flags & 8) || t->width < 32 || t->height < 16) return false;
+    if (t->target != 1 || t->samples > 1 || !(t->flags & SF2C_TEXTURES_N_8_2C62) || t->width < SF2C_TEXTURES_N_32_E29C || t->height < SF2C_TEXTURES_N_16_B17E) return false;
     // Screen buffers have an exact native size in every aspect mode. Artwork
     // can also be 16:9 (including 2048x1152 uploads), but its CPU copies and
     // texture coordinates use native texels and must not be resolution-scaled.
-    return t->width == settings_screen_width(1080) && t->height == 1080;
+    return t->width == settings_screen_width(SF2C_TEXTURES_N_1080_32EB) && t->height == SF2C_TEXTURES_N_1080_32EB;
 }
 
 bool renderer_texture_first_write(NvnTexture *t) {
@@ -223,7 +224,7 @@ bool renderer_texture_frame_fresh(NvnTexture *t) {
     // LARECOMP_NO_FRAME_CLEAR skips the clear only while the contents cover the whole target: below 1x a frame draws
     // into part of it, and the rest would show what an earlier frame left there (issue #205: the upper part flickered)
     // (Dynamic: the contents cover the whole target only at the factor 1 - its render scale is the allocation's)
-    if (g_vk.no_frame_clear && b->sx >= 1.0f && b->sy >= 1.0f && b->sx >= b->ax && b->sy >= b->ay) return false;
+    if (g_vk.no_frame_clear && b->sx >= SF2C_TEXTURES_N_1_0F_CA71 && b->sy >= SF2C_TEXTURES_N_1_0F_CA71 && b->sx >= b->ax && b->sy >= b->ay) return false;
     b->frame_cleared = total_frames + 1;
     return true;
 }
@@ -300,7 +301,7 @@ VkFormat vk_view_format(TexBackend *b, VkFormat want) {
     if (!b || !b->nview_fmt || want == b->format) return want;
     for (int i = 0; i < b->nview_fmt; i++) if (b->view_fmt[i] == want) return want;
     static int nlog;
-    if (nlog++ < 10) LOG("[vk] lean usage: view format %d of an image of format %d refused (its own instead)\n", want, b->format);
+    if (nlog++ < SF2C_TEXTURES_N_10_4A44) LOG(SF2C_TEXTURES_S_VK_LEAN_USAGE_VIEW_FORMAT_D__8536, want, b->format);
     return b->format;
 }
 
@@ -320,11 +321,11 @@ static void create_image(NvnTexture *t, TexBackend *b) {
     uint32_t layers = 1, depth = 1;
     switch (t->target) {
     case 0: type = VK_IMAGE_TYPE_1D; th = 1; break;
-    case 2: type = VK_IMAGE_TYPE_3D; depth = t->depth ? t->depth : 1; break;
-    case 3: type = VK_IMAGE_TYPE_1D; layers = t->height ? t->height : 1; th = 1; break;
-    case 4: case 6: layers = t->depth ? t->depth : 1; break;
-    case 8: layers = 6; break;
-    case 9: layers = t->depth ? t->depth : 6; break;
+    case SF2C_TEXTURES_N_2_D473: type = VK_IMAGE_TYPE_3D; depth = t->depth ? t->depth : 1; break;
+    case SF2C_TEXTURES_N_3_4E07: type = VK_IMAGE_TYPE_1D; layers = t->height ? t->height : 1; th = 1; break;
+    case SF2C_TEXTURES_N_4_4B22: case SF2C_TEXTURES_N_6_E7F6: layers = t->depth ? t->depth : 1; break;
+    case SF2C_TEXTURES_N_8_2C62: layers = SF2C_TEXTURES_N_6_E7F6; break;
+    case SF2C_TEXTURES_N_9_1958: layers = t->depth ? t->depth : SF2C_TEXTURES_N_6_E7F6; break;
     default: break;
     }
     uint32_t levels = t->levels ? t->levels : 1;
@@ -342,14 +343,14 @@ static void create_image(NvnTexture *t, TexBackend *b) {
     if (!format_supports(vf, need)) {
         bool astc = vf >= VK_FORMAT_ASTC_4x4_UNORM_BLOCK && vf <= VK_FORMAT_ASTC_12x12_SRGB_BLOCK;
         const FormatInfo *fi = t->layout.fmt;
-        if (astc && fi && fi->bpb == 16) {  // desktop GPUs: decoded on the CPU into an RGBA8 image of the same colour space
+        if (astc && fi && fi->bpb == SF2C_TEXTURES_N_16_B17E) {  // desktop GPUs: decoded on the CPU into an RGBA8 image of the same colour space
             b->astc_bw = fi->bw;
             b->astc_bh = fi->bh;
-            b->astc_srgb = t->format >= 0x87;
+            b->astc_srgb = t->format >= SF2C_TEXTURES_N_0X87_1A28;
             vf = b->astc_srgb ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM;
         } else {
             static int nlog;
-            if (nlog++ < 20) LOG("[vk] format %d (nvn %#x) not supported: RGBA8 instead\n", vf, t->format);
+            if (nlog++ < SF2C_TEXTURES_N_20_F5CA) LOG(SF2C_TEXTURES_S_VK_FORMAT_D_NVN_X_NOT_SUPPOR_8D1A, vf, t->format);
             vf = VK_FORMAT_R8G8B8A8_UNORM;
         }
     }
@@ -359,7 +360,7 @@ static void create_image(NvnTexture *t, TexBackend *b) {
     else if (format_supports(vf, VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT)) usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     VkImageCreateFlags flags = 0;
     if (!depthfmt) flags |= VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;  // format views (NVN texture views, raw sRGB views)
-    if (type == VK_IMAGE_TYPE_2D && layers >= 6 && tw == th && samples == 1) flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+    if (type == VK_IMAGE_TYPE_2D && layers >= SF2C_TEXTURES_N_6_E7F6 && tw == th && samples == 1) flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
     // g_vk.lean_usage (integrated GPUs): colour images may only be viewed as their own format and its sRGB / UNORM
     // twin, listed in a VkImageFormatListCreateInfo (no twin: not mutable at all). Mesa's AMD / Intel drivers keep
     // DCC / CCS compression for such images; with MUTABLE_FORMAT and no list they turn it off. Views in any other
@@ -370,9 +371,9 @@ static void create_image(NvnTexture *t, TexBackend *b) {
         VkFormat twin = srgb_twin(vf);
         b->view_fmt[0] = vf;
         b->view_fmt[1] = twin;
-        b->nview_fmt = twin != VK_FORMAT_UNDEFINED ? 2 : 1;
+        b->nview_fmt = twin != VK_FORMAT_UNDEFINED ? SF2C_TEXTURES_N_2_D473 : 1;
         if (b->nview_fmt == 1) flags &= ~VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
-        else fl.viewFormatCount = 2, fl.pViewFormats = b->view_fmt;
+        else fl.viewFormatCount = SF2C_TEXTURES_N_2_D473, fl.pViewFormats = b->view_fmt;
     }
     VkImageCreateInfo ci = {.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO, .pNext = fl.viewFormatCount ? &fl : NULL,
                             .flags = flags, .imageType = type, .format = vf,
@@ -384,7 +385,7 @@ static void create_image(NvnTexture *t, TexBackend *b) {
     // Work around NVIDIA copy-engine faults when a small image reuses pooled
     // memory from a destroyed texture (observed on 595.99.02 entering Sparring).
     // A dedicated allocation avoids that reuse without retaining dead textures.
-    if (g_vk.props.vendorID == 0x10DE && type == VK_IMAGE_TYPE_2D && tw <= 16 && th <= 16 &&
+    if (g_vk.props.vendorID == SF2C_TEXTURES_N_0X10DE_112D && type == VK_IMAGE_TYPE_2D && tw <= SF2C_TEXTURES_N_16_B17E && th <= SF2C_TEXTURES_N_16_B17E &&
         depth == 1 && layers == 1 && samples == 1)
         ai.flags |= VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
 #endif
@@ -392,10 +393,10 @@ static void create_image(NvnTexture *t, TexBackend *b) {
     if (r != VK_SUCCESS) {
         // (the Vulkan side too: a driver can refuse a format / usage / tiling combination with "out of device memory",
         // issue #45 - a GTX 1060 failing a 1920x1080 image with plenty of memory free)
-        LOG("[vk] image creation failed (%d): nvn fmt %#x %ux%ux%u target %u - vk format %d, usage %#x, flags %#x, "
-            "%u levels, %u layers, %u samples\n", r, t->format, t->width, t->height, t->depth, t->target, ci.format,
+        LOG(SF2C_TEXTURES_S_VK_IMAGE_CREATION_FAILED_D_N_E5DD
+            SF2C_TEXTURES_S_U_LEVELS_U_LAYERS_U_SAMPLES__93E9, r, t->format, t->width, t->height, t->depth, t->target, ci.format,
             ci.usage, ci.flags, ci.mipLevels, ci.arrayLayers, (unsigned)ci.samples);
-        vk_log_memory("image creation failed");
+        vk_log_memory(SF2C_TEXTURES_S_IMAGE_CREATION_FAILED_4B76);
         ci.format = vf = VK_FORMAT_R8G8B8A8_UNORM;
         ci.pNext = NULL;  // (g_vk.lean_usage: the fallback image is mutable as before, no format list)
         ci.flags |= VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
@@ -406,16 +407,16 @@ static void create_image(NvnTexture *t, TexBackend *b) {
         VK_CHECK(vmaCreateImage(g_vk.vma, &ci, &ai, &b->image, &b->mem, NULL));
         depthfmt = false;
     }
-    if (getenv("LARECOMP_VK_DEVLOST_TRACE") && tw <= 16 && th <= 16)
-        LOG("[vk] small image %p %ux%ux%u type %d layers %u samples %u fmt %d allocation flags %#x\n",
+    if (getenv(SF2C_TEXTURES_S_LARECOMP_VK_DEVLOST_TRACE_28EE) && tw <= SF2C_TEXTURES_N_16_B17E && th <= SF2C_TEXTURES_N_16_B17E)
+        LOG(SF2C_TEXTURES_S_VK_SMALL_IMAGE_P_UX_UX_U_TYP_6090,
             (void *)b->image, tw, th, depth, type, layers, samples, vf, ai.flags);
     b->format = vf;
     b->width = tw; b->height = th; b->depth = depth; b->layers = layers; b->levels = levels; b->samples = samples;
     b->aspect = depthfmt ? aspect_of(t->format) : VK_IMAGE_ASPECT_COLOR_BIT;
     b->base_type = type == VK_IMAGE_TYPE_1D ? (layers > 1 ? VK_IMAGE_VIEW_TYPE_1D_ARRAY : VK_IMAGE_VIEW_TYPE_1D)
                  : type == VK_IMAGE_TYPE_3D ? VK_IMAGE_VIEW_TYPE_3D
-                 : t->target == 8 ? VK_IMAGE_VIEW_TYPE_CUBE : t->target == 9 ? VK_IMAGE_VIEW_TYPE_CUBE_ARRAY
-                 : layers > 1 || t->target == 4 || t->target == 6 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
+                 : t->target == SF2C_TEXTURES_N_8_2C62 ? VK_IMAGE_VIEW_TYPE_CUBE : t->target == SF2C_TEXTURES_N_9_1958 ? VK_IMAGE_VIEW_TYPE_CUBE_ARRAY
+                 : layers > 1 || t->target == SF2C_TEXTURES_N_4_4B22 || t->target == SF2C_TEXTURES_N_6_E7F6 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
     vk_image_init_layout(vk_upload_cmd(), b->image, b->aspect);
     // New depth / stencil images start zeroed. The game builds its depth pyramid with depth-only copies, so the stencil
     // of those images was never written: whatever the memory held, different per image and per run, then failed or
@@ -432,15 +433,15 @@ static void create_image(NvnTexture *t, TexBackend *b) {
         VkCommandBuffer cb = vk_upload_cmd();
         VkImageSubresourceRange rg = {b->aspect, 0, VK_REMAINING_MIP_LEVELS, 0, VK_REMAINING_ARRAY_LAYERS};
         if (depthfmt) {
-            VkClearDepthStencilValue zero = {0.0f, 0};
+            VkClearDepthStencilValue zero = {SF2C_TEXTURES_N_0_0F_6895, 0};
             rec_CmdClearDepthStencilImage(cb, b->image, VK_IMAGE_LAYOUT_GENERAL, &zero, 1, &rg);
         } else {
             static int fill = -1;
             static VkClearColorValue fc;
             if (fill < 0) {
-                const char *e = getenv("LARECOMP_NEW_TARGET_FILL");
+                const char *e = getenv(SF2C_TEXTURES_S_LARECOMP_NEW_TARGET_FILL_112D);
                 float *c = fc.float32;
-                fill = e && sscanf(e, "%f,%f,%f,%f", &c[0], &c[1], &c[2], &c[3]) == 4;
+                fill = e && sscanf(e, SF2C_TEXTURES_S_F_F_F_F_60DF, &c[0], &c[1], &c[SF2C_TEXTURES_N_2_D473], &c[SF2C_TEXTURES_N_3_4E07]) == SF2C_TEXTURES_N_4_4B22;
             }
             VkClearColorValue zero = {{0}};
             rec_CmdClearColorImage(cb, b->image, VK_IMAGE_LAYOUT_GENERAL, fill ? &fc : &zero, 1, &rg);
@@ -454,7 +455,7 @@ static void create_image(NvnTexture *t, TexBackend *b) {
 }
 
 static void defer(Dead d) {
-    if (ndead == cap_dead) { cap_dead = cap_dead ? cap_dead * 2 : 256; dead = realloc(dead, cap_dead * sizeof *dead); }
+    if (ndead == cap_dead) { cap_dead = cap_dead ? cap_dead * SF2C_TEXTURES_N_2_D473 : SF2C_TEXTURES_N_256_51E8; dead = realloc(dead, cap_dead * sizeof *dead); }
     d.seq = vk_pending_seq();
     dead[ndead++] = d;
 }
@@ -479,7 +480,7 @@ static void destroy_image(TexBackend *b) {
 static NvnTexture **g_live;
 static int g_nlive, g_cap_live;
 static void live_add(NvnTexture *t, TexBackend *b) {
-    if (g_nlive == g_cap_live) { g_cap_live = g_cap_live ? g_cap_live * 2 : 1024; g_live = realloc(g_live, g_cap_live * sizeof *g_live); }
+    if (g_nlive == g_cap_live) { g_cap_live = g_cap_live ? g_cap_live * SF2C_TEXTURES_N_2_D473 : SF2C_TEXTURES_N_1024_E39E; g_live = realloc(g_live, g_cap_live * sizeof *g_live); }
     g_live[g_nlive++] = t;
     b->reg = g_nlive;
 }
@@ -529,7 +530,7 @@ void vk_textures_reset(void) {
     vk_alias_reset();
     while (g_nlive > 0) backend_texture_destroyed(g_live[g_nlive - 1]);
     vk_collect_dead();
-    LOG("[vk] reboot: %d textures released\n", n);
+    LOG(SF2C_TEXTURES_S_VK_REBOOT_D_TEXTURES_RELEASE_BF52, n);
 }
 
 // ================================================================== uploads (same change detection as metal.m)
@@ -538,25 +539,25 @@ static uint64_t full_hash_budget, full_hash_budget_frame;
 // Four independent lanes (one serial multiply chain ran at ~1.5 bytes/cycle; dynamic textures are hashed every
 // frame). Values are only compared within a run.
 static uint64_t hash_full(const uint8_t *p, uint64_t n) {
-    uint64_t h0 = 0x9E3779B97F4A7C15ull ^ n, h1 = 0xC2B2AE3D27D4EB4Full, h2 = 0x165667B19E3779F9ull, h3 = 0x27D4EB2F165667C5ull;
+    uint64_t h0 = SF2C_TEXTURES_N_0X9E3779B97F4A7C15ULL_8CC5 ^ n, h1 = SF2C_TEXTURES_N_0XC2B2AE3D27D4EB4FULL_ACE8, h2 = SF2C_TEXTURES_N_0X165667B19E3779F9ULL_99AC, h3 = SF2C_TEXTURES_N_0X27D4EB2F165667C5ULL_8690;
     uint64_t i = 0;
-    for (; i + 32 <= n; i += 32) {
-        uint64_t v[4];
-        memcpy(v, p + i, 32);
-        h0 = (h0 ^ v[0]) * 0x100000001B3ull; h0 ^= h0 >> 29;
-        h1 = (h1 ^ v[1]) * 0x100000001B3ull; h1 ^= h1 >> 29;
-        h2 = (h2 ^ v[2]) * 0x100000001B3ull; h2 ^= h2 >> 29;
-        h3 = (h3 ^ v[3]) * 0x100000001B3ull; h3 ^= h3 >> 29;
+    for (; i + SF2C_TEXTURES_N_32_E29C <= n; i += SF2C_TEXTURES_N_32_E29C) {
+        uint64_t v[SF2C_TEXTURES_N_4_4B22];
+        memcpy(v, p + i, SF2C_TEXTURES_N_32_E29C);
+        h0 = (h0 ^ v[0]) * SF2C_TEXTURES_N_0X100000001B3ULL_3E10; h0 ^= h0 >> SF2C_TEXTURES_N_29_3513;
+        h1 = (h1 ^ v[1]) * SF2C_TEXTURES_N_0X100000001B3ULL_3E10; h1 ^= h1 >> SF2C_TEXTURES_N_29_3513;
+        h2 = (h2 ^ v[SF2C_TEXTURES_N_2_D473]) * SF2C_TEXTURES_N_0X100000001B3ULL_3E10; h2 ^= h2 >> SF2C_TEXTURES_N_29_3513;
+        h3 = (h3 ^ v[SF2C_TEXTURES_N_3_4E07]) * SF2C_TEXTURES_N_0X100000001B3ULL_3E10; h3 ^= h3 >> SF2C_TEXTURES_N_29_3513;
     }
-    uint64_t h = h0 ^ (h1 * 0x9E3779B97F4A7C15ull) ^ (h2 * 0xC2B2AE3D27D4EB4Full) ^ (h3 * 0x165667B19E3779F9ull);
-    for (; i < n; i++) h = (h ^ p[i]) * 0x100000001B3ull;
-    return h ^ (h >> 31);
+    uint64_t h = h0 ^ (h1 * SF2C_TEXTURES_N_0X9E3779B97F4A7C15ULL_8CC5) ^ (h2 * SF2C_TEXTURES_N_0XC2B2AE3D27D4EB4FULL_ACE8) ^ (h3 * SF2C_TEXTURES_N_0X165667B19E3779F9ULL_99AC);
+    for (; i < n; i++) h = (h ^ p[i]) * SF2C_TEXTURES_N_0X100000001B3ULL_3E10;
+    return h ^ (h >> SF2C_TEXTURES_N_31_EB1E);
 }
 
 static uint64_t fnv_sample(const uint8_t *p, uint64_t n) {
-    uint64_t h = 1469598103934665603ull;
-    uint64_t step = n > 4096 ? n / 4096 : 1;
-    for (uint64_t i = 0; i < n; i += step) { h ^= p[i]; h *= 1099511628211ull; }
+    uint64_t h = SF2C_TEXTURES_N_1469598103934665603ULL_7B90;
+    uint64_t step = n > SF2C_TEXTURES_N_4096_8B92 ? n / SF2C_TEXTURES_N_4096_8B92 : 1;
+    for (uint64_t i = 0; i < n; i += step) { h ^= p[i]; h *= SF2C_TEXTURES_N_1099511628211ULL_D3BD; }
     return h ^ n;
 }
 
@@ -566,7 +567,7 @@ static bool movie_texture_initialized;
 static pthread_mutex_t movie_frame_lock = PTHREAD_MUTEX_INITIALIZER;
 static uint8_t *movie_frame_pending;
 static bool movie_frame_clear_pending;
-static uint8_t movie_black_nv12[RENDERER_MOVIE_WIDTH * RENDERER_MOVIE_HEIGHT * 3 / 2];
+static uint8_t movie_black_nv12[RENDERER_MOVIE_WIDTH * RENDERER_MOVIE_HEIGHT * SF2C_TEXTURES_N_3_4E07 / SF2C_TEXTURES_N_2_D473];
 static bool movie_black_initialized;
 
 static void upload_pending(TexBackend *b) {
@@ -580,9 +581,9 @@ static void upload_pending(TexBackend *b) {
     if (nv12) { vk_convert_nv12(b, px, w, h, stride, uv_off); free(px); return; }
     if (w > b->width) w = b->width;
     if (h > b->height) h = b->height;
-    VkSpan s = vk_transient_copy(px, (uint64_t)stride * h, 16);
+    VkSpan s = vk_transient_copy(px, (uint64_t)stride * h, SF2C_TEXTURES_N_16_B17E);
     free(px);
-    VkBufferImageCopy rg = {.bufferOffset = s.off, .bufferRowLength = stride / 4,
+    VkBufferImageCopy rg = {.bufferOffset = s.off, .bufferRowLength = stride / SF2C_TEXTURES_N_4_4B22,
                             .imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1}, .imageExtent = {w, h, 1}};
     VkCommandBuffer cb = vk_upload_cmd();
     vk_dl_note_upload((void *)b->image, rg.imageExtent.width, rg.imageExtent.height, rg.imageSubresource.mipLevel,
@@ -592,29 +593,29 @@ static void upload_pending(TexBackend *b) {
 
 uint64_t prof_tex_checks, prof_tex_samples, prof_tex_full, prof_tex_full_bytes, prof_tex_dyn, prof_tex_watch_skips;
 static void upload_texture(NvnTexture *t, TexBackend *b) {
-    if (!t->addr || t->target == 10) return;
+    if (!t->addr || t->target == SF2C_TEXTURES_N_10_4A44) return;
     uint64_t frame = vk_frame_counter();
     if (b->uploaded && b->checked_frame == frame) return;
-    if (b->uploaded && !b->dynamic && ((frame + ((uintptr_t)b >> 6)) & 7)) return;
+    if (b->uploaded && !b->dynamic && ((frame + ((uintptr_t)b >> SF2C_TEXTURES_N_6_E7F6)) & SF2C_TEXTURES_N_7_7902)) return;
     const FormatInfo *fi = t->layout.fmt;
     if (!fi || !fi->bpb) return;
     VkFmt mf = fmt_of(t->format);
     uint64_t total = tegra_total_size(&t->layout);
     b->checked_frame = frame;
     prof_tex_checks++;
-    if (t->flags & 0x10) b->dynamic = true;
-    if (full_hash_budget_frame != frame) { full_hash_budget_frame = frame; full_hash_budget = 4 << 20; }
+    if (t->flags & SF2C_TEXTURES_N_0X10_BF9C) b->dynamic = true;
+    if (full_hash_budget_frame != frame) { full_hash_budget_frame = frame; full_hash_budget = SF2C_TEXTURES_N_4_4B22 << SF2C_TEXTURES_N_20_F5CA; }
     const uint8_t *mem = (const uint8_t *)(uintptr_t)t->addr;
     static int always_full = -1;
-    if (always_full < 0) always_full = getenv("LARECOMP_TEX_FULLHASH") ? 1 : 0;
+    if (always_full < 0) always_full = getenv(SF2C_TEXTURES_S_LARECOMP_TEX_FULLHASH_DEFD) ? 1 : 0;
     bool full = b->dynamic || !b->uploaded || always_full;
-    bool periodic = frame - b->full_frame >= 120 && full_hash_budget >= total;  // (safety net: a full hash now and then)
+    bool periodic = frame - b->full_frame >= SF2C_TEXTURES_N_120_2ABA && full_hash_budget >= total;  // (safety net: a full hash now and then)
     if (!full && periodic) { full = true; full_hash_budget -= total; }
     // The OS's page write tracking (exec.c vk_pages_changed, shared with the vertex cache): texture memory the CPU
     // hasn't written since the last check is not hashed at all (dynamic textures were fully hashed every frame,
     // ~2.4 MB a frame in the overworld). The periodic full hash stays as a safety net. LARECOMP_VK_TEX_WATCH=0: off.
     static int watch = -1;
-    if (watch < 0) { const char *e = getenv("LARECOMP_VK_TEX_WATCH"); watch = !e || atoi(e) != 0; }
+    if (watch < 0) { const char *e = getenv(SF2C_TEXTURES_S_LARECOMP_VK_TEX_WATCH_599C); watch = !e || atoi(e) != 0; }
     if (watch && !always_full) {
         extern int vk_pages_changed(uint64_t addr, uint64_t size, uint32_t since, uint32_t *now);
         uint32_t now = 0;
@@ -651,17 +652,17 @@ static void upload_texture(NvnTexture *t, TexBackend *b) {
     uint32_t layers = t->layout.layers ? t->layout.layers : 1;
     if (layers > b->layers && b->depth == 1) layers = b->layers;
     uint64_t layer_size = tegra_layer_size(&t->layout);
-    bool linear = (t->flags & 0x10) != 0;
+    bool linear = (t->flags & SF2C_TEXTURES_N_0X10_BF9C) != 0;
     uint32_t levels = t->layout.levels < b->levels ? t->layout.levels : b->levels;
     for (uint32_t layer = 0; layer < layers; layer++) {
         for (uint32_t lv = 0; lv < levels; lv++) {
             LevelLayout l = tegra_level(&t->layout, lv);
             if (b->astc_bw) {  // blocks -> linear block rows -> RGBA8 texels
                 const uint8_t *src = (const uint8_t *)(uintptr_t)t->addr + layer * layer_size + l.offset;
-                uint8_t *blocks = malloc((uint64_t)l.wb * l.hb * 16);
-                if (linear) for (uint32_t y = 0; y < l.hb; y++) memcpy(blocks + (uint64_t)y * l.wb * 16, src + (uint64_t)y * t->stride, l.wb * 16);
-                else tegra_deswizzle(src, blocks, l.wb, l.hb, 1, 16, l.block_height_log2, l.block_depth_log2);
-                VkSpan s = vk_transient((uint64_t)l.w * l.h * 4, 16);
+                uint8_t *blocks = malloc((uint64_t)l.wb * l.hb * SF2C_TEXTURES_N_16_B17E);
+                if (linear) for (uint32_t y = 0; y < l.hb; y++) memcpy(blocks + (uint64_t)y * l.wb * SF2C_TEXTURES_N_16_B17E, src + (uint64_t)y * t->stride, l.wb * SF2C_TEXTURES_N_16_B17E);
+                else tegra_deswizzle(src, blocks, l.wb, l.hb, 1, SF2C_TEXTURES_N_16_B17E, l.block_height_log2, l.block_depth_log2);
+                VkSpan s = vk_transient((uint64_t)l.w * l.h * SF2C_TEXTURES_N_4_4B22, SF2C_TEXTURES_N_16_B17E);
                 astc_decode_ldr(blocks, l.w, l.h, b->astc_bw, b->astc_bh, b->astc_srgb, s.ptr);
                 free(blocks);
                 VkBufferImageCopy rg = {.bufferOffset = s.off, .bufferRowLength = l.w, .bufferImageHeight = l.h,
@@ -674,9 +675,9 @@ static void upload_texture(NvnTexture *t, TexBackend *b) {
             }
             uint32_t row = l.wb * fi->bpb;
             uint64_t sz = (uint64_t)row * l.hb * l.d;
-            bool expand = mf.expand_rgb && fi->bpb == 3;
-            uint32_t out_row = expand ? l.wb * 4 : row;
-            VkSpan s = vk_transient((uint64_t)out_row * l.hb * l.d, 16);
+            bool expand = mf.expand_rgb && fi->bpb == SF2C_TEXTURES_N_3_4E07;
+            uint32_t out_row = expand ? l.wb * SF2C_TEXTURES_N_4_4B22 : row;
+            VkSpan s = vk_transient((uint64_t)out_row * l.hb * l.d, SF2C_TEXTURES_N_16_B17E);
             uint8_t *lin = expand ? malloc(sz) : s.ptr;
             const uint8_t *src = (const uint8_t *)(uintptr_t)t->addr + layer * layer_size + l.offset;
             if (linear) {
@@ -687,7 +688,7 @@ static void upload_texture(NvnTexture *t, TexBackend *b) {
             if (expand) {  // RGB8 -> RGBA8
                 uint8_t *o = s.ptr;
                 uint64_t n = (uint64_t)l.wb * l.hb * l.d;
-                for (uint64_t i = 0; i < n; i++) { o[i * 4] = lin[i * 3]; o[i * 4 + 1] = lin[i * 3 + 1]; o[i * 4 + 2] = lin[i * 3 + 2]; o[i * 4 + 3] = 255; }
+                for (uint64_t i = 0; i < n; i++) { o[i * SF2C_TEXTURES_N_4_4B22] = lin[i * SF2C_TEXTURES_N_3_4E07]; o[i * SF2C_TEXTURES_N_4_4B22 + 1] = lin[i * SF2C_TEXTURES_N_3_4E07 + 1]; o[i * SF2C_TEXTURES_N_4_4B22 + SF2C_TEXTURES_N_2_D473] = lin[i * SF2C_TEXTURES_N_3_4E07 + SF2C_TEXTURES_N_2_D473]; o[i * SF2C_TEXTURES_N_4_4B22 + SF2C_TEXTURES_N_3_4E07] = SF2C_TEXTURES_N_255_9556; }
                 free(lin);
             }
             uint32_t w = l.w, hh = l.h, d = l.d;
@@ -716,9 +717,9 @@ TexBackend *vk_tex(NvnTexture *t, bool for_render) {
     if (for_render) b->gpu_owned = true;
     else if (!b->gpu_owned) {
         extern uint64_t prof_up_ns;
-        uint64_t t0 = prof_up_ns != ~0ull ? SDL_GetTicksNS() : 0;
+        uint64_t t0 = prof_up_ns != ~SF2C_TEXTURES_N_0ULL_DF1B ? SDL_GetTicksNS() : 0;
         upload_texture(t, b);
-        if (prof_up_ns != ~0ull) prof_up_ns += SDL_GetTicksNS() - t0;
+        if (prof_up_ns != ~SF2C_TEXTURES_N_0ULL_DF1B) prof_up_ns += SDL_GetTicksNS() - t0;
     }
     return b;
 }
@@ -768,7 +769,7 @@ bool renderer_upload_nv12(NvnTexture *t, const void *nv12, uint32_t w, uint32_t 
     if (!rq_on()) return upload_nv12_now(t, nv12, w, h, stride, uv_off);
     if (!t->backend) return true;
     if (!nv12_format_ok(vk_format(t->format))) return false;
-    size_t n = (size_t)uv_off + (size_t)stride * (h / 2);
+    size_t n = (size_t)uv_off + (size_t)stride * (h / SF2C_TEXTURES_N_2_D473);
     void *copy = malloc(n);
     memcpy(copy, nv12, n);
     rq_upload(t, RQ_UPLOAD_NV12, copy, w, h, stride, uv_off);
@@ -783,7 +784,7 @@ static bool upload_nv12_now(NvnTexture *t, const void *nv12, uint32_t w, uint32_
     TexBackend *b = t->backend;
     if (!b) return true;  // (as renderer_upload_rgba: a frame before the texture is first bound is dropped)
     if (!nv12_format_ok(b->format)) return false;
-    size_t n = (size_t)uv_off + (size_t)stride * (h / 2);
+    size_t n = (size_t)uv_off + (size_t)stride * (h / SF2C_TEXTURES_N_2_D473);
     void *copy = malloc(n);
     memcpy(copy, nv12, n);
     pthread_mutex_lock(&pending_lock);
@@ -799,7 +800,7 @@ static bool upload_nv12_now(NvnTexture *t, const void *nv12, uint32_t w, uint32_
 
 bool renderer_movie_submit_nv12(const void *data, uint32_t w, uint32_t h, uint32_t stride, uint32_t uv_off) {
     if (!data || w != RENDERER_MOVIE_WIDTH || h != RENDERER_MOVIE_HEIGHT || stride != w || uv_off != w * h) return false;
-    size_t size = (size_t)uv_off + (size_t)stride * (h / 2);
+    size_t size = (size_t)uv_off + (size_t)stride * (h / SF2C_TEXTURES_N_2_D473);
     void *copy = malloc(size);
     if (!copy) return false;
     memcpy(copy, data, size);
@@ -815,7 +816,7 @@ NvnTexture *renderer_movie_texture(void) {
     if (!movie_texture_initialized) {
         memset(&movie_texture, 0, sizeof movie_texture);
         movie_texture.target = 1;
-        movie_texture.format = 0x25;
+        movie_texture.format = SF2C_TEXTURES_N_0X25_2611;
         movie_texture.width = RENDERER_MOVIE_WIDTH;
         movie_texture.height = RENDERER_MOVIE_HEIGHT;
         movie_texture.depth = 1;
@@ -828,7 +829,7 @@ NvnTexture *renderer_movie_texture(void) {
         movie_texture.layout.levels = 1;
         movie_texture.layout.fmt = nvn_format_info(movie_texture.format);
         tegra_layout_init(&movie_texture.layout);
-        snprintf(movie_texture.label, sizeof movie_texture.label, "host movie frame");
+        snprintf(movie_texture.label, sizeof movie_texture.label, SF2C_TEXTURES_S_HOST_MOVIE_FRAME_0978);
         movie_texture_initialized = true;
     }
     tex_backend(&movie_texture);
@@ -846,8 +847,8 @@ NvnTexture *renderer_movie_texture(void) {
         free(frame);
     } else if (clear) {
         if (!movie_black_initialized) {
-            memset(movie_black_nv12, 128, sizeof movie_black_nv12);
-            memset(movie_black_nv12, 16, RENDERER_MOVIE_WIDTH * RENDERER_MOVIE_HEIGHT);
+            memset(movie_black_nv12, SF2C_TEXTURES_N_128_2747, sizeof movie_black_nv12);
+            memset(movie_black_nv12, SF2C_TEXTURES_N_16_B17E, RENDERER_MOVIE_WIDTH * RENDERER_MOVIE_HEIGHT);
             movie_black_initialized = true;
         }
         upload_nv12_now(&movie_texture, movie_black_nv12, RENDERER_MOVIE_WIDTH, RENDERER_MOVIE_HEIGHT,
@@ -865,7 +866,7 @@ void renderer_movie_clear(void) {
 }
 
 // ================================================================== views
-#define VIEW_TAB 16384
+#define VIEW_TAB SF2C_TEXTURES_VIEW_TAB
 typedef struct { TexBackend *b; uint64_t k1, k2; VkImageView view; } ViewEnt;
 static ViewEnt view_tab[VIEW_TAB];
 
@@ -881,11 +882,11 @@ static void views_forget(TexBackend *b) {
 VkImageView vk_image_view(TexBackend *b, VkImageViewType type, VkFormat fmt, uint32_t lv0, uint32_t nlv, uint32_t ly0,
                           uint32_t nly, VkComponentMapping sw, VkImageAspectFlags aspect) {
     fmt = vk_view_format(b, fmt);  // (g_vk.lean_usage: only the listed formats)
-    uint64_t k1 = (uint64_t)type | (uint64_t)fmt << 8 | (uint64_t)lv0 << 40 | (uint64_t)nlv << 48 | (uint64_t)aspect << 56;
-    uint64_t k2 = (uint64_t)ly0 | (uint64_t)nly << 16 | (uint64_t)sw.r << 32 | (uint64_t)sw.g << 40 | (uint64_t)sw.b << 48 | (uint64_t)sw.a << 56;
-    uint64_t h = ((uint64_t)(uintptr_t)b * 0x9E3779B97F4A7C15ull) ^ (k1 * 0xC2B2AE3D27D4EB4Full) ^ (k2 * 0x165667B19E3779F9ull);
-    uint32_t slot = (uint32_t)(h ^ (h >> 32)) & (VIEW_TAB - 1);
-    for (int probe = 0; probe < 16; probe++, slot = (slot + 1) & (VIEW_TAB - 1)) {
+    uint64_t k1 = (uint64_t)type | (uint64_t)fmt << SF2C_TEXTURES_N_8_2C62 | (uint64_t)lv0 << SF2C_TEXTURES_N_40_D59E | (uint64_t)nlv << SF2C_TEXTURES_N_48_9801 | (uint64_t)aspect << SF2C_TEXTURES_N_56_7688;
+    uint64_t k2 = (uint64_t)ly0 | (uint64_t)nly << SF2C_TEXTURES_N_16_B17E | (uint64_t)sw.r << SF2C_TEXTURES_N_32_E29C | (uint64_t)sw.g << SF2C_TEXTURES_N_40_D59E | (uint64_t)sw.b << SF2C_TEXTURES_N_48_9801 | (uint64_t)sw.a << SF2C_TEXTURES_N_56_7688;
+    uint64_t h = ((uint64_t)(uintptr_t)b * SF2C_TEXTURES_N_0X9E3779B97F4A7C15ULL_8CC5) ^ (k1 * SF2C_TEXTURES_N_0XC2B2AE3D27D4EB4FULL_ACE8) ^ (k2 * SF2C_TEXTURES_N_0X165667B19E3779F9ULL_99AC);
+    uint32_t slot = (uint32_t)(h ^ (h >> SF2C_TEXTURES_N_32_E29C)) & (VIEW_TAB - 1);
+    for (int probe = 0; probe < SF2C_TEXTURES_N_16_B17E; probe++, slot = (slot + 1) & (VIEW_TAB - 1)) {
         ViewEnt *e = &view_tab[slot];
         if (e->b == b && e->k1 == k1 && e->k2 == k2) return e->view;
         if (!e->b) break;
@@ -897,7 +898,7 @@ VkImageView vk_image_view(TexBackend *b, VkImageViewType type, VkFormat fmt, uin
     VkImageView v;
     if (vkCreateImageView(g_vk.dev, &vi, NULL, &v) != VK_SUCCESS) {
         static int nfail;
-        if (nfail++ < 20) LOG("[vk] view failed: type %d fmt %d (image fmt %d) levels %u+%u layers %u+%u\n", type, fmt, b->format, lv0, nlv, ly0, nly);
+        if (nfail++ < SF2C_TEXTURES_N_20_F5CA) LOG(SF2C_TEXTURES_S_VK_VIEW_FAILED_TYPE_D_FMT_D__8DFA, type, fmt, b->format, lv0, nlv, ly0, nly);
         return VK_NULL_HANDLE;
     }
     ViewEnt *e = &view_tab[slot];
@@ -934,7 +935,7 @@ static int vk_color_bytes(VkFormat f) {  // texel size of an ordinary colour for
     case VK_FORMAT_R8G8_SINT: case VK_FORMAT_R8G8_SRGB: case VK_FORMAT_R4G4B4A4_UNORM_PACK16: case VK_FORMAT_B4G4R4A4_UNORM_PACK16:
     case VK_FORMAT_R5G6B5_UNORM_PACK16: case VK_FORMAT_B5G6R5_UNORM_PACK16: case VK_FORMAT_R5G5B5A1_UNORM_PACK16:
     case VK_FORMAT_B5G5R5A1_UNORM_PACK16: case VK_FORMAT_A1R5G5B5_UNORM_PACK16:
-        return 2;
+        return SF2C_TEXTURES_N_2_D473;
     case VK_FORMAT_R32_UINT: case VK_FORMAT_R32_SINT: case VK_FORMAT_R32_SFLOAT: case VK_FORMAT_R16G16_UNORM:
     case VK_FORMAT_R16G16_SNORM: case VK_FORMAT_R16G16_UINT: case VK_FORMAT_R16G16_SINT: case VK_FORMAT_R16G16_SFLOAT:
     case VK_FORMAT_R8G8B8A8_UNORM: case VK_FORMAT_R8G8B8A8_SNORM: case VK_FORMAT_R8G8B8A8_UINT: case VK_FORMAT_R8G8B8A8_SINT:
@@ -942,20 +943,20 @@ static int vk_color_bytes(VkFormat f) {  // texel size of an ordinary colour for
     case VK_FORMAT_A8B8G8R8_UNORM_PACK32: case VK_FORMAT_A8B8G8R8_SRGB_PACK32: case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
     case VK_FORMAT_A2B10G10R10_UINT_PACK32: case VK_FORMAT_A2R10G10B10_UNORM_PACK32: case VK_FORMAT_B10G11R11_UFLOAT_PACK32:
     case VK_FORMAT_E5B9G9R9_UFLOAT_PACK32:
-        return 4;
+        return SF2C_TEXTURES_N_4_4B22;
     case VK_FORMAT_R32G32_UINT: case VK_FORMAT_R32G32_SINT: case VK_FORMAT_R32G32_SFLOAT: case VK_FORMAT_R16G16B16A16_UNORM:
     case VK_FORMAT_R16G16B16A16_SNORM: case VK_FORMAT_R16G16B16A16_UINT: case VK_FORMAT_R16G16B16A16_SINT:
     case VK_FORMAT_R16G16B16A16_SFLOAT:
-        return 8;
+        return SF2C_TEXTURES_N_8_2C62;
     case VK_FORMAT_R32G32B32A32_UINT: case VK_FORMAT_R32G32B32A32_SINT: case VK_FORMAT_R32G32B32A32_SFLOAT:
-        return 16;
+        return SF2C_TEXTURES_N_16_B17E;
     default:
         return 0;
     }
 }
 static int vk_block_class(VkFormat f) {  // compressed formats: one id per compatibility class, 0 = not compressed
-    if (f >= VK_FORMAT_BC1_RGB_UNORM_BLOCK && f <= VK_FORMAT_BC7_SRGB_BLOCK) return 1 + (f - VK_FORMAT_BC1_RGB_UNORM_BLOCK) / 2;
-    if (f >= VK_FORMAT_ASTC_4x4_UNORM_BLOCK && f <= VK_FORMAT_ASTC_12x12_SRGB_BLOCK) return 100 + (f - VK_FORMAT_ASTC_4x4_UNORM_BLOCK) / 2;
+    if (f >= VK_FORMAT_BC1_RGB_UNORM_BLOCK && f <= VK_FORMAT_BC7_SRGB_BLOCK) return 1 + (f - VK_FORMAT_BC1_RGB_UNORM_BLOCK) / SF2C_TEXTURES_N_2_D473;
+    if (f >= VK_FORMAT_ASTC_4x4_UNORM_BLOCK && f <= VK_FORMAT_ASTC_12x12_SRGB_BLOCK) return SF2C_TEXTURES_N_100_AD57 + (f - VK_FORMAT_ASTC_4x4_UNORM_BLOCK) / SF2C_TEXTURES_N_2_D473;
     return 0;
 }
 static bool vk_view_compatible(VkFormat image, VkFormat view) {
@@ -972,22 +973,22 @@ VkImageView vk_view(NvnTexture *t, const NvnTextureView *v, bool has_view, bool 
     TexBackend *b = vk_tex(t, render);
     if (!has_view) v = NULL;
     VkFormat fmt = b->format;
-    if (v && (v->setmask & 4) && !(b->aspect & (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT))) {
+    if (v && (v->setmask & SF2C_TEXTURES_N_4_4B22) && !(b->aspect & (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT))) {
         VkFormat vf = fmt_of(v->format).vf;
         if (vk_format(t->format) == b->format && vf != fmt) {  // (fallback images keep their own format)
             if (vk_view_compatible(fmt, vf)) fmt = vf;
             else {
                 static int nlog;
                 if (!nlog++)
-                    LOG("[vk] texture %ux%u fmt %#x (vk %d) can't be viewed as nvn %#x (vk %d): its own format instead "
-                        "(logged once)\n", t->width, t->height, t->format, b->format, v->format, vf);
+                    LOG(SF2C_TEXTURES_S_VK_TEXTURE_UX_U_FMT_X_VK_D_C_A9E3
+                        SF2C_TEXTURES_S_LOGGED_ONCE_N_F045, t->width, t->height, t->format, b->format, v->format, vf);
             }
         }
     }
     uint32_t lv0 = v && (v->setmask & 1) ? v->base_level : 0;
     uint32_t nlv = v && (v->setmask & 1) && v->num_levels ? v->num_levels : b->levels - (lv0 < b->levels ? lv0 : 0);
-    uint32_t ly0 = v && (v->setmask & 2) ? v->min_layer : 0;
-    uint32_t nly = v && (v->setmask & 2) && v->num_layers ? v->num_layers : b->layers - (ly0 < b->layers ? ly0 : 0);
+    uint32_t ly0 = v && (v->setmask & SF2C_TEXTURES_N_2_D473) ? v->min_layer : 0;
+    uint32_t nly = v && (v->setmask & SF2C_TEXTURES_N_2_D473) && v->num_layers ? v->num_layers : b->layers - (ly0 < b->layers ? ly0 : 0);
     if (lv0 >= b->levels) lv0 = b->levels - 1;
     if (lv0 + nlv > b->levels) nlv = b->levels - lv0;
     if (ly0 >= b->layers) ly0 = b->layers - 1;
@@ -1000,15 +1001,15 @@ VkImageView vk_view(NvnTexture *t, const NvnTextureView *v, bool has_view, bool 
     VkImageAspectFlags aspect = b->aspect & VK_IMAGE_ASPECT_DEPTH_BIT ? VK_IMAGE_ASPECT_DEPTH_BIT : b->aspect;
     VkComponentMapping sw = IDENTITY;
     if (!(b->aspect & (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)) && b->samples == 1) {
-        const uint8_t *s = v && (v->setmask & 8) ? v->swizzle : t->swizzle;
-        uint8_t c[4];
-        for (int i = 0; i < 4; i++) c[i] = s[i] <= 5 ? s[i] : (uint8_t)(2 + i);
-        if (c[0] || c[1] || c[2] || c[3]) {  // never set: identity
+        const uint8_t *s = v && (v->setmask & SF2C_TEXTURES_N_8_2C62) ? v->swizzle : t->swizzle;
+        uint8_t c[SF2C_TEXTURES_N_4_4B22];
+        for (int i = 0; i < SF2C_TEXTURES_N_4_4B22; i++) c[i] = s[i] <= SF2C_TEXTURES_N_5_EF2D ? s[i] : (uint8_t)(SF2C_TEXTURES_N_2_D473 + i);
+        if (c[0] || c[1] || c[SF2C_TEXTURES_N_2_D473] || c[SF2C_TEXTURES_N_3_4E07]) {  // never set: identity
             if (fmt_of(t->format).alpha_one)
-                for (int i = 0; i < 4; i++) if (c[i] == 5) c[i] = 1;
+                for (int i = 0; i < SF2C_TEXTURES_N_4_4B22; i++) if (c[i] == SF2C_TEXTURES_N_5_EF2D) c[i] = 1;
             // NVN swizzle 0 zero, 1 one, 2..5 r,g,b,a == VkComponentSwizzle - 1
-            sw = (VkComponentMapping){(VkComponentSwizzle)(c[0] + 1), (VkComponentSwizzle)(c[1] + 1), (VkComponentSwizzle)(c[2] + 1),
-                                      (VkComponentSwizzle)(c[3] + 1)};
+            sw = (VkComponentMapping){(VkComponentSwizzle)(c[0] + 1), (VkComponentSwizzle)(c[1] + 1), (VkComponentSwizzle)(c[SF2C_TEXTURES_N_2_D473] + 1),
+                                      (VkComponentSwizzle)(c[SF2C_TEXTURES_N_3_4E07] + 1)};
         } else if (fmt_of(t->format).alpha_one) {
             sw.a = VK_COMPONENT_SWIZZLE_ONE;
         }
@@ -1017,28 +1018,28 @@ VkImageView vk_view(NvnTexture *t, const NvnTextureView *v, bool has_view, bool 
     VkImageViewType have = b->base_type;
     if (b->samples > 1) return vk_dummy_view(want_textype);  // multisampled images can't be sampled as 2D
     if (want == have) {
-        if (have == VK_IMAGE_VIEW_TYPE_CUBE) nly = 6;
+        if (have == VK_IMAGE_VIEW_TYPE_CUBE) nly = SF2C_TEXTURES_N_6_E7F6;
         return vk_image_view(b, want, fmt, lv0, nlv, ly0, nly, sw, aspect);
     }
     if (want == VK_IMAGE_VIEW_TYPE_2D && (have == VK_IMAGE_VIEW_TYPE_2D_ARRAY || have == VK_IMAGE_VIEW_TYPE_CUBE))
         return vk_image_view(b, want, fmt, lv0, nlv, ly0, 1, sw, aspect);
     if (want == VK_IMAGE_VIEW_TYPE_2D_ARRAY && (have == VK_IMAGE_VIEW_TYPE_2D || have == VK_IMAGE_VIEW_TYPE_CUBE))
         return vk_image_view(b, want, fmt, lv0, nlv, ly0, have == VK_IMAGE_VIEW_TYPE_CUBE ? nly : 1, sw, aspect);
-    if (want == VK_IMAGE_VIEW_TYPE_CUBE && have == VK_IMAGE_VIEW_TYPE_2D_ARRAY && b->layers >= 6 && b->width == b->height)
-        return vk_image_view(b, want, fmt, lv0, nlv, ly0 + 6 <= b->layers ? ly0 : 0, 6, sw, aspect);
+    if (want == VK_IMAGE_VIEW_TYPE_CUBE && have == VK_IMAGE_VIEW_TYPE_2D_ARRAY && b->layers >= SF2C_TEXTURES_N_6_E7F6 && b->width == b->height)
+        return vk_image_view(b, want, fmt, lv0, nlv, ly0 + SF2C_TEXTURES_N_6_E7F6 <= b->layers ? ly0 : 0, SF2C_TEXTURES_N_6_E7F6, sw, aspect);
     if (want == VK_IMAGE_VIEW_TYPE_1D_ARRAY && have == VK_IMAGE_VIEW_TYPE_1D)
         return vk_image_view(b, want, fmt, lv0, nlv, 0, 1, sw, aspect);
     static int nlog;
-    if (nlog++ < 30) LOG("[tex] type mismatch: want %d have %d (%ux%ux%u target %u fmt %#x layers %u)\n", want, have, t->width,
+    if (nlog++ < SF2C_TEXTURES_N_30_624B) LOG(SF2C_TEXTURES_S_TEX_TYPE_MISMATCH_WANT_D_HAV_2766, want, have, t->width,
                          t->height, t->depth, t->target, t->format, b->layers);
     return vk_dummy_view(want_textype);
 }
 
 // 1x1 black textures for unbound slots, per type
 VkImageView vk_dummy_view(int textype) {
-    static TexBackend dummies[10];
-    static VkImageView views[10];
-    if (textype < 0 || textype >= 10) textype = TEXTYPE_2D;
+    static TexBackend dummies[SF2C_TEXTURES_N_10_4A44];
+    static VkImageView views[SF2C_TEXTURES_N_10_4A44];
+    if (textype < 0 || textype >= SF2C_TEXTURES_N_10_4A44) textype = TEXTYPE_2D;
     if (views[textype]) return views[textype];
     TexBackend *b = &dummies[textype];
     VkImageViewType vt = view_type_for(textype);
@@ -1046,7 +1047,7 @@ VkImageView vk_dummy_view(int textype) {
     VkImageCreateInfo ci = {.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO, .flags = cube ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0,
                             .imageType = vt == VK_IMAGE_VIEW_TYPE_3D ? VK_IMAGE_TYPE_3D
                                        : vt == VK_IMAGE_VIEW_TYPE_1D || vt == VK_IMAGE_VIEW_TYPE_1D_ARRAY ? VK_IMAGE_TYPE_1D : VK_IMAGE_TYPE_2D,
-                            .format = VK_FORMAT_R8G8B8A8_UNORM, .extent = {1, 1, 1}, .mipLevels = 1, .arrayLayers = cube ? 6 : 1,
+                            .format = VK_FORMAT_R8G8B8A8_UNORM, .extent = {1, 1, 1}, .mipLevels = 1, .arrayLayers = cube ? SF2C_TEXTURES_N_6_E7F6 : 1,
                             .samples = VK_SAMPLE_COUNT_1_BIT, .tiling = VK_IMAGE_TILING_OPTIMAL,
                             .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT};
     VmaAllocationCreateInfo ai = {.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE};
@@ -1054,12 +1055,12 @@ VkImageView vk_dummy_view(int textype) {
     VkCommandBuffer cb = vk_upload_cmd();
     vk_image_init_layout(cb, b->image, VK_IMAGE_ASPECT_COLOR_BIT);
     VkClearColorValue zero = {{0, 0, 0, 0}};
-    VkImageSubresourceRange all = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, cube ? 6 : 1};
+    VkImageSubresourceRange all = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, cube ? SF2C_TEXTURES_N_6_E7F6 : 1};
     rec_CmdClearColorImage(cb, b->image, VK_IMAGE_LAYOUT_GENERAL, &zero, 1, &all);
     b->format = VK_FORMAT_R8G8B8A8_UNORM;
     b->levels = 1;
-    b->layers = cube ? 6 : 1;
-    views[textype] = vk_image_view(b, vt, b->format, 0, 1, 0, cube ? 6 : 1, IDENTITY, VK_IMAGE_ASPECT_COLOR_BIT);
+    b->layers = cube ? SF2C_TEXTURES_N_6_E7F6 : 1;
+    views[textype] = vk_image_view(b, vt, b->format, 0, 1, 0, cube ? SF2C_TEXTURES_N_6_E7F6 : 1, IDENTITY, VK_IMAGE_ASPECT_COLOR_BIT);
     return views[textype];
 }
 
@@ -1069,15 +1070,15 @@ VkImageView vk_dummy_view(int textype) {
 // map would. D32_SFLOAT where it can be compared, else D16_UNORM. 3D (no shadow form) and 1D (depth 1D images are not
 // required) types keep the colour dummy.
 bool vk_format_depth_compare(VkFormat f) {
-    static VkFormat fs[16];
-    static int8_t ok[16];
+    static VkFormat fs[SF2C_TEXTURES_N_16_B17E];
+    static int8_t ok[SF2C_TEXTURES_N_16_B17E];
     static int n;
     for (int i = 0; i < n; i++) if (fs[i] == f) return ok[i];
     VkFormatProperties3 p3 = {.sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_3};
     VkFormatProperties2 p2 = {.sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2, .pNext = &p3};
     vkGetPhysicalDeviceFormatProperties2(g_vk.phys, f, &p2);
     bool r = (p3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT) != 0;
-    if (n < 16) { fs[n] = f; ok[n++] = r; }
+    if (n < SF2C_TEXTURES_N_16_B17E) { fs[n] = f; ok[n++] = r; }
     return r;
 }
 
@@ -1088,9 +1089,9 @@ bool vk_tex_depth_compare(NvnTexture *t) {
 }
 
 VkImageView vk_dummy_depth_view(int textype) {
-    static TexBackend dummies[10];
-    static VkImageView views[10];
-    if (textype < 0 || textype >= 10) textype = TEXTYPE_2D;
+    static TexBackend dummies[SF2C_TEXTURES_N_10_4A44];
+    static VkImageView views[SF2C_TEXTURES_N_10_4A44];
+    if (textype < 0 || textype >= SF2C_TEXTURES_N_10_4A44) textype = TEXTYPE_2D;
     if (views[textype]) return views[textype];
     VkImageViewType vt = view_type_for(textype);
     if (vt != VK_IMAGE_VIEW_TYPE_2D && vt != VK_IMAGE_VIEW_TYPE_2D_ARRAY && vt != VK_IMAGE_VIEW_TYPE_CUBE &&
@@ -1099,10 +1100,10 @@ VkImageView vk_dummy_depth_view(int textype) {
     static VkFormat df;
     if (!df) {
         df = vk_format_depth_compare(VK_FORMAT_D32_SFLOAT) ? VK_FORMAT_D32_SFLOAT : VK_FORMAT_D16_UNORM;
-        LOG("[vk] shadow slot dummy: 1x1 %s cleared to 1.0\n", df == VK_FORMAT_D32_SFLOAT ? "D32_SFLOAT" : "D16_UNORM");
+        LOG(SF2C_TEXTURES_S_VK_SHADOW_SLOT_DUMMY_1X1_S_C_3133, df == VK_FORMAT_D32_SFLOAT ? SF2C_TEXTURES_S_D32_SFLOAT_AEF4 : SF2C_TEXTURES_S_D16_UNORM_0448);
     }
     bool cube = vt == VK_IMAGE_VIEW_TYPE_CUBE || vt == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
-    uint32_t layers = cube ? 6 : 1;
+    uint32_t layers = cube ? SF2C_TEXTURES_N_6_E7F6 : 1;
     TexBackend *b = &dummies[textype];
     VkImageCreateInfo ci = {.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO, .flags = cube ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0,
                             .imageType = VK_IMAGE_TYPE_2D, .format = df, .extent = {1, 1, 1}, .mipLevels = 1,
@@ -1110,12 +1111,12 @@ VkImageView vk_dummy_depth_view(int textype) {
                             .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT};
     VmaAllocationCreateInfo ai = {.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE};
     if (vmaCreateImage(g_vk.vma, &ci, &ai, &b->image, &b->mem, NULL) != VK_SUCCESS) {
-        LOG("[vk] shadow slot dummy: depth image creation failed, the colour dummy instead\n");
+        LOG(SF2C_TEXTURES_S_VK_SHADOW_SLOT_DUMMY_DEPTH_I_CDAA);
         return views[textype] = vk_dummy_view(textype);
     }
     VkCommandBuffer cb = vk_upload_cmd();
     vk_image_init_layout(cb, b->image, VK_IMAGE_ASPECT_DEPTH_BIT);
-    VkClearDepthStencilValue one = {1.0f, 0};
+    VkClearDepthStencilValue one = {SF2C_TEXTURES_N_1_0F_CA71, 0};
     VkImageSubresourceRange all = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, layers};
     rec_CmdClearDepthStencilImage(cb, b->image, VK_IMAGE_LAYOUT_GENERAL, &one, 1, &all);
     VkMemoryBarrier2 mb = {.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2, .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
@@ -1140,9 +1141,9 @@ VkImageView vk_dummy_depth_view(int textype) {
 // evicted from that table and destroyed under us). Called by the translating thread only (the render thread, or the
 // game's GPU thread with LARECOMP_RENDER_THREAD=0), as vk_dummy_view and the view table are.
 VkImageView vk_dummy_color_view(uint32_t w, uint32_t h, uint32_t samples) {
-    static TexBackend imgs[5];  // samples 1, 2, 4, 8, 16
+    static TexBackend imgs[SF2C_TEXTURES_N_5_EF2D];  // samples 1, 2, 4, 8, 16
     int k = 0;
-    while (k < 4 && (1u << k) < samples) k++;
+    while (k < SF2C_TEXTURES_N_4_4B22 && (SF2C_TEXTURES_N_1U_B8E6 << k) < samples) k++;
     TexBackend *b = &imgs[k];
     if (!b->image || b->width < w || b->height < h || b->samples != samples) {
         if (b->width > w) w = b->width;
@@ -1160,7 +1161,7 @@ VkImageView vk_dummy_color_view(uint32_t w, uint32_t h, uint32_t samples) {
         *b = (TexBackend){.image = img, .mem = mem, .format = VK_FORMAT_R8_UNORM, .base_type = VK_IMAGE_VIEW_TYPE_2D,
                           .width = w, .height = h, .depth = 1, .layers = 1, .levels = 1, .samples = samples,
                           .aspect = VK_IMAGE_ASPECT_COLOR_BIT, .gpu_owned = true};
-        LOG("[vk] placeholder color attachment %ux%u (samples %u) for passes without one\n", w, h, samples);
+        LOG(SF2C_TEXTURES_S_VK_PLACEHOLDER_COLOR_ATTACHM_6194, w, h, samples);
     }
     return vk_image_view(b, VK_IMAGE_VIEW_TYPE_2D, b->format, 0, 1, 0, 1, IDENTITY, VK_IMAGE_ASPECT_COLOR_BIT);
 }
@@ -1169,12 +1170,12 @@ VkImageView vk_dummy_color_view(uint32_t w, uint32_t h, uint32_t samples) {
 static VkCompareOp compare_op(uint32_t f) {
     switch (f) {
     case 1: return VK_COMPARE_OP_NEVER;
-    case 2: return VK_COMPARE_OP_LESS;
-    case 3: return VK_COMPARE_OP_EQUAL;
-    case 4: return VK_COMPARE_OP_LESS_OR_EQUAL;
-    case 5: return VK_COMPARE_OP_GREATER;
-    case 6: return VK_COMPARE_OP_NOT_EQUAL;
-    case 7: return VK_COMPARE_OP_GREATER_OR_EQUAL;
+    case SF2C_TEXTURES_N_2_D473: return VK_COMPARE_OP_LESS;
+    case SF2C_TEXTURES_N_3_4E07: return VK_COMPARE_OP_EQUAL;
+    case SF2C_TEXTURES_N_4_4B22: return VK_COMPARE_OP_LESS_OR_EQUAL;
+    case SF2C_TEXTURES_N_5_EF2D: return VK_COMPARE_OP_GREATER;
+    case SF2C_TEXTURES_N_6_E7F6: return VK_COMPARE_OP_NOT_EQUAL;
+    case SF2C_TEXTURES_N_7_7902: return VK_COMPARE_OP_GREATER_OR_EQUAL;
     default: return VK_COMPARE_OP_ALWAYS;
     }
 }
@@ -1184,45 +1185,45 @@ VkSampler vk_sampler(NvnSamplerDesc *d) {
     VkSamplerCreateInfo si = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
     si.magFilter = d->mag_filter == 1 ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
     uint32_t mf = d->min_filter;
-    si.minFilter = (mf == 1 || mf == 3 || mf == 5) ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
-    si.mipmapMode = mf == 4 || mf == 5 ? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST;
-    VkSamplerAddressMode modes[3];
+    si.minFilter = (mf == 1 || mf == SF2C_TEXTURES_N_3_4E07 || mf == SF2C_TEXTURES_N_5_EF2D) ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
+    si.mipmapMode = mf == SF2C_TEXTURES_N_4_4B22 || mf == SF2C_TEXTURES_N_5_EF2D ? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST;
+    VkSamplerAddressMode modes[SF2C_TEXTURES_N_3_4E07];
     bool border = false;
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < SF2C_TEXTURES_N_3_4E07; i++) {
         switch (d->wrap[i]) {
-        case 0: case 7: modes[i] = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE; break;
+        case 0: case SF2C_TEXTURES_N_7_7902: modes[i] = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE; break;
         case 1: modes[i] = VK_SAMPLER_ADDRESS_MODE_REPEAT; break;
-        case 2: case 3: modes[i] = VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE; break;
-        case 4: case 5: modes[i] = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER; border = true; break;
-        case 6: modes[i] = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT; break;
+        case SF2C_TEXTURES_N_2_D473: case SF2C_TEXTURES_N_3_4E07: modes[i] = VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE; break;
+        case SF2C_TEXTURES_N_4_4B22: case SF2C_TEXTURES_N_5_EF2D: modes[i] = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER; border = true; break;
+        case SF2C_TEXTURES_N_6_E7F6: modes[i] = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT; break;
         default: modes[i] = VK_SAMPLER_ADDRESS_MODE_REPEAT;
         }
     }
-    si.addressModeU = modes[0]; si.addressModeV = modes[1]; si.addressModeW = modes[2];
+    si.addressModeU = modes[0]; si.addressModeV = modes[1]; si.addressModeW = modes[SF2C_TEXTURES_N_2_D473];
     si.minLod = d->lod_min;
-    si.maxLod = d->lod_max > 1000 ? VK_LOD_CLAMP_NONE : d->lod_max;
-    if (mf <= 1) si.maxLod = si.minLod + 0.25f;  // not mipmapped: stay on the base level
+    si.maxLod = d->lod_max > SF2C_TEXTURES_N_1000_4051 ? VK_LOD_CLAMP_NONE : d->lod_max;
+    if (mf <= 1) si.maxLod = si.minLod + SF2C_TEXTURES_N_0_25F_17C9;  // not mipmapped: stay on the base level
     if (si.maxLod < si.minLod) si.maxLod = si.minLod;
     si.mipLodBias = d->lod_bias;
-    if (d->max_aniso > 1) { si.anisotropyEnable = VK_TRUE; si.maxAnisotropy = fminf(d->max_aniso, 16); }
+    if (d->max_aniso > 1) { si.anisotropyEnable = VK_TRUE; si.maxAnisotropy = fminf(d->max_aniso, SF2C_TEXTURES_N_16_B17E); }
     static float lodmin = -1;
-    if (lodmin < 0) lodmin = getenv("LARECOMP_LOD_MIN") ? (float)atof(getenv("LARECOMP_LOD_MIN")) : 0;
+    if (lodmin < 0) lodmin = getenv(SF2C_TEXTURES_S_LARECOMP_LOD_MIN_4349) ? (float)atof(getenv(SF2C_TEXTURES_S_LARECOMP_LOD_MIN_4349)) : 0;
     if (lodmin > 0 && mf > 1) si.minLod = fmaxf(si.minLod, lodmin);
     static int stest = -1;
-    if (stest < 0) stest = getenv("LARECOMP_SAMPLER_TEST") != NULL;
-    if (stest && mf > 1) { si.minLod = 0; si.maxLod = VK_LOD_CLAMP_NONE; si.anisotropyEnable = VK_TRUE; si.maxAnisotropy = 16; }
+    if (stest < 0) stest = getenv(SF2C_TEXTURES_S_LARECOMP_SAMPLER_TEST_F5E0) != NULL;
+    if (stest && mf > 1) { si.minLod = 0; si.maxLod = VK_LOD_CLAMP_NONE; si.anisotropyEnable = VK_TRUE; si.maxAnisotropy = SF2C_TEXTURES_N_16_B17E; }
     if (d->compare_mode) {
         si.compareEnable = VK_TRUE;
-        si.compareOp = getenv("LARECOMP_NO_SHADOW") ? VK_COMPARE_OP_ALWAYS : compare_op(d->compare_func);
+        si.compareOp = getenv(SF2C_TEXTURES_S_LARECOMP_NO_SHADOW_1863) ? VK_COMPARE_OP_ALWAYS : compare_op(d->compare_func);
     }
     VkSamplerCustomBorderColorCreateInfoEXT cb = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CUSTOM_BORDER_COLOR_CREATE_INFO_EXT};
     if (border) {
         const float *c = d->border;
-        if (c[0] == 0 && c[1] == 0 && c[2] == 0 && c[3] == 0) si.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
-        else if (c[0] == 0 && c[1] == 0 && c[2] == 0 && c[3] == 1) si.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
-        else if (c[0] == 1 && c[1] == 1 && c[2] == 1 && c[3] == 1) si.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+        if (c[0] == 0 && c[1] == 0 && c[SF2C_TEXTURES_N_2_D473] == 0 && c[SF2C_TEXTURES_N_3_4E07] == 0) si.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
+        else if (c[0] == 0 && c[1] == 0 && c[SF2C_TEXTURES_N_2_D473] == 0 && c[SF2C_TEXTURES_N_3_4E07] == 1) si.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
+        else if (c[0] == 1 && c[1] == 1 && c[SF2C_TEXTURES_N_2_D473] == 1 && c[SF2C_TEXTURES_N_3_4E07] == 1) si.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
         else if (g_vk.custom_border) {
-            memcpy(cb.customBorderColor.float32, c, 16);
+            memcpy(cb.customBorderColor.float32, c, SF2C_TEXTURES_N_16_B17E);
             si.borderColor = VK_BORDER_COLOR_FLOAT_CUSTOM_EXT;
             si.pNext = &cb;
         } else si.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
@@ -1234,14 +1235,14 @@ VkSampler vk_sampler(NvnSamplerDesc *d) {
 }
 
 VkSampler vk_default_sampler(bool linear) {
-    static VkSampler s[2];
+    static VkSampler s[SF2C_TEXTURES_N_2_D473];
     if (!s[linear]) {
         VkSamplerCreateInfo si = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
                                   .magFilter = linear ? VK_FILTER_LINEAR : VK_FILTER_NEAREST,
                                   .minFilter = linear ? VK_FILTER_LINEAR : VK_FILTER_NEAREST,
                                   .addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
                                   .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                                  .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, .maxLod = 0.25f};
+                                  .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, .maxLod = SF2C_TEXTURES_N_0_25F_17C9};
         VK_CHECK(vkCreateSampler(g_vk.dev, &si, NULL, &s[linear]));
     }
     return s[linear];

@@ -1,3 +1,4 @@
+#include "../constants/nvn.h"
 // ASTC LDR decoder (2D blocks) to RGBA8, for GPUs without native ASTC (desktop NVIDIA / AMD).
 // Bit-exact with ARM astcenc's 8-bit (decode_unorm8) decode, -dl (srgb = false) / -ds (srgb = true).
 #pragma once
@@ -12,4 +13,4 @@ void astc_decode_ldr(const uint8_t *blocks, uint32_t width, uint32_t height, uin
                      bool srgb, uint8_t *rgba_out);
 
 // One block -> bw*bh*4 bytes (rows of bw texels). Returns false for an error block (output magenta).
-bool astc_decode_block(const uint8_t block[16], uint32_t bw, uint32_t bh, bool srgb, uint8_t *rgba_out);
+bool astc_decode_block(const uint8_t block[SF2C_ASTC_N_16_B17E], uint32_t bw, uint32_t bh, bool srgb, uint8_t *rgba_out);

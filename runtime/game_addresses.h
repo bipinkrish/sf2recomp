@@ -1,3 +1,4 @@
+#include "constants/core.h"
 // Supported SF2 source versions, selected by the original NSO build ID.
 #pragma once
 #include <stdbool.h>
@@ -5,10 +6,10 @@
 #include <stdint.h>
 
 #ifdef __cplusplus
-extern "C" {
+extern SF2C_GAME_ADDRESSES_S_C_C2E8 {
 #endif
 
-#define SF2_BUILD_ID_LEN 16  // the main program's build ID bytes (NSO0 header: a 32-byte field, zero-padded)
+#define SF2_BUILD_ID_LEN SF2C_GAME_ADDRESSES_N_16_B17E  // the main program's build ID bytes (NSO0 header: a 32-byte field, zero-padded)
 
 typedef struct GameVersion {
     const char *key;       // "update_v131072": the tables' suffix

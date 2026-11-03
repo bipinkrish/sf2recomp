@@ -1,3 +1,4 @@
+#include "../constants/hle.h"
 // Control remapping: input.c reads these tables on each event. sf2recomp.ini
 // supplies runtime mappings; capture helpers also support development input tests.
 #include <SDL3/SDL.h>
@@ -8,7 +9,7 @@
 #include "../hle.h"
 #include "../input_bind.h"
 
-_Static_assert(PADB_LTRIGGER == SDL_GAMEPAD_BUTTON_COUNT, "trigger pseudo-buttons follow SDL's buttons");
+_Static_assert(PADB_LTRIGGER == SDL_GAMEPAD_BUTTON_COUNT, SF2C_BINDINGS_S_TRIGGER_PSEUDO_BUTTONS_FOLLO_ADF1);
 
 // Defaults: Nintendo layout by position (east = A, south = B, north = X, west = Y), triggers = ZL / ZR;
 // keyboard WASD left stick, arrows d-pad, K/J/L/I = A/B/X/Y, Q/E = L/R, 1/3 = ZL/ZR, Tab / Backspace = Plus /
@@ -28,19 +29,19 @@ static const int16_t k_def_pad[BIND_PAD_COUNT] = DEF_PAD, k_def_key[BIND_KEY_COU
 int16_t g_bind_pad[BIND_PAD_COUNT] = DEF_PAD, g_bind_key[BIND_KEY_COUNT] = DEF_KEY;
 
 static const char *const k_ini[BIND_KEY_COUNT] = {
-    "a", "b", "x", "y", "lstick", "rstick", "l", "r", "zl", "zr", "plus", "minus", "left", "up", "right", "down",
-    "ls_up", "ls_down", "ls_left", "ls_right", "rs_up", "rs_down", "rs_left", "rs_right",
+    SF2C_BINDINGS_S_A_AC8D, SF2C_BINDINGS_S_B_C100, SF2C_BINDINGS_S_X_BA2D, SF2C_BINDINGS_S_Y_2BC9, SF2C_BINDINGS_S_LSTICK_A71F, SF2C_BINDINGS_S_RSTICK_4923, SF2C_BINDINGS_S_L_FBDC, SF2C_BINDINGS_S_R_2659, SF2C_BINDINGS_S_ZL_9A51, SF2C_BINDINGS_S_ZR_7019, SF2C_BINDINGS_S_PLUS_B917, SF2C_BINDINGS_S_MINUS_865A, SF2C_BINDINGS_S_LEFT_6157, SF2C_BINDINGS_S_UP_5CC8, SF2C_BINDINGS_S_RIGHT_187E, SF2C_BINDINGS_S_DOWN_DE3A,
+    SF2C_BINDINGS_S_LS_UP_8A3E, SF2C_BINDINGS_S_LS_DOWN_F43B, SF2C_BINDINGS_S_LS_LEFT_B24F, SF2C_BINDINGS_S_LS_RIGHT_44E9, SF2C_BINDINGS_S_RS_UP_8DF0, SF2C_BINDINGS_S_RS_DOWN_FE12, SF2C_BINDINGS_S_RS_LEFT_C308, SF2C_BINDINGS_S_RS_RIGHT_77BB,
 };
 static const char *const k_names[BIND_KEY_COUNT] = {
-    "A", "B", "X", "Y", "Left stick press", "Right stick press", "L", "R", "ZL", "ZR", "Plus", "Minus",
-    "D-pad Left", "D-pad Up", "D-pad Right", "D-pad Down", "Left stick Up", "Left stick Down", "Left stick Left",
-    "Left stick Right", "Right stick Up", "Right stick Down", "Right stick Left", "Right stick Right",
+    SF2C_BINDINGS_S_A_7986, SF2C_BINDINGS_S_B_955C, SF2C_BINDINGS_S_X_DE9E, SF2C_BINDINGS_S_Y_DB5B, SF2C_BINDINGS_S_LEFT_STICK_PRESS_C8C0, SF2C_BINDINGS_S_RIGHT_STICK_PRESS_3B03, SF2C_BINDINGS_S_L_8463, SF2C_BINDINGS_S_R_D742, SF2C_BINDINGS_S_ZL_38D1, SF2C_BINDINGS_S_ZR_5317, SF2C_BINDINGS_S_PLUS_8DFC, SF2C_BINDINGS_S_MINUS_CBF2,
+    SF2C_BINDINGS_S_D_PAD_LEFT_D0BE, SF2C_BINDINGS_S_D_PAD_UP_798B, SF2C_BINDINGS_S_D_PAD_RIGHT_A5E9, SF2C_BINDINGS_S_D_PAD_DOWN_5A0F, SF2C_BINDINGS_S_LEFT_STICK_UP_BA8C, SF2C_BINDINGS_S_LEFT_STICK_DOWN_1E80, SF2C_BINDINGS_S_LEFT_STICK_LEFT_32E1,
+    SF2C_BINDINGS_S_LEFT_STICK_RIGHT_196F, SF2C_BINDINGS_S_RIGHT_STICK_UP_EDE6, SF2C_BINDINGS_S_RIGHT_STICK_DOWN_6080, SF2C_BINDINGS_S_RIGHT_STICK_LEFT_CD66, SF2C_BINDINGS_S_RIGHT_STICK_RIGHT_DB11,
 };
 // Controller buttons by position, independent of printed Xbox/PS/Nintendo labels.
 static const char *const k_pad_ini[PADB_HOST_COUNT] = {
-    "south", "east", "west", "north", "back", "guide", "start", "lstick", "rstick", "lshoulder", "rshoulder",
-    "dpad_up", "dpad_down", "dpad_left", "dpad_right", "misc1", "rpaddle1", "lpaddle1", "rpaddle2", "lpaddle2",
-    "touchpad", "misc2", "misc3", "misc4", "misc5", "misc6", "ltrigger", "rtrigger",
+    SF2C_BINDINGS_S_SOUTH_C449, SF2C_BINDINGS_S_EAST_46E1, SF2C_BINDINGS_S_WEST_8814, SF2C_BINDINGS_S_NORTH_3717, SF2C_BINDINGS_S_BACK_D249, SF2C_BINDINGS_S_GUIDE_35B2, SF2C_BINDINGS_S_START_A92A, SF2C_BINDINGS_S_LSTICK_A71F, SF2C_BINDINGS_S_RSTICK_4923, SF2C_BINDINGS_S_LSHOULDER_F9C9, SF2C_BINDINGS_S_RSHOULDER_2453,
+    SF2C_BINDINGS_S_DPAD_UP_D3AA, SF2C_BINDINGS_S_DPAD_DOWN_1910, SF2C_BINDINGS_S_DPAD_LEFT_2631, SF2C_BINDINGS_S_DPAD_RIGHT_2EB8, SF2C_BINDINGS_S_MISC1_5037, SF2C_BINDINGS_S_RPADDLE1_5375, SF2C_BINDINGS_S_LPADDLE1_C21F, SF2C_BINDINGS_S_RPADDLE2_DAB5, SF2C_BINDINGS_S_LPADDLE2_F932,
+    SF2C_BINDINGS_S_TOUCHPAD_7CAC, SF2C_BINDINGS_S_MISC2_986F, SF2C_BINDINGS_S_MISC3_BD50, SF2C_BINDINGS_S_MISC4_0059, SF2C_BINDINGS_S_MISC5_D565, SF2C_BINDINGS_S_MISC6_E745, SF2C_BINDINGS_S_LTRIGGER_11BD, SF2C_BINDINGS_S_RTRIGGER_CD5B,
 };
 
 bool bind_key_unassigned(int scancode) {
@@ -65,33 +66,33 @@ int bind_pad_from_name(const char *name) {
     return -1;
 }
 
-const char *bind_input_name(int slot) { return slot >= 0 && slot < BIND_KEY_COUNT ? k_names[slot] : "?"; }
+const char *bind_input_name(int slot) { return slot >= 0 && slot < BIND_KEY_COUNT ? k_names[slot] : SF2C_BINDINGS_S_EMPTY_15C5; }
 
 // fam: 0 Nintendo, 1 Xbox (and pads SDL labels like one), 2 PlayStation
 const char *bind_pad_label(int host, int fam) {
     static const char *const nin[PADB_HOST_COUNT] = {
-        "B", "A", "Y", "X", "Minus", "Home", "Plus", "Left stick press", "Right stick press", "L", "R",
-        "D-pad Up", "D-pad Down", "D-pad Left", "D-pad Right", "Capture", "Right paddle 1", "Left paddle 1",
-        "Right paddle 2", "Left paddle 2", "Touchpad", "Misc 2", "Misc 3", "Misc 4", "Misc 5", "Misc 6", "ZL", "ZR",
+        SF2C_BINDINGS_S_B_955C, SF2C_BINDINGS_S_A_7986, SF2C_BINDINGS_S_Y_DB5B, SF2C_BINDINGS_S_X_DE9E, SF2C_BINDINGS_S_MINUS_CBF2, SF2C_BINDINGS_S_HOME_D218, SF2C_BINDINGS_S_PLUS_8DFC, SF2C_BINDINGS_S_LEFT_STICK_PRESS_C8C0, SF2C_BINDINGS_S_RIGHT_STICK_PRESS_3B03, SF2C_BINDINGS_S_L_8463, SF2C_BINDINGS_S_R_D742,
+        SF2C_BINDINGS_S_D_PAD_UP_798B, SF2C_BINDINGS_S_D_PAD_DOWN_5A0F, SF2C_BINDINGS_S_D_PAD_LEFT_D0BE, SF2C_BINDINGS_S_D_PAD_RIGHT_A5E9, SF2C_BINDINGS_S_CAPTURE_3A07, SF2C_BINDINGS_S_RIGHT_PADDLE_1_B703, SF2C_BINDINGS_S_LEFT_PADDLE_1_91D3,
+        SF2C_BINDINGS_S_RIGHT_PADDLE_2_CAD1, SF2C_BINDINGS_S_LEFT_PADDLE_2_9C62, SF2C_BINDINGS_S_TOUCHPAD_9884, SF2C_BINDINGS_S_MISC_2_D09B, SF2C_BINDINGS_S_MISC_3_AC6B, SF2C_BINDINGS_S_MISC_4_844D, SF2C_BINDINGS_S_MISC_5_65E8, SF2C_BINDINGS_S_MISC_6_57DB, SF2C_BINDINGS_S_ZL_38D1, SF2C_BINDINGS_S_ZR_5317,
     };
     static const char *const xb[PADB_HOST_COUNT] = {
-        "A", "B", "X", "Y", "View", "Xbox", "Menu", "LS (press)", "RS (press)", "LB", "RB",
-        "D-pad Up", "D-pad Down", "D-pad Left", "D-pad Right", "Share", "Paddle P1", "Paddle P3",
-        "Paddle P2", "Paddle P4", "Touchpad", "Misc 2", "Misc 3", "Misc 4", "Misc 5", "Misc 6", "LT", "RT",
+        SF2C_BINDINGS_S_A_7986, SF2C_BINDINGS_S_B_955C, SF2C_BINDINGS_S_X_DE9E, SF2C_BINDINGS_S_Y_DB5B, SF2C_BINDINGS_S_VIEW_A5A2, SF2C_BINDINGS_S_XBOX_B4A3, SF2C_BINDINGS_S_MENU_1340, SF2C_BINDINGS_S_LS_PRESS_75C1, SF2C_BINDINGS_S_RS_PRESS_1400, SF2C_BINDINGS_S_LB_804C, SF2C_BINDINGS_S_RB_08C0,
+        SF2C_BINDINGS_S_D_PAD_UP_798B, SF2C_BINDINGS_S_D_PAD_DOWN_5A0F, SF2C_BINDINGS_S_D_PAD_LEFT_D0BE, SF2C_BINDINGS_S_D_PAD_RIGHT_A5E9, SF2C_BINDINGS_S_SHARE_331E, SF2C_BINDINGS_S_PADDLE_P1_BB3C, SF2C_BINDINGS_S_PADDLE_P3_F7BF,
+        SF2C_BINDINGS_S_PADDLE_P2_28EF, SF2C_BINDINGS_S_PADDLE_P4_03A2, SF2C_BINDINGS_S_TOUCHPAD_9884, SF2C_BINDINGS_S_MISC_2_D09B, SF2C_BINDINGS_S_MISC_3_AC6B, SF2C_BINDINGS_S_MISC_4_844D, SF2C_BINDINGS_S_MISC_5_65E8, SF2C_BINDINGS_S_MISC_6_57DB, SF2C_BINDINGS_S_LT_FB61, SF2C_BINDINGS_S_RT_9749,
     };
     static const char *const ps[PADB_HOST_COUNT] = {
-        "Cross", "Circle", "Square", "Triangle", "Create", "PS", "Options", "L3", "R3", "L1", "R1",
-        "D-pad Up", "D-pad Down", "D-pad Left", "D-pad Right", "Mute", "Right back button", "Left back button",
-        "Right Fn", "Left Fn", "Touchpad", "Misc 2", "Misc 3", "Misc 4", "Misc 5", "Misc 6", "L2", "R2",
+        SF2C_BINDINGS_S_CROSS_D500, SF2C_BINDINGS_S_CIRCLE_207A, SF2C_BINDINGS_S_SQUARE_3928, SF2C_BINDINGS_S_TRIANGLE_2662, SF2C_BINDINGS_S_CREATE_88F0, SF2C_BINDINGS_S_PS_AA12, SF2C_BINDINGS_S_OPTIONS_0AC7, SF2C_BINDINGS_S_L3_465D, SF2C_BINDINGS_S_R3_A86F, SF2C_BINDINGS_S_L1_56A4, SF2C_BINDINGS_S_R1_5521,
+        SF2C_BINDINGS_S_D_PAD_UP_798B, SF2C_BINDINGS_S_D_PAD_DOWN_5A0F, SF2C_BINDINGS_S_D_PAD_LEFT_D0BE, SF2C_BINDINGS_S_D_PAD_RIGHT_A5E9, SF2C_BINDINGS_S_MUTE_88DB, SF2C_BINDINGS_S_RIGHT_BACK_BUTTON_78B4, SF2C_BINDINGS_S_LEFT_BACK_BUTTON_8B49,
+        SF2C_BINDINGS_S_RIGHT_FN_532C, SF2C_BINDINGS_S_LEFT_FN_00AF, SF2C_BINDINGS_S_TOUCHPAD_9884, SF2C_BINDINGS_S_MISC_2_D09B, SF2C_BINDINGS_S_MISC_3_AC6B, SF2C_BINDINGS_S_MISC_4_844D, SF2C_BINDINGS_S_MISC_5_65E8, SF2C_BINDINGS_S_MISC_6_57DB, SF2C_BINDINGS_S_L2_C79E, SF2C_BINDINGS_S_R2_85BD,
     };
-    if (host < 0 || host >= PADB_HOST_COUNT) return "(none)";
-    return fam == 1 ? xb[host] : fam == 2 ? ps[host] : nin[host];
+    if (host < 0 || host >= PADB_HOST_COUNT) return SF2C_BINDINGS_S_NONE_A64B;
+    return fam == 1 ? xb[host] : fam == SF2C_BINDINGS_N_2_D473 ? ps[host] : nin[host];
 }
 
 const char *bind_key_label(int sc) {
-    if (sc <= 0 || sc >= SDL_SCANCODE_COUNT) return "(none)";
+    if (sc <= 0 || sc >= SDL_SCANCODE_COUNT) return SF2C_BINDINGS_S_NONE_A64B;
     const char *n = SDL_GetScancodeName((SDL_Scancode)sc);
-    return n && *n ? n : "(unnamed key)";
+    return n && *n ? n : SF2C_BINDINGS_S_UNNAMED_KEY_4EB5;
 }
 
 int bind_label_family(void) {
@@ -111,8 +112,8 @@ static void result(int kind, int dev, int slot, int other);
 void bind_reset(int dev) {
     if (dev == BIND_DEV_PAD) memcpy(g_bind_pad, k_def_pad, sizeof g_bind_pad);
     else memcpy(g_bind_key, k_def_key, sizeof g_bind_key);
-    LOG("[input] %s bindings reset to the defaults\n", dev == BIND_DEV_PAD ? "controller" : "keyboard");
-    result(5, dev, -1, -1);
+    LOG(SF2C_BINDINGS_S_INPUT_S_BINDINGS_RESET_TO_TH_1D7A, dev == BIND_DEV_PAD ? SF2C_BINDINGS_S_CONTROLLER_E1A8 : SF2C_BINDINGS_S_KEYBOARD_FBA3);
+    result(SF2C_BINDINGS_N_5_EF2D, dev, -1, -1);
 }
 
 bool bind_is_default(int dev) {
@@ -144,13 +145,13 @@ void bind_capture_begin(int dev, int slot) {
 
 void bind_capture_cancel(void) {
     if (cap_dev < 0) return;
-    result(3, cap_dev, cap_slot, -1);
+    result(SF2C_BINDINGS_N_3_4E07, cap_dev, cap_slot, -1);
     cap_dev = -1;
 }
 
 bool bind_capture_active(int *dev, int *slot, int *ms_left) {
     int d = cap_dev;
-    if (d >= 0 && SDL_GetTicks() >= cap_deadline) { result(4, d, cap_slot, -1); cap_dev = d = -1; }
+    if (d >= 0 && SDL_GetTicks() >= cap_deadline) { result(SF2C_BINDINGS_N_4_4B22, d, cap_slot, -1); cap_dev = d = -1; }
     if (dev) *dev = d;
     if (slot) *slot = d >= 0 ? cap_slot : -1;
     if (ms_left) *ms_left = d >= 0 ? (int)(cap_deadline - SDL_GetTicks()) : 0;
@@ -172,11 +173,11 @@ static void assign(int dev, int slot, int host) {
     for (int i = 0; i < n; i++)
         if (i != slot && t[i] == host) { other = i; t[i] = t[slot]; }
     t[slot] = (int16_t)host;
-    LOG("[input] %s %s -> %s%s%s%s\n", dev == BIND_DEV_PAD ? "controller" : "keyboard", k_names[slot],
-        dev == BIND_DEV_PAD ? k_pad_ini[host] : bind_key_label(host), other >= 0 ? " (swapped with " : "",
-        other >= 0 ? k_names[other] : "", other >= 0 ? ")" : "");
-    if (other >= 0) LOG("[input]   %s -> %s\n", k_names[other], dev == BIND_DEV_PAD ? k_pad_ini[t[other]] : bind_key_label(t[other]));
-    result(other >= 0 ? 2 : 1, dev, slot, other);
+    LOG(SF2C_BINDINGS_S_INPUT_S_S_S_S_S_S_N_DB89, dev == BIND_DEV_PAD ? SF2C_BINDINGS_S_CONTROLLER_E1A8 : SF2C_BINDINGS_S_KEYBOARD_FBA3, k_names[slot],
+        dev == BIND_DEV_PAD ? k_pad_ini[host] : bind_key_label(host), other >= 0 ? SF2C_BINDINGS_S_SWAPPED_WITH_0960 : SF2C_BINDINGS_S_EMPTY_12AE,
+        other >= 0 ? k_names[other] : SF2C_BINDINGS_S_EMPTY_12AE, other >= 0 ? SF2C_BINDINGS_S_EMPTY_C921 : SF2C_BINDINGS_S_EMPTY_12AE);
+    if (other >= 0) LOG(SF2C_BINDINGS_S_INPUT_S_S_N_F4E3, k_names[other], dev == BIND_DEV_PAD ? k_pad_ini[t[other]] : bind_key_label(t[other]));
+    result(other >= 0 ? SF2C_BINDINGS_N_2_D473 : 1, dev, slot, other);
 }
 
 bool bind_capture_event(const SDL_Event *e) {
@@ -203,7 +204,7 @@ bool bind_capture_event(const SDL_Event *e) {
     case SDL_EVENT_GAMEPAD_BUTTON_UP:
         return true;
     case SDL_EVENT_GAMEPAD_AXIS_MOTION:
-        if (dev == BIND_DEV_PAD && e->gaxis.value > 16000 &&
+        if (dev == BIND_DEV_PAD && e->gaxis.value > SF2C_BINDINGS_N_16000_2570 &&
             (e->gaxis.axis == SDL_GAMEPAD_AXIS_LEFT_TRIGGER || e->gaxis.axis == SDL_GAMEPAD_AXIS_RIGHT_TRIGGER)) {
             cap_dev = -1;
             assign(dev, cap_slot, e->gaxis.axis == SDL_GAMEPAD_AXIS_LEFT_TRIGGER ? PADB_LTRIGGER : PADB_RTRIGGER);
@@ -220,7 +221,7 @@ BindConfigResult bind_config_set(int dev, const char *action, const char *value)
     int slot = bind_slot_from_name(action);
     bool pad = dev == BIND_DEV_PAD;
     if (slot < 0 || slot >= (pad ? BIND_PAD_COUNT : BIND_KEY_COUNT)) return BIND_CONFIG_UNKNOWN;
-    if (!strcasecmp(value, "none")) {
+    if (!strcasecmp(value, SF2C_BINDINGS_S_NONE_30A0)) {
         if (pad) g_bind_pad[slot] = -1;
         else g_bind_key[slot] = SDL_SCANCODE_UNKNOWN;
         return BIND_CONFIG_APPLIED;
@@ -235,12 +236,12 @@ BindConfigResult bind_config_set(int dev, const char *action, const char *value)
 }
 
 void bind_config_save(FILE *f) {
-    fprintf(f, "\n[controls.gamepad]\n");
+    fprintf(f, SF2C_BINDINGS_S_N_CONTROLS_GAMEPAD_N_B389);
     for (int i = 0; i < BIND_PAD_COUNT; i++)
         if (g_bind_pad[i] != k_def_pad[i])
-            fprintf(f, "%s = %s\n", k_ini[i], g_bind_pad[i] >= 0 && g_bind_pad[i] < PADB_HOST_COUNT ? k_pad_ini[g_bind_pad[i]] : "none");
-    fprintf(f, "\n[controls.keyboard]\n");
+            fprintf(f, SF2C_BINDINGS_S_S_S_N_C2E5, k_ini[i], g_bind_pad[i] >= 0 && g_bind_pad[i] < PADB_HOST_COUNT ? k_pad_ini[g_bind_pad[i]] : SF2C_BINDINGS_S_NONE_30A0);
+    fprintf(f, SF2C_BINDINGS_S_N_CONTROLS_KEYBOARD_N_5ABB);
     for (int i = 0; i < BIND_KEY_COUNT; i++)
         if (g_bind_key[i] != k_def_key[i])
-            fprintf(f, "%s = \"%s\"\n", k_ini[i], g_bind_key[i] ? SDL_GetScancodeName((SDL_Scancode)g_bind_key[i]) : "none");
+            fprintf(f, SF2C_BINDINGS_S_S_S_N_A1C0, k_ini[i], g_bind_key[i] ? SDL_GetScancodeName((SDL_Scancode)g_bind_key[i]) : SF2C_BINDINGS_S_NONE_30A0);
 }

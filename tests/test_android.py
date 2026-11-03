@@ -44,7 +44,7 @@ public class StorageTest {
             harness=root/"StorageTest.java"
             harness.write_text(source)
             implementation=ROOT/"android/app/src/main/java/org/sf2recomp/app/GameStorage.java"
-            subprocess.run(["javac","-d",str(root),str(implementation),str(harness)],check=True)
+            subprocess.run(["javac","-d",str(root),str(implementation.parent/"GameConstants.java"),str(implementation),str(harness)],check=True)
             subprocess.run(["java","-ea","-cp",str(root),"org.sf2recomp.app.StorageTest",str(root/"data")],check=True)
 
     def test_bundled_game_installs_once_and_rejects_invalid_replacements(self):
@@ -101,7 +101,7 @@ public class GameBundleTest {
             harness = directory / "GameBundleTest.java"
             harness.write_text(source)
             implementation = ROOT / "android/app/src/main/java/org/sf2recomp/app"
-            subprocess.run(["javac", "-d", str(directory), str(implementation / "GameImport.java"),
+            subprocess.run(["javac", "-d", str(directory), str(implementation / "GameConstants.java"), str(implementation / "GameImport.java"),
                             str(implementation / "GameBundle.java"), str(harness)], check=True)
             subprocess.run(["java", "-ea", "-cp", str(directory), "org.sf2recomp.app.GameBundleTest",
                             str(directory / "data")], check=True)
@@ -174,7 +174,7 @@ public class GameImportTest {
             harness = directory / "GameImportTest.java"
             harness.write_text(source)
             implementation = ROOT / "android/app/src/main/java/org/sf2recomp/app/GameImport.java"
-            subprocess.run(["javac", "-d", str(directory), str(implementation), str(harness)], check=True)
+            subprocess.run(["javac", "-d", str(directory), str(implementation.parent/"GameConstants.java"), str(implementation), str(harness)], check=True)
             subprocess.run(["java", "-ea", "-cp", str(directory), "org.sf2recomp.app.GameImportTest",
                             str(directory / "data")], check=True)
 

@@ -1,3 +1,4 @@
+#include "constants/core.h"
 // Tables compiled locally from the user's original NSOs. The executable embeds
 // these translated functions; source releases do not contain generated game code.
 #pragma once
@@ -7,7 +8,7 @@
 #include "cpu.h"
 
 #ifdef __cplusplus
-extern "C" {
+extern SF2C_GAMELIB_S_C_C2E8 {
 #endif
 
 typedef struct {

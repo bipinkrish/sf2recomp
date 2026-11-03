@@ -1,0 +1,33 @@
+static class Sf2Constants {
+    public const string PROGRAM_S_DUMPED_A615 = "dumped -> ";
+    public const int PROGRAM_N_20_F5CA = 20;
+    public const string PROGRAM_S_DUMP_SIZE_33F6 = "dump size: ";
+    public const string PROGRAM_S_MERGED_ROMFS_SIZE_9E79 = "merged romfs size: ";
+    public const string PROGRAM_S_SET_SF2BKTR_DUMP_OUT_OR_SF2B_03BF = "set SF2BKTR_DUMP_OUT (or SF2BKTR_PROBE)";
+    public const string PROGRAM_S_SF2BKTR_DUMP_OUT_A432 = "SF2BKTR_DUMP_OUT";
+    public const string PROGRAM_S_SF2BKTR_DUMP_PATCH_EX_B138 = "SF2BKTR_DUMP_PATCH_EX";
+    public const string PROGRAM_S_OPEN_ERR_B9B0 = " OPEN-ERR: ";
+    public const string PROGRAM_S_EMPTY_194A = ":";
+    public const int PROGRAM_N_0X20_A766 = 0x20;
+    public const string PROGRAM_S_BASE_751B = "base";
+    public const string PROGRAM_S_PATCH_B67B = "patch";
+    public const string PROGRAM_S_SF2BKTR_PROBE_84D7 = "SF2BKTR_PROBE";
+    public const string PROGRAM_S_FORCED_EXTERNAL_KEY_FOR_RID_772B = "forced external key for rid ";
+    public const int PROGRAM_N_16_B17E = 16;
+    public const char PROGRAM_CH_EMPTY_C874 = '=';
+    public const string PROGRAM_S_SF2BKTR_FORCE_TK_919F = "SF2BKTR_FORCE_TK";
+    public const string PROGRAM_S_USAGE_SF2BKTR_PATCHNCA_BASEN_835B = "usage: Sf2Bktr <patchNca> <baseNca> <prod.keys> <title.keys>";
+    public const string PROGRAM_S_RID_BB75 = " rid=";
+    public const string PROGRAM_S_KEYGEN_8523 = " keygen=";
+    public const string PROGRAM_S_X_BA2D = "x";
+    public const string PROGRAM_S_TITLEID_2989 = ": titleid=";
+    public const char PROGRAM_CH_EMPTY_730D = ' ';
+    public const string PROGRAM_S_ERR_71C4 = " ERR: ";
+    public const string PROGRAM_S_EMPTY_2F7A = "@";
+    public const string PROGRAM_S_EMPTY_6A86 = ": ";
+    public const string PROGRAM_S_EMPTY_BD70 = " @";
+    public const string PROGRAM_S_LH_DE56 = "[lh] ";
+    public const int PROGRAM_N_3_4E07 = 3;
+    public const int PROGRAM_N_2_D473 = 2;
+    public const int PROGRAM_N_4_4B22 = 4;
+}

@@ -1,31 +1,31 @@
+#include "constants/core.h"
 // SF2 Recomp settings, the subset the runtime needs before the UI exists
 #pragma once
 #include <stdbool.h>
 #include <stddef.h>
 
 #ifdef __cplusplus
-extern "C" {
+extern SF2C_SETTINGS_S_C_C2E8 {
 #endif
 
-enum { ASPECT_UNLOCKED = 0, ASPECT_ORIGINAL = 1, ASPECT_21_9 = 2, ASPECT_16_10 = 3, ASPECT_32_9 = 4, ASPECT_NATIVE = 5 };
-enum { RES_MATCH = 0, RES_DYNAMIC = 9, RES_Q75 = 10, RES_Q25 = 11, RES_Q50 = 12 };
-enum { UPSCALE_BILINEAR = 0, UPSCALE_METALFX = 1, UPSCALE_FSR1 = 2 };
+enum { ASPECT_UNLOCKED = 0, ASPECT_ORIGINAL = 1, ASPECT_21_9 = SF2C_SETTINGS_N_2_D473, ASPECT_16_10 = SF2C_SETTINGS_N_3_4E07, ASPECT_32_9 = SF2C_SETTINGS_N_4_4B22, ASPECT_NATIVE = SF2C_SETTINGS_N_5_EF2D };
+enum { RES_MATCH = 0, RES_DYNAMIC = SF2C_SETTINGS_N_9_1958, RES_Q75 = SF2C_SETTINGS_N_10_4A44, RES_Q25 = SF2C_SETTINGS_N_11_4FC8, RES_Q50 = SF2C_SETTINGS_N_12_6B51 };
+enum { UPSCALE_BILINEAR = 0, UPSCALE_METALFX = 1, UPSCALE_FSR1 = SF2C_SETTINGS_N_2_D473 };
 #define UPSCALE_SHARP UPSCALE_FSR1
 enum { AA_OFF = 0, AA_SMAA = 1 };
 enum { PLAYER_SETUP_SOLO = 0, PLAYER_SETUP_KEYBOARD_VS_CONTROLLER, PLAYER_SETUP_TWO_CONTROLLERS };
 enum {
-    PROMPTS_AUTO = 0, PROMPTS_NINTENDO = 1, PROMPTS_XBOX = 2, PROMPTS_PLAYSTATION = 3
+    PROMPTS_AUTO = 0, PROMPTS_NINTENDO = 1, PROMPTS_XBOX = SF2C_SETTINGS_N_2_D473, PROMPTS_PLAYSTATION = SF2C_SETTINGS_N_3_4E07
 };
 
 extern bool g_gpu_integrated;
 
-enum { LANG_AUTO = -1, N_LANGUAGES = 12 };
+enum { LANG_AUTO = -1, N_LANGUAGES = SF2C_SETTINGS_N_12_6B51 };
 extern const char *const g_language_codes[N_LANGUAGES];
 extern const char *const g_language_names[N_LANGUAGES];
 
 // Leave room for a mount suffix and guest filenames in filesystem path buffers.
-#define SETTINGS_SAVE_DIRECTORY_CAP 768
-
+#define SETTINGS_SAVE_DIRECTORY_CAP SF2C_SETTINGS_SETTINGS_SAVE_DIRECTORY_CAP
 typedef struct Settings {
     float volume;
     bool reverb;
@@ -76,12 +76,12 @@ static inline unsigned settings_screen_width(unsigned height) {
     switch (g_settings.aspect) {
     case ASPECT_NATIVE:
         if (g_settings.native_width && g_settings.native_height)
-            return ((unsigned long long)height * g_settings.native_width / g_settings.native_height + 1) & ~1u;
-        return height * 16 / 9;
-    case ASPECT_16_10: return height * 16 / 10;
-    case ASPECT_21_9: return height * 21 / 9;
-    case ASPECT_32_9: return height * 32 / 9;
-    default: return height * 16 / 9;
+            return ((unsigned long long)height * g_settings.native_width / g_settings.native_height + 1) & ~SF2C_SETTINGS_N_1U_B8E6;
+        return height * SF2C_SETTINGS_N_16_B17E / SF2C_SETTINGS_N_9_1958;
+    case ASPECT_16_10: return height * SF2C_SETTINGS_N_16_B17E / SF2C_SETTINGS_N_10_4A44;
+    case ASPECT_21_9: return height * SF2C_SETTINGS_N_21_6F4B / SF2C_SETTINGS_N_9_1958;
+    case ASPECT_32_9: return height * SF2C_SETTINGS_N_32_E29C / SF2C_SETTINGS_N_9_1958;
+    default: return height * SF2C_SETTINGS_N_16_B17E / SF2C_SETTINGS_N_9_1958;
     }
 }
 

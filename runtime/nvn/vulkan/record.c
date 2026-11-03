@@ -1,3 +1,4 @@
+#include "../../constants/nvn_vulkan.h"
 // The recorder thread: see record.h.
 //
 // The render thread translated the game's command lists and made every Vulkan call itself. On a slow CPU (Steam
@@ -55,8 +56,8 @@
 // ================================================================== the ring
 typedef void (*PktFn)(const void *args);
 typedef struct { PktFn fn; uint32_t size; uint32_t pad; } PktHdr;  // fn NULL: skip to the ring's start
-#define PKT_ALIGN 16
-#define PUBLISH_EVERY (4u << 10)  // bytes queued before T publishes them (and at every submission / present / wait)
+#define PKT_ALIGN SF2C_RECORD_PKT_ALIGN
+#define PUBLISH_EVERY (SF2C_RECORD_N_4U_0B4E << SF2C_RECORD_N_10_4A44)  // bytes queued before T publishes them (and at every submission / present / wait)
 
 static uint8_t *ring;
 static uint64_t ring_cap;  // (a power of two)
@@ -83,7 +84,7 @@ static int wait_pipes = -1;
 
 bool rec_on(void) { return on > 0; }
 bool rec_wait_pipes(void) {
-    if (wait_pipes < 0) wait_pipes = getenv("LARECOMP_VK_RECORDER_WAIT_PIPES") && atoi(getenv("LARECOMP_VK_RECORDER_WAIT_PIPES")) != 0;
+    if (wait_pipes < 0) wait_pipes = getenv(SF2C_RECORD_S_LARECOMP_VK_RECORDER_WAIT_PI_72CE) && atoi(getenv(SF2C_RECORD_S_LARECOMP_VK_RECORDER_WAIT_PI_72CE)) != 0;
     return wait_pipes;
 }
 void rec_set_pipe_resolver(RecPipeResolve f) { pipe_resolve = f; }
@@ -94,9 +95,9 @@ void rec_set_pipe_resolver(RecPipeResolve f) { pipe_resolve = f; }
 static void timed_wait(pthread_cond_t *cv, uint64_t ns) {  // (mu held)
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
-    ts.tv_nsec += (long)(ns % 1000000000ull);
-    ts.tv_sec += (time_t)(ns / 1000000000ull);
-    if (ts.tv_nsec >= 1000000000) { ts.tv_sec++; ts.tv_nsec -= 1000000000; }
+    ts.tv_nsec += (long)(ns % SF2C_RECORD_N_1000000000ULL_E860);
+    ts.tv_sec += (time_t)(ns / SF2C_RECORD_N_1000000000ULL_E860);
+    if (ts.tv_nsec >= SF2C_RECORD_N_1000000000_52A5) { ts.tv_sec++; ts.tv_nsec -= SF2C_RECORD_N_1000000000_52A5; }
     pthread_cond_timedwait(cv, &mu, &ts);
 }
 
@@ -118,9 +119,9 @@ static void wait_room(uint64_t need) {
     if (wpos + need - atomic_load_explicit(&tail, memory_order_acquire) <= ring_cap) return;
     publish();
     uint64_t t0 = NOW();
-    rq_watch("the recorder (ring full)", wpos);
+    rq_watch(SF2C_RECORD_S_THE_RECORDER_RING_FULL_B50A, wpos);
     pthread_mutex_lock(&mu);
-    while (wpos + need - atomic_load_explicit(&tail, memory_order_acquire) > ring_cap) timed_wait(&cv_done, 1000000);
+    while (wpos + need - atomic_load_explicit(&tail, memory_order_acquire) > ring_cap) timed_wait(&cv_done, SF2C_RECORD_N_1000000_6CCE);
     pthread_mutex_unlock(&mu);
     rq_watch(NULL, 0);
     st_t.full_waits++;
@@ -131,7 +132,7 @@ static void wait_room(uint64_t need) {
 // own); returns the arguments' place. Committed with commit() once filled.
 static void *push(PktFn fn, size_t args, size_t extra) {
     uint64_t need = (sizeof(PktHdr) + ((args + PKT_ALIGN - 1) & ~(size_t)(PKT_ALIGN - 1)) + extra + PKT_ALIGN - 1) & ~(uint64_t)(PKT_ALIGN - 1);
-    if (need > ring_cap / 4) FATAL("[vk] recorder: a packet of %llu bytes does not fit the ring\n", (unsigned long long)need);
+    if (need > ring_cap / SF2C_RECORD_N_4_4B22) FATAL(SF2C_RECORD_S_VK_RECORDER_A_PACKET_OF_LLU__DAE3, (unsigned long long)need);
     uint64_t at = wpos & (ring_cap - 1);
     if (at + need > ring_cap) {  // no room before the end: a skip packet, the real one at the start
         uint64_t skip = ring_cap - at;
@@ -155,7 +156,7 @@ static void commit(void) {
     if (wpos - published >= PUBLISH_EVERY) publish();
 }
 // (the arrays of a packet: after its arguments, 16-aligned)
-#define AL16(n) (((n) + 15) & ~(size_t)15)
+#define AL16(n) (((n) + SF2C_RECORD_N_15_E629) & ~(size_t)SF2C_RECORD_N_15_E629)
 static inline void *after(const void *args, size_t args_size) { return (uint8_t *)args + AL16(args_size); }
 
 // ---- the thread
@@ -193,24 +194,24 @@ static void stats_init(void);
 void rec_init(bool prof_on) {
     if (on >= 0) return;
     prof = prof_on;
-    const char *e = getenv("LARECOMP_VK_RECORDER");
+    const char *e = getenv(SF2C_RECORD_S_LARECOMP_VK_RECORDER_C9B7);
     int want = !e || atoi(e) != 0;
     // ARM's Mali drivers: the GPU was lost a few seconds into the title screen with the recorder thread on (Mali-G610,
     // #358) and ran fine with it off; LARECOMP_VK_RECORDER=1 still turns it on there
-    bool mali = g_vk.props.vendorID == 0x13B5;
+    bool mali = g_vk.props.vendorID == SF2C_RECORD_N_0X13B5_EC9F;
     if (mali && !e) want = 0;
     on = 0;
     if (want) {
-        const char *mb = getenv("LARECOMP_VK_RECORDER_MB");
-        uint64_t cap = (uint64_t)(mb && atoi(mb) > 0 ? atoi(mb) : 16) << 20;
+        const char *mb = getenv(SF2C_RECORD_S_LARECOMP_VK_RECORDER_MB_204D);
+        uint64_t cap = (uint64_t)(mb && atoi(mb) > 0 ? atoi(mb) : SF2C_RECORD_N_16_B17E) << SF2C_RECORD_N_20_F5CA;
         while (cap & (cap - 1)) cap &= cap - 1;  // (a power of two)
         ring = malloc(cap);
         pthread_t th;
         pthread_attr_t attr;
         pthread_attr_init(&attr);
-        pthread_attr_setstacksize(&attr, 1 << 20);
+        pthread_attr_setstacksize(&attr, 1 << SF2C_RECORD_N_20_F5CA);
         if (!ring || pthread_create(&th, &attr, run, NULL) != 0) {
-            LOG("[vk] recorder thread: could not start (%s): Vulkan calls on the render thread\n", ring ? "thread" : "memory");
+            LOG(SF2C_RECORD_S_VK_RECORDER_THREAD_COULD_NOT_B5D5, ring ? SF2C_RECORD_S_THREAD_56FF : SF2C_RECORD_S_MEMORY_E386);
             free(ring);
             ring = NULL;
         } else {
@@ -222,17 +223,17 @@ void rec_init(bool prof_on) {
         pthread_attr_destroy(&attr);
     }
     stats_init();
-    LOG("[vk] recorder thread %s%s\n", on ? "on" : "off", on && rec_wait_pipes() ? " (draws wait for their pipelines)" :
-        mali && !e ? " (Mali driver)" : "");
+    LOG(SF2C_RECORD_S_VK_RECORDER_THREAD_S_S_N_5496, on ? SF2C_RECORD_S_ON_990C : SF2C_RECORD_S_OFF_9F3B, on && rec_wait_pipes() ? SF2C_RECORD_S_DRAWS_WAIT_FOR_THEIR_PIPELIN_7236 :
+        mali && !e ? SF2C_RECORD_S_MALI_DRIVER_75A5 : SF2C_RECORD_S_EMPTY_12AE);
 }
 
 // ================================================================== waits
 // A wait on the recorder this long (a quarter second) is logged: the recorder was stuck in a driver call (a slow
 // vkQueueSubmit2 / vkQueuePresentKHR is logged too, just before) or the whole process stalled
 static void slow_wait(const char *what, uint64_t ns) {
-    if (ns <= 250000000) return;
+    if (ns <= SF2C_RECORD_N_250000000_1BE6) return;
     static _Atomic int n;
-    if (atomic_fetch_add_explicit(&n, 1, memory_order_relaxed) < 20) LOG("[vk] recorder: a wait for %s took %llu ms\n", what, (unsigned long long)(ns / 1000000));
+    if (atomic_fetch_add_explicit(&n, 1, memory_order_relaxed) < SF2C_RECORD_N_20_F5CA) LOG(SF2C_RECORD_S_VK_RECORDER_A_WAIT_FOR_S_TOO_3311, what, (unsigned long long)(ns / SF2C_RECORD_N_1000000_6CCE));
 }
 
 uint64_t rec_submitted(void) { return atomic_load_explicit(&submitted, memory_order_acquire); }
@@ -241,47 +242,47 @@ uint64_t rec_presents_queued(void) { return presents_queued; }
 void rec_wait_submitted(uint64_t seq) {
     if (on <= 0 || rec_submitted() >= seq) return;
     uint64_t t0 = NOW();
-    rq_watch("the recorder (submission)", seq);
+    rq_watch(SF2C_RECORD_S_THE_RECORDER_SUBMISSION_D678, seq);
     pthread_mutex_lock(&mu);
-    while (rec_submitted() < seq) timed_wait(&cv_done, 2000000);
+    while (rec_submitted() < seq) timed_wait(&cv_done, SF2C_RECORD_N_2000000_DD80);
     pthread_mutex_unlock(&mu);
     rq_watch(NULL, 0);
     uint64_t dt = NOW() - t0;
     ADD(a_seq_waits, 1);
     ADD(a_seq_wait_ns, dt);
-    slow_wait("a submission", dt);
+    slow_wait(SF2C_RECORD_S_A_SUBMISSION_977E, dt);
 }
 
 void rec_wait_presents(uint64_t n) {
     if (on <= 0 || atomic_load_explicit(&presents_done, memory_order_acquire) >= n) return;
     uint64_t t0 = NOW();
-    rq_watch("the recorder (present)", n);
+    rq_watch(SF2C_RECORD_S_THE_RECORDER_PRESENT_50CB, n);
     pthread_mutex_lock(&mu);
-    while (atomic_load_explicit(&presents_done, memory_order_acquire) < n) timed_wait(&cv_done, 2000000);
+    while (atomic_load_explicit(&presents_done, memory_order_acquire) < n) timed_wait(&cv_done, SF2C_RECORD_N_2000000_DD80);
     pthread_mutex_unlock(&mu);
     rq_watch(NULL, 0);
     uint64_t dt = NOW() - t0;
     ADD(a_present_waits, 1);
     ADD(a_present_wait_ns, dt);
-    slow_wait("the last present", dt);
+    slow_wait(SF2C_RECORD_S_THE_LAST_PRESENT_65CC, dt);
 }
 
 static void drain_to(uint64_t upto, uint64_t *n, uint64_t *ns) {
     uint64_t at = atomic_load_explicit(&tail, memory_order_acquire);
     if (at >= upto) return;
     uint64_t t0 = NOW();
-    rq_watch("the recorder (drain)", upto);
+    rq_watch(SF2C_RECORD_S_THE_RECORDER_DRAIN_6C37, upto);
     pthread_mutex_lock(&mu);
-    while (atomic_load_explicit(&tail, memory_order_acquire) < upto) timed_wait(&cv_done, 2000000);
+    while (atomic_load_explicit(&tail, memory_order_acquire) < upto) timed_wait(&cv_done, SF2C_RECORD_N_2000000_DD80);
     pthread_mutex_unlock(&mu);
     rq_watch(NULL, 0);
     uint64_t dt = NOW() - t0;
     (*n)++;
     *ns += dt;
-    if (dt > 250000000) {  // (a backlog of packets, or the recorder stuck in one driver call: see slow_wait)
+    if (dt > SF2C_RECORD_N_250000000_1BE6) {  // (a backlog of packets, or the recorder stuck in one driver call: see slow_wait)
         static int k;
-        if (k++ < 20) LOG("[vk] recorder: a drain took %llu ms (%llu KB of packets behind)\n", (unsigned long long)(dt / 1000000),
-                          (unsigned long long)((upto - at) / 1024));
+        if (k++ < SF2C_RECORD_N_20_F5CA) LOG(SF2C_RECORD_S_VK_RECORDER_A_DRAIN_TOOK_LLU_448E, (unsigned long long)(dt / SF2C_RECORD_N_1000000_6CCE),
+                          (unsigned long long)((upto - at) / SF2C_RECORD_N_1024_E39E));
     }
 }
 void rec_drain(void) {
@@ -293,7 +294,7 @@ void rec_drain_published(void) {
     if (on <= 0 || pthread_equal(pthread_self(), rec_thread)) return;  // (an exit from the recorder itself: nothing to wait for)
     uint64_t upto = atomic_load_explicit(&head, memory_order_acquire), t0 = NOW();
     pthread_mutex_lock(&mu);  // (bounded: at exit a recorder stuck in the driver must not keep the process alive)
-    while (atomic_load_explicit(&tail, memory_order_acquire) < upto && NOW() - t0 < 5000000000ull) timed_wait(&cv_done, 2000000);
+    while (atomic_load_explicit(&tail, memory_order_acquire) < upto && NOW() - t0 < SF2C_RECORD_N_5000000000ULL_3F32) timed_wait(&cv_done, SF2C_RECORD_N_2000000_DD80);
     pthread_mutex_unlock(&mu);
 }
 
@@ -339,12 +340,12 @@ void rec_stats_take(RecStats *o) {
 // in full before it is bound, as a new one), and the pools are reset only when the stock outgrew the slot's first
 // pool, a set had to be allocated outside it (table full), or the table is 3/4 full. Without recycling, the pools are
 // reset only if a set was allocated since the last reset.
-#define STOCK_TAB 1024
-#define SET_BATCH 32
+#define STOCK_TAB SF2C_RECORD_STOCK_TAB
+#define SET_BATCH SF2C_RECORD_SET_BATCH
 // A layout's sets in a slot: sets[0..count) allocated from the slot's pools, [0..next) handed out this submission
 struct SetStock { VkDescriptorSetLayout layout; uint32_t next, count, cap; VkDescriptorSet *sets; };
 typedef struct {
-    VkDescriptorPool pools[16];
+    VkDescriptorPool pools[SF2C_RECORD_N_16_B17E];
     int npools, cur_pool;
     struct SetStock *stock;  // the slot's sets per layout (NULL: none yet)
     uint16_t stock_used[STOCK_TAB];  // (its entries in use)
@@ -359,22 +360,22 @@ static bool alloc_sets(Pools *s, VkDescriptorSetLayout layout, uint32_t count, V
     for (uint32_t i = 0; i < count; i++) ls[i] = layout;
     for (;;) {
         if (s->cur_pool == s->npools) {
-            if (s->npools == 16) {
+            if (s->npools == SF2C_RECORD_N_16_B17E) {
                 if (count > 1) return false;  // (the caller asks for one)
-                FATAL("descriptor pools exhausted\n");
+                FATAL(SF2C_RECORD_S_DESCRIPTOR_POOLS_EXHAUSTED_N_F2ED);
             }
             // exec.c's set reuse moves most uniform buffers to the dynamic type: the pool then holds 8192 static + 16384
             // dynamic instead of 32768 static. Without it (LARECOMP_VK_NO_SET_REUSE=1), the pool is as in beta_5: no
             // dynamic descriptors (a pool's size costs on some drivers: the Intel UHD 770's Windows driver spent ~0.4 ms
             // more a frame with 32768 more of them). A pool that runs out of a type is followed by another.
             static int dynp = -1;
-            if (dynp < 0) dynp = getenv("LARECOMP_VK_NO_SET_REUSE") == NULL;  // (as exec.c set_reuse_on)
-            VkDescriptorPoolSize sizes[] = {{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, dynp ? 8192 : 32768}, {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4096},
-                                            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 32768},
-                                            {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1024}, {VK_DESCRIPTOR_TYPE_SAMPLER, 1024},
-                                            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 16384}};  // (exec.c stage_set: set reuse)
-            VkDescriptorPoolCreateInfo ci = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO, .maxSets = 8192,
-                                             .poolSizeCount = dynp ? 6 : 5, .pPoolSizes = sizes};
+            if (dynp < 0) dynp = getenv(SF2C_RECORD_S_LARECOMP_VK_NO_SET_REUSE_7972) == NULL;  // (as exec.c set_reuse_on)
+            VkDescriptorPoolSize sizes[] = {{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, dynp ? SF2C_RECORD_N_8192_864A : SF2C_RECORD_N_32768_D196}, {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, SF2C_RECORD_N_4096_8B92},
+                                            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, SF2C_RECORD_N_32768_D196},
+                                            {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, SF2C_RECORD_N_1024_E39E}, {VK_DESCRIPTOR_TYPE_SAMPLER, SF2C_RECORD_N_1024_E39E},
+                                            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, SF2C_RECORD_N_16384_CA90}};  // (exec.c stage_set: set reuse)
+            VkDescriptorPoolCreateInfo ci = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO, .maxSets = SF2C_RECORD_N_8192_864A,
+                                             .poolSizeCount = dynp ? SF2C_RECORD_N_6_E7F6 : SF2C_RECORD_N_5_EF2D, .pPoolSizes = sizes};
             VK_CHECK(vkCreateDescriptorPool(g_vk.dev, &ci, NULL, &s->pools[s->npools++]));
         }
         VkDescriptorSetAllocateInfo ai = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
@@ -387,16 +388,16 @@ static bool alloc_sets(Pools *s, VkDescriptorSetLayout layout, uint32_t count, V
 }
 
 static VkDescriptorSet pools_alloc(Pools *s, VkDescriptorSetLayout layout) {
-    if (set_batch < 0) set_batch = getenv("LARECOMP_VK_NO_SET_BATCH") == NULL;
-    if (set_recycle < 0) set_recycle = getenv("LARECOMP_VK_NO_SET_RECYCLE") == NULL;
+    if (set_batch < 0) set_batch = getenv(SF2C_RECORD_S_LARECOMP_VK_NO_SET_BATCH_A810) == NULL;
+    if (set_recycle < 0) set_recycle = getenv(SF2C_RECORD_S_LARECOMP_VK_NO_SET_RECYCLE_B2D9) == NULL;
     ADD(r_set_allocs, 1);
     struct SetStock *e = NULL;
     if (set_batch || set_recycle) {
         if (!s->stock) s->stock = calloc(STOCK_TAB, sizeof *s->stock);
         uintptr_t h = (uintptr_t)layout;
-        h ^= h >> 17;
-        h *= 0x9E3779B97F4A7C15ull;
-        for (uint32_t i = 0, j = (uint32_t)(h >> 40) & (STOCK_TAB - 1); i < STOCK_TAB; i++, j = (j + 1) & (STOCK_TAB - 1))
+        h ^= h >> SF2C_RECORD_N_17_4523;
+        h *= SF2C_RECORD_N_0X9E3779B97F4A7C15ULL_8CC5;
+        for (uint32_t i = 0, j = (uint32_t)(h >> SF2C_RECORD_N_40_D59E) & (STOCK_TAB - 1); i < STOCK_TAB; i++, j = (j + 1) & (STOCK_TAB - 1))
             if (s->stock[j].layout == layout || !s->stock[j].layout) { e = &s->stock[j]; break; }
     }
     if (e) {
@@ -407,8 +408,8 @@ static VkDescriptorSet pools_alloc(Pools *s, VkDescriptorSetLayout layout) {
         if (e->next < e->count) return e->sets[e->next++];
         uint32_t want = !set_batch ? 1 : e->count < 1 ? 1 : e->count > SET_BATCH ? SET_BATCH : e->count;
         if (e->count + want > e->cap) {
-            uint32_t nc = e->cap ? e->cap * 2 : 32;
-            while (nc < e->count + want) nc *= 2;
+            uint32_t nc = e->cap ? e->cap * SF2C_RECORD_N_2_D473 : SF2C_RECORD_N_32_E29C;
+            while (nc < e->count + want) nc *= SF2C_RECORD_N_2_D473;
             e->sets = realloc(e->sets, nc * sizeof *e->sets);
             e->cap = nc;
         }
@@ -426,18 +427,18 @@ static VkDescriptorSet pools_alloc(Pools *s, VkDescriptorSetLayout layout) {
 }
 
 bool rec_set_batch(void) {
-    if (set_batch < 0) set_batch = getenv("LARECOMP_VK_NO_SET_BATCH") == NULL;
+    if (set_batch < 0) set_batch = getenv(SF2C_RECORD_S_LARECOMP_VK_NO_SET_BATCH_A810) == NULL;
     return set_batch;
 }
 
 bool rec_set_recycle(void) {
-    if (set_recycle < 0) set_recycle = getenv("LARECOMP_VK_NO_SET_RECYCLE") == NULL;
+    if (set_recycle < 0) set_recycle = getenv(SF2C_RECORD_S_LARECOMP_VK_NO_SET_RECYCLE_B2D9) == NULL;
     return set_recycle;
 }
 
 static void pools_reset(Pools *s) {  // (the slot's previous submission is done)
-    if (set_recycle < 0) set_recycle = getenv("LARECOMP_VK_NO_SET_RECYCLE") == NULL;
-    bool full = !set_recycle || s->cur_pool > 0 || s->sets_untracked || s->nstock_used > STOCK_TAB * 3 / 4;
+    if (set_recycle < 0) set_recycle = getenv(SF2C_RECORD_S_LARECOMP_VK_NO_SET_RECYCLE_B2D9) == NULL;
+    bool full = !set_recycle || s->cur_pool > 0 || s->sets_untracked || s->nstock_used > STOCK_TAB * SF2C_RECORD_N_3_4E07 / SF2C_RECORD_N_4_4B22;
     if (!full) {
         for (int i = 0; i < s->nstock_used; i++) s->stock[s->stock_used[i]].next = 0;
         return;
@@ -459,11 +460,11 @@ static void pools_reset(Pools *s) {  // (the slot's previous submission is done)
 }
 
 // ---- stand-ins: a handle that names a slot of rset[], filled by the recorder at the allocation packet
-#define RSETS (1u << 18)  // (more than a slot's pools can hold: 16 x 8192)
-#define RSET_TAG 0xD5ED000000000000ull  // (no pointer and no small integer has these top bits)
+#define RSETS (SF2C_RECORD_N_1U_B8E6 << SF2C_RECORD_N_18_4EC9)  // (more than a slot's pools can hold: 16 x 8192)
+#define RSET_TAG SF2C_RECORD_N_0XD5ED000000000000ULL_68F7  // (no pointer and no small integer has these top bits)
 static VkDescriptorSet rset[RSETS];  // (R)
 static uint32_t rset_next;           // (T)
-static inline bool is_standin(VkDescriptorSet s) { return ((uint64_t)(uintptr_t)s & 0xFFFF000000000000ull) == RSET_TAG; }
+static inline bool is_standin(VkDescriptorSet s) { return ((uint64_t)(uintptr_t)s & SF2C_RECORD_N_0XFFFF000000000000ULL_0703) == RSET_TAG; }
 static inline VkDescriptorSet resolve_set(VkDescriptorSet s) {
     return is_standin(s) ? rset[(uint32_t)(uintptr_t)s & (RSETS - 1)] : s;
 }
@@ -522,7 +523,7 @@ void rec_UpdateDescriptorSets(uint32_t n, const VkWriteDescriptorSet *w) {
     VkWriteDescriptorSet *pw = after(a, sizeof *a);
     WriteInfo *inf = after(pw, n * sizeof *pw);
     for (uint32_t i = 0; i < n; i++) {
-        if (w[i].descriptorCount != 1 || w[i].pNext) FATAL("[vk] recorder: a descriptor write of %u descriptors\n", w[i].descriptorCount);
+        if (w[i].descriptorCount != 1 || w[i].pNext) FATAL(SF2C_RECORD_S_VK_RECORDER_A_DESCRIPTOR_WRI_AB49, w[i].descriptorCount);
         pw[i] = w[i];
         if (write_is_image(&w[i])) inf[i].i = *w[i].pImageInfo;
         else inf[i].b = *w[i].pBufferInfo;
@@ -554,8 +555,8 @@ void rec_EndCommandBuffer(VkCommandBuffer cb) {
 }
 
 typedef struct {
-    VkCommandBufferSubmitInfo cbs[2];
-    VkSemaphoreSubmitInfo wait, sig[2];
+    VkCommandBufferSubmitInfo cbs[SF2C_RECORD_N_2_D473];
+    VkSemaphoreSubmitInfo wait, sig[SF2C_RECORD_N_2_D473];
     uint32_t ncb, nwait, nsig;
     uint64_t seq;
 } SubmitArgs;
@@ -565,14 +566,14 @@ static void submit_run(const void *p) {
                         .signalSemaphoreInfoCount = a->nsig, .pSignalSemaphoreInfos = a->sig,
                         .waitSemaphoreInfoCount = a->nwait, .pWaitSemaphoreInfos = &a->wait};
     uint64_t t0 = NOW();
-    rq_watch("vkQueueSubmit2", a->seq);  // (a hang dump names it)
+    rq_watch(SF2C_RECORD_S_VKQUEUESUBMIT2_E5D1, a->seq);  // (a hang dump names it)
     VkResult r = vkQueueSubmit2(g_vk.queue, 1, &si, VK_NULL_HANDLE);
     rq_watch(NULL, 0);
     uint64_t dt = NOW() - t0;
     if (prof) ADD(r_submit_ns, dt);
-    if (dt > 50000000) {  // (a driver stall: a slow drain or wait on the recorder shows where it was)
+    if (dt > SF2C_RECORD_N_50000000_C546) {  // (a driver stall: a slow drain or wait on the recorder shows where it was)
         static int n;
-        if (n++ < 20) LOG("[vk] vkQueueSubmit2 of submission %llu took %llu ms\n", (unsigned long long)a->seq, (unsigned long long)(dt / 1000000));
+        if (n++ < SF2C_RECORD_N_20_F5CA) LOG(SF2C_RECORD_S_VK_VKQUEUESUBMIT2_OF_SUBMISS_4130, (unsigned long long)a->seq, (unsigned long long)(dt / SF2C_RECORD_N_1000000_6CCE));
     }
     if (r == VK_ERROR_DEVICE_LOST) { extern void vk_devlost_dump(void); vk_devlost_dump(); }
     VK_CHECK(r);
@@ -585,7 +586,7 @@ static void submit_run(const void *p) {
 }
 void rec_QueueSubmit2(const VkSubmitInfo2 *si, uint64_t seq) {
     SubmitArgs a = {.ncb = si->commandBufferInfoCount, .nwait = si->waitSemaphoreInfoCount, .nsig = si->signalSemaphoreInfoCount, .seq = seq};
-    if (a.ncb > 2 || a.nwait > 1 || a.nsig > 2 || si->pNext) FATAL("[vk] recorder: a submission it can't carry\n");
+    if (a.ncb > SF2C_RECORD_N_2_D473 || a.nwait > 1 || a.nsig > SF2C_RECORD_N_2_D473 || si->pNext) FATAL(SF2C_RECORD_S_VK_RECORDER_A_SUBMISSION_IT__27B3);
     for (uint32_t i = 0; i < a.ncb; i++) a.cbs[i] = si->pCommandBufferInfos[i];
     if (a.nwait) a.wait = si->pWaitSemaphoreInfos[0];
     for (uint32_t i = 0; i < a.nsig; i++) a.sig[i] = si->pSignalSemaphoreInfos[i];
@@ -602,16 +603,16 @@ static void present_run(const void *p) {
     VkPresentInfoKHR pi = {.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, .waitSemaphoreCount = 1, .pWaitSemaphores = &a->wait,
                            .swapchainCount = 1, .pSwapchains = &a->swapchain, .pImageIndices = &a->image};
     uint64_t t0 = NOW();
-    rq_watch("vkQueuePresentKHR", a->image);
+    rq_watch(SF2C_RECORD_S_VKQUEUEPRESENTKHR_248B, a->image);
     VkResult r = vkQueuePresentKHR(g_vk.queue, &pi);
     rq_watch(NULL, 0);
     uint64_t dt = NOW() - t0;
-    __atomic_fetch_add(&g_vk_frame_waits[2], dt, __ATOMIC_RELAXED);
-    if (dt > 250000000) {  // (FIFO waits for the display, a few ms; this long is a stall in the driver or the compositor)
+    __atomic_fetch_add(&g_vk_frame_waits[SF2C_RECORD_N_2_D473], dt, __ATOMIC_RELAXED);
+    if (dt > SF2C_RECORD_N_250000000_1BE6) {  // (FIFO waits for the display, a few ms; this long is a stall in the driver or the compositor)
         static int n;
-        if (n++ < 20) LOG("[vk] vkQueuePresentKHR took %llu ms\n", (unsigned long long)(dt / 1000000));
+        if (n++ < SF2C_RECORD_N_20_F5CA) LOG(SF2C_RECORD_S_VK_VKQUEUEPRESENTKHR_TOOK_LL_A4A9, (unsigned long long)(dt / SF2C_RECORD_N_1000000_6CCE));
     }
-    __atomic_fetch_add(&g_vk_frame_waits[3], 1, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&g_vk_frame_waits[SF2C_RECORD_N_3_4E07], 1, __ATOMIC_RELAXED);
     // Android can report SUBOPTIMAL on every present because compositor rotation
     // was selected intentionally. Resizing still recreates from SDL's drawable
     // size, and OUT_OF_DATE always recreates; repeating the same transform here
@@ -620,8 +621,8 @@ static void present_run(const void *p) {
         atomic_store_explicit(&present_recreate, 1, memory_order_release);
     else if (r != VK_SUCCESS && r != VK_SUBOPTIMAL_KHR) {
         static int n;
-        if (n++ < 10) LOG("[vk] present failed: %d\n", r);
-        if (r == VK_ERROR_DEVICE_LOST) { vk_device_fault_report(); FATAL("vkQueuePresentKHR: device lost\n"); }
+        if (n++ < SF2C_RECORD_N_10_4A44) LOG(SF2C_RECORD_S_VK_PRESENT_FAILED_D_N_F3C4, r);
+        if (r == VK_ERROR_DEVICE_LOST) { vk_device_fault_report(); FATAL(SF2C_RECORD_S_VKQUEUEPRESENTKHR_DEVICE_LOS_53B0); }
     }
     atomic_fetch_add_explicit(&presents_done, 1, memory_order_release);
     if (on > 0) {
@@ -721,9 +722,9 @@ void rec_CmdWriteTimestamp2(VkCommandBuffer cb, VkPipelineStageFlags2 stage, VkQ
     CMD_QUEUE(CmdWriteTimestamp2, cb, stage, pool, query);
 }
 
-CMD_ARGS(CmdSetBlendConstants, float c[4];)
+CMD_ARGS(CmdSetBlendConstants, float c[SF2C_RECORD_N_4_4B22];)
 static void CmdSetBlendConstants_run(const void *p) { const CmdSetBlendConstantsArgs *a = p; vkCmdSetBlendConstants(a->cb, a->c); }
-void rec_CmdSetBlendConstants(VkCommandBuffer cb, const float c[4]) {
+void rec_CmdSetBlendConstants(VkCommandBuffer cb, const float c[SF2C_RECORD_N_4_4B22]) {
     if (on <= 0) { vkCmdSetBlendConstants(cb, c); return; }
     ENQ_T0();
     CmdSetBlendConstantsArgs *a = push(CmdSetBlendConstants_run, sizeof *a, 0);
@@ -772,7 +773,7 @@ void rec_CmdBindPipelineObj(VkCommandBuffer cb, VkPipelineBindPoint bp, void *ob
 }
 static bool draw_dropped(void) {
     if (!unbound) return false;
-    if (!atomic_fetch_add_explicit(&r_dropped, 1, memory_order_relaxed)) LOG("[vk] recorder: a pipeline failed to build: its draws are dropped\n");
+    if (!atomic_fetch_add_explicit(&r_dropped, 1, memory_order_relaxed)) LOG(SF2C_RECORD_S_VK_RECORDER_A_PIPELINE_FAILE_82FB);
     return true;
 }
 
@@ -1044,10 +1045,10 @@ static void CmdPipelineBarrier2_run(const void *p) {
 }
 void rec_CmdPipelineBarrier2(VkCommandBuffer cb, const VkDependencyInfo *di) {
     if (on <= 0) { vkCmdPipelineBarrier2(cb, di); return; }
-    if (di->pNext) FATAL("[vk] recorder: a chained dependency\n");
-    for (uint32_t i = 0; i < di->memoryBarrierCount; i++) if (di->pMemoryBarriers[i].pNext) FATAL("[vk] recorder: a chained barrier\n");
-    for (uint32_t i = 0; i < di->bufferMemoryBarrierCount; i++) if (di->pBufferMemoryBarriers[i].pNext) FATAL("[vk] recorder: a chained barrier\n");
-    for (uint32_t i = 0; i < di->imageMemoryBarrierCount; i++) if (di->pImageMemoryBarriers[i].pNext) FATAL("[vk] recorder: a chained barrier\n");
+    if (di->pNext) FATAL(SF2C_RECORD_S_VK_RECORDER_A_CHAINED_DEPEND_03EA);
+    for (uint32_t i = 0; i < di->memoryBarrierCount; i++) if (di->pMemoryBarriers[i].pNext) FATAL(SF2C_RECORD_S_VK_RECORDER_A_CHAINED_BARRIE_D466);
+    for (uint32_t i = 0; i < di->bufferMemoryBarrierCount; i++) if (di->pBufferMemoryBarriers[i].pNext) FATAL(SF2C_RECORD_S_VK_RECORDER_A_CHAINED_BARRIE_D466);
+    for (uint32_t i = 0; i < di->imageMemoryBarrierCount; i++) if (di->pImageMemoryBarriers[i].pNext) FATAL(SF2C_RECORD_S_VK_RECORDER_A_CHAINED_BARRIE_D466);
     ENQ_T0();
     size_t sm = di->memoryBarrierCount * sizeof(VkMemoryBarrier2), sb = di->bufferMemoryBarrierCount * sizeof(VkBufferMemoryBarrier2);
     size_t si = di->imageMemoryBarrierCount * sizeof(VkImageMemoryBarrier2);
@@ -1076,10 +1077,10 @@ static void CmdBeginRendering_run(const void *p) {
 }
 void rec_CmdBeginRendering(VkCommandBuffer cb, const VkRenderingInfo *ri) {
     if (on <= 0) { vkCmdBeginRendering(cb, ri); return; }
-    if (ri->pNext) FATAL("[vk] recorder: a chained rendering info\n");
-    for (uint32_t i = 0; i < ri->colorAttachmentCount; i++) if (ri->pColorAttachments[i].pNext) FATAL("[vk] recorder: a chained attachment\n");
+    if (ri->pNext) FATAL(SF2C_RECORD_S_VK_RECORDER_A_CHAINED_RENDER_4C04);
+    for (uint32_t i = 0; i < ri->colorAttachmentCount; i++) if (ri->pColorAttachments[i].pNext) FATAL(SF2C_RECORD_S_VK_RECORDER_A_CHAINED_ATTACH_1C9F);
     if ((ri->pDepthAttachment && ri->pDepthAttachment->pNext) || (ri->pStencilAttachment && ri->pStencilAttachment->pNext))
-        FATAL("[vk] recorder: a chained attachment\n");
+        FATAL(SF2C_RECORD_S_VK_RECORDER_A_CHAINED_ATTACH_1C9F);
     ENQ_T0();
     size_t sc = ri->colorAttachmentCount * sizeof(VkRenderingAttachmentInfo);
     CmdBeginRenderingArgs *a = push(CmdBeginRendering_run, sizeof *a, sc);

@@ -1,3 +1,4 @@
+#include "../constants/ui.h"
 #include "touch.h"
 #include "../hle.h"
 #include "../settings.h"
@@ -105,8 +106,8 @@ unsigned menu_touch_frame(unsigned width, unsigned height, bool captured, MenuTo
     unsigned count = 0;
     SDL_LockSpinlock(&touch_lock);
     if (captured) cancel_contacts();
-    float base_width = settings_screen_width(1080);
-    float scale = fminf(window_width / base_width, window_height / 1080.f);
+    float base_width = settings_screen_width(SF2C_TOUCH_N_1080_32EB);
+    float scale = fminf(window_width / base_width, window_height / SF2C_TOUCH_N_1080_F_E3B8);
     uint64_t now = SDL_GetTicksNS();
     for (unsigned i = 0; scale > 0 && width && height && i < MENU_TOUCH_MAX; ++i) {
         Contact *p = &contacts[i];
@@ -114,13 +115,13 @@ unsigned menu_touch_frame(unsigned width, unsigned height, bool captured, MenuTo
         bool began = !p->began;
         float x = began ? p->start_x : p->x, y = began ? p->start_y : p->y;
         // Same fitted viewport as mouse input; leave black-bar contacts outside.
-        x = (x * window_width - (window_width - base_width * scale) * .5f) / (base_width * scale) * width;
-        y = (1 - (y * window_height - (window_height - 1080 * scale) * .5f) / (1080 * scale)) * height;
+        x = (x * window_width - (window_width - base_width * scale) * SF2C_TOUCH_N_5F_33EA) / (base_width * scale) * width;
+        y = (1 - (y * window_height - (window_height - SF2C_TOUCH_N_1080_32EB * scale) * SF2C_TOUCH_N_5F_33EA) / (SF2C_TOUCH_N_1080_32EB * scale)) * height;
         int phase = began ? TOUCH_BEGAN : p->terminal >= 0 ? p->terminal :
                     x != p->previous_x || y != p->previous_y ? TOUCH_MOVED : TOUCH_STATIONARY;
         out[count++] = (MenuTouch){.finger = i, .x = x, .y = y, .raw_x = x, .raw_y = y,
             .dx = began ? 0 : x - p->previous_x, .dy = began ? 0 : y - p->previous_y,
-            .dt = began ? 0 : (now - p->previous_ns) / 1e9f, .taps = 1, .phase = phase,
+            .dt = began ? 0 : (now - p->previous_ns) / SF2C_TOUCH_N_1E9F_C087, .taps = 1, .phase = phase,
             .pressure = p->pressure, .maximum_pressure = 1};
         p->began = true; p->previous_x = x; p->previous_y = y; p->previous_ns = now;
         // A short tap still produces Began and Ended on separate guest updates.

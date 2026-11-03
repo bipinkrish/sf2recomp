@@ -29,7 +29,7 @@ class Log : IProgressReport
     public void Report(long value) { }
     public void ReportAdd(long value) { }
     public void SetTotal(long value) { }
-    public void LogMessage(string message) { Console.WriteLine("[lh] " + message); }
+    public void LogMessage(string message) { Console.WriteLine(Sf2Constants.PROGRAM_S_LH_DE56 + message); }
 }
 
 static class Program
@@ -40,41 +40,41 @@ static class Program
         {
             byte[] b = new byte[n];
             s.Read(offset, b);
-            Console.WriteLine(tag + " @" + offset + ": " + Convert.ToHexString(b));
+            Console.WriteLine(tag + Sf2Constants.PROGRAM_S_EMPTY_BD70 + offset + Sf2Constants.PROGRAM_S_EMPTY_6A86 + Convert.ToHexString(b));
         }
-        catch (Exception e) { Console.WriteLine(tag + "@" + offset + " ERR: " + e.Message); }
+        catch (Exception e) { Console.WriteLine(tag + Sf2Constants.PROGRAM_S_EMPTY_2F7A + offset + Sf2Constants.PROGRAM_S_ERR_71C4 + e.Message); }
     }
 
     static byte[] HexBytes(string s)
     {
-        var words = s.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var words = s.Split(Sf2Constants.PROGRAM_CH_EMPTY_730D, StringSplitOptions.RemoveEmptyEntries);
         return Convert.FromHexString(string.Concat(words));
     }
 
     static void PrintNcaDiag(string tag, Nca nca)
     {
         var hdr = nca.Header;
-        byte[] rid = new byte[16];
+        byte[] rid = new byte[Sf2Constants.PROGRAM_N_16_B17E];
         hdr.RightsId.CopyTo(rid);
-        Console.WriteLine(tag + ": titleid=" + hdr.TitleId.ToString("x")
-            + " keygen=" + hdr.KeyGeneration + " rid=" + Convert.ToHexString(rid));
+        Console.WriteLine(tag + Sf2Constants.PROGRAM_S_TITLEID_2989 + hdr.TitleId.ToString(Sf2Constants.PROGRAM_S_X_BA2D)
+            + Sf2Constants.PROGRAM_S_KEYGEN_8523 + hdr.KeyGeneration + Sf2Constants.PROGRAM_S_RID_BB75 + Convert.ToHexString(rid));
 
     }
 
     static int Main(string[] args)
     {
-        if (args.Length < 4)
+        if (args.Length < Sf2Constants.PROGRAM_N_4_4B22)
         {
-            Console.WriteLine("usage: Sf2Bktr <patchNca> <baseNca> <prod.keys> <title.keys>");
+            Console.WriteLine(Sf2Constants.PROGRAM_S_USAGE_SF2BKTR_PATCHNCA_BASEN_835B);
             return 1;
         }
-        string patchPath = args[0], basePath = args[1], keysPath = args[2];
+        string patchPath = args[0], basePath = args[1], keysPath = args[Sf2Constants.PROGRAM_N_2_D473];
 
         var keySet = KeySet.CreateDefaultKeySet();
         ExternalKeyReader.ReadKeyFile(keySet, keysPath, null, null, new Log());
-        if (File.Exists(args[3]))
+        if (File.Exists(args[Sf2Constants.PROGRAM_N_3_4E07]))
         {
-            using var ts = File.OpenRead(args[3]);
+            using var ts = File.OpenRead(args[Sf2Constants.PROGRAM_N_3_4E07]);
             ExternalKeyReader.ReadTitleKeys(keySet, ts, new Log());
         }
         keySet.DeriveKeys(new Log());
@@ -84,39 +84,39 @@ static class Program
         var baseNca = new Nca(keySet, baseStorage);
         var patchNca = new Nca(keySet, patchStorage);
 
-        if (Environment.GetEnvironmentVariable("SF2BKTR_FORCE_TK") != null)
+        if (Environment.GetEnvironmentVariable(Sf2Constants.PROGRAM_S_SF2BKTR_FORCE_TK_919F) != null)
         {
-            foreach (string line in File.ReadLines(args[3]))
+            foreach (string line in File.ReadLines(args[Sf2Constants.PROGRAM_N_3_4E07]))
             {
-                int eq = line.IndexOf('=');
+                int eq = line.IndexOf(Sf2Constants.PROGRAM_CH_EMPTY_C874);
                 if (eq < 0) continue;
                 byte[] rid = HexBytes(line[..eq].Trim());
                 byte[] key = HexBytes(line[(eq + 1)..].Trim());
-                if (rid.Length != 16 || key.Length != 16) continue;
+                if (rid.Length != Sf2Constants.PROGRAM_N_16_B17E || key.Length != Sf2Constants.PROGRAM_N_16_B17E) continue;
                 keySet.ExternalKeySet.Add(new RightsId(rid), new AccessKey(key));
-                Console.WriteLine("forced external key for rid " + Convert.ToHexString(rid));
+                Console.WriteLine(Sf2Constants.PROGRAM_S_FORCED_EXTERNAL_KEY_FOR_RID_772B + Convert.ToHexString(rid));
             }
         }
 
-        bool probe = Environment.GetEnvironmentVariable("SF2BKTR_PROBE") != null;
+        bool probe = Environment.GetEnvironmentVariable(Sf2Constants.PROGRAM_S_SF2BKTR_PROBE_84D7) != null;
         if (probe)
         {
-            PrintNcaDiag("base", baseNca);
-            PrintNcaDiag("patch", patchNca);
-            foreach (var nm in new[] { "base", "patch" })
+            PrintNcaDiag(Sf2Constants.PROGRAM_S_BASE_751B, baseNca);
+            PrintNcaDiag(Sf2Constants.PROGRAM_S_PATCH_B67B, patchNca);
+            foreach (var nm in new[] { Sf2Constants.PROGRAM_S_BASE_751B, Sf2Constants.PROGRAM_S_PATCH_B67B })
             {
-                var n = nm == "base" ? baseNca : patchNca;
+                var n = nm == Sf2Constants.PROGRAM_S_BASE_751B ? baseNca : patchNca;
                 foreach (var t in new[] { NcaSectionType.Code, NcaSectionType.Data })
                 {
-                    try { using var s = n.OpenStorage(t, IntegrityCheckLevel.None); Hex(nm + ":" + t, s, 0, 0x20); }
-                    catch (Exception e) { Console.WriteLine(nm + ":" + t + " OPEN-ERR: " + e.Message); }
+                    try { using var s = n.OpenStorage(t, IntegrityCheckLevel.None); Hex(nm + Sf2Constants.PROGRAM_S_EMPTY_194A + t, s, 0, Sf2Constants.PROGRAM_N_0X20_A766); }
+                    catch (Exception e) { Console.WriteLine(nm + Sf2Constants.PROGRAM_S_EMPTY_194A + t + Sf2Constants.PROGRAM_S_OPEN_ERR_B9B0 + e.Message); }
                 }
             }
         }
 
         // Raw AesCtrEx view of the patch romfs section: ivfc hash layers plus only
         // the patch's own data slots (base-relocated slots are placeholders here).
-        string patchExOut = Environment.GetEnvironmentVariable("SF2BKTR_DUMP_PATCH_EX");
+        string patchExOut = Environment.GetEnvironmentVariable(Sf2Constants.PROGRAM_S_SF2BKTR_DUMP_PATCH_EX_B138);
         if (!string.IsNullOrEmpty(patchExOut))
         {
             using var s = patchNca.OpenStorage(NcaSectionType.Data, IntegrityCheckLevel.None);
@@ -124,15 +124,15 @@ static class Program
         }
 
         // Merged (base + patch) ivfc data storage: virtual 0 = romfs partition header.
-        string dumpOut = Environment.GetEnvironmentVariable("SF2BKTR_DUMP_OUT");
+        string dumpOut = Environment.GetEnvironmentVariable(Sf2Constants.PROGRAM_S_SF2BKTR_DUMP_OUT_A432);
         if (string.IsNullOrEmpty(dumpOut))
         {
-            if (!probe) { Console.WriteLine("set SF2BKTR_DUMP_OUT (or SF2BKTR_PROBE)"); return 1; }
+            if (!probe) { Console.WriteLine(Sf2Constants.PROGRAM_S_SET_SF2BKTR_DUMP_OUT_OR_SF2B_03BF); return 1; }
             return 0;
         }
         using var merged = baseNca.OpenStorageWithPatch(patchNca, NcaSectionType.Data, IntegrityCheckLevel.None);
         merged.GetSize(out long mlen);
-        Console.WriteLine("merged romfs size: " + mlen);
+        Console.WriteLine(Sf2Constants.PROGRAM_S_MERGED_ROMFS_SIZE_9E79 + mlen);
         Dump(merged, dumpOut);
         return 0;
     }
@@ -140,9 +140,9 @@ static class Program
     static void Dump(IStorage s, string outPath)
     {
         s.GetSize(out long len);
-        Console.WriteLine("dump size: " + len);
+        Console.WriteLine(Sf2Constants.PROGRAM_S_DUMP_SIZE_33F6 + len);
         using var o = new FileStream(outPath, FileMode.Create);
-        byte[] buf = new byte[1 << 20];
+        byte[] buf = new byte[1 << Sf2Constants.PROGRAM_N_20_F5CA];
         long done = 0;
         while (done < len)
         {
@@ -151,6 +151,6 @@ static class Program
             o.Write(buf, 0, n);
             done += n;
         }
-        Console.WriteLine("dumped -> " + outPath);
+        Console.WriteLine(Sf2Constants.PROGRAM_S_DUMPED_A615 + outPath);
     }
 }

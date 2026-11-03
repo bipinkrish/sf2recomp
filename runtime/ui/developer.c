@@ -1,3 +1,4 @@
+#include "../constants/ui.h"
 // SDL events are collected on the window thread, then consumed by guest code on
 // its own update thread. Never invoke Unity/game methods from the window thread.
 #include "../developer.h"
@@ -6,7 +7,7 @@
 #include <stdatomic.h>
 #include <string.h>
 
-enum { EVENT_CAP = 128 };
+enum { EVENT_CAP = SF2C_DEVELOPER_N_128_2747 };
 static DeveloperEvent events[EVENT_CAP];
 static unsigned read_pos, write_pos;
 static SDL_SpinLock event_lock;

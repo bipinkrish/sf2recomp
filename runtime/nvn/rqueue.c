@@ -1,3 +1,4 @@
+#include "../constants/nvn.h"
 // The render thread: see rqueue.h.
 //
 // The game's GPU thread records command lists and submits them; translating them into Metal / Vulkan work took
@@ -36,7 +37,7 @@ __thread uint64_t g_present_ns, g_hooks_ns;  // (the backends' backend_present)
 extern __thread uint64_t g_blocked_ns;  // kernel.c: idle time of the presenting thread (frame pacing)
 
 enum { IT_EXEC, IT_PRESENT, IT_DESTROY, IT_UPLOAD, IT_FLUSH, IT_FINALIZE, IT_COUNT };
-static const char *const kind_name[] = {"exec", "present", "destroy", "upload", "flush", "finalize"};
+static const char *const kind_name[] = {SF2C_RQUEUE_S_EXEC_37C9, SF2C_RQUEUE_S_PRESENT_9433, SF2C_RQUEUE_S_DESTROY_0482, SF2C_RQUEUE_S_UPLOAD_CA46, SF2C_RQUEUE_S_FLUSH_D030, SF2C_RQUEUE_S_FINALIZE_3693};
 typedef struct {
     int kind;
     uint64_t handle;  // EXEC
@@ -49,8 +50,8 @@ typedef struct {
     uint32_t w, h, stride, uv_off;
 } Item;
 
-#define RQ_CAP 1024  // items queued at most (power of two)
-#define RQ_HIST 4096
+#define RQ_CAP SF2C_RQUEUE_N_1024_E39E  // items queued at most (power of two)
+#define RQ_HIST SF2C_RQUEUE_RQ_HIST
 static Item items[RQ_CAP];
 static uint64_t gpu_seq_of[RQ_HIST];  // per item number: the backend submission it ended with
 static uint8_t kind_of[RQ_HIST];      // (hang dump) per item number: its kind
@@ -81,25 +82,25 @@ static pthread_once_t once = PTHREAD_ONCE_INIT;
 static void start(void) {
     extern uint64_t kernel_current_thread_id(void);
     uint64_t asker = kernel_current_thread_id();
-    if (getenv("LARECOMP_RQ_START_DELAY_MS")) usleep((unsigned)atoi(getenv("LARECOMP_RQ_START_DELAY_MS")) * 1000u);  // (test: the race)
-    const char *e = getenv("LARECOMP_RENDER_THREAD");
+    if (getenv(SF2C_RQUEUE_S_LARECOMP_RQ_START_DELAY_MS_CB6C)) usleep((unsigned)atoi(getenv(SF2C_RQUEUE_S_LARECOMP_RQ_START_DELAY_MS_CB6C)) * SF2C_RQUEUE_N_1000U_4C8A);  // (test: the race)
+    const char *e = getenv(SF2C_RQUEUE_S_LARECOMP_RENDER_THREAD_5CA6);
     int want = !e || atoi(e) != 0;
     if (want) {
         pthread_attr_t attr;
         pthread_attr_init(&attr);
-        pthread_attr_setstacksize(&attr, 16 << 20);
-        rq_watch("starting the render thread", 0);
+        pthread_attr_setstacksize(&attr, SF2C_RQUEUE_N_16_B17E << SF2C_RQUEUE_N_20_F5CA);
+        rq_watch(SF2C_RQUEUE_S_STARTING_THE_RENDER_THREAD_5F28, 0);
         int r = pthread_create(&thread, &attr, run, NULL);
         rq_watch(NULL, 0);
         if (r != 0) {
-            LOG("[rq] cannot start the render thread: running on the game thread\n");
+            LOG(SF2C_RQUEUE_S_RQ_CANNOT_START_THE_RENDER_T_2D2D);
             want = 0;
         } else {
             atomic_store(&started, true);
         }
         pthread_attr_destroy(&attr);
     }
-    LOG("[rq] render thread %s (first asked by guest thread %llu)\n", want ? "on" : "off", (unsigned long long)asker);
+    LOG(SF2C_RQUEUE_S_RQ_RENDER_THREAD_S_FIRST_ASK_A5F6, want ? SF2C_RQUEUE_S_ON_990C : SF2C_RQUEUE_S_OFF_9F3B, (unsigned long long)asker);
     atomic_store(&on, want);
     rq_hang_watch_start();
 }
@@ -112,7 +113,7 @@ bool rq_on(void) {
         int n = atomic_fetch_add(&askers, 1);
         pthread_once(&once, start);
         if (n == 1)
-            LOG("[rq] guest thread %llu asked too while the render thread was being started (started once)\n",
+            LOG(SF2C_RQUEUE_S_RQ_GUEST_THREAD_LLU_ASKED_TO_00E3,
                 (unsigned long long)kernel_current_thread_id());
         v = atomic_load(&on);
     }
@@ -120,11 +121,11 @@ bool rq_on(void) {
 }
 
 // ---- what threads wait on (the hang dump's view)
-#define NWATCH 48
+#define NWATCH SF2C_RQUEUE_NWATCH
 typedef struct {
     _Atomic(const char *) what;  // NULL: not waiting
     _Atomic uint64_t since, arg;
-    char name[24];
+    char name[SF2C_RQUEUE_N_24_C235];
 } Watch;
 static Watch watches[NWATCH];
 static _Atomic int nwatch;
@@ -138,9 +139,9 @@ static Watch *watch_self(void) {
     Watch *w = &watches[i];
     extern uint64_t kernel_current_thread_id(void);
     uint64_t kt = kernel_current_thread_id();
-    if (is_render) snprintf(w->name, sizeof w->name, "render thread");
-    else if (kt) snprintf(w->name, sizeof w->name, "guest thread %llu", (unsigned long long)kt);
-    else snprintf(w->name, sizeof w->name, "host thread #%d", i);
+    if (is_render) snprintf(w->name, sizeof w->name, SF2C_RQUEUE_S_RENDER_THREAD_3762);
+    else if (kt) snprintf(w->name, sizeof w->name, SF2C_RQUEUE_S_GUEST_THREAD_LLU_5DDC, (unsigned long long)kt);
+    else snprintf(w->name, sizeof w->name, SF2C_RQUEUE_S_HOST_THREAD_D_36A2, i);
     my_watch = w;
     return w;
 }
@@ -182,18 +183,18 @@ static void wait_until(pthread_cond_t *cv, bool (*ready)(uint64_t), uint64_t arg
         if (guest && g_rt_unwind) break;
         struct timespec ts;
         clock_gettime(CLOCK_REALTIME, &ts);
-        ts.tv_nsec += 50000000;
-        if (ts.tv_nsec >= 1000000000) { ts.tv_sec++; ts.tv_nsec -= 1000000000; }
+        ts.tv_nsec += SF2C_RQUEUE_N_50000000_C546;
+        if (ts.tv_nsec >= SF2C_RQUEUE_N_1000000000_52A5) { ts.tv_sec++; ts.tv_nsec -= SF2C_RQUEUE_N_1000000000_52A5; }
         pthread_cond_timedwait(cv, &lock, &ts);
         if (!what) continue;
         uint64_t now = plat_now_ns();
         if (!t0) t0 = now;
-        else if (!warned && now - t0 > 2000000000ull) {
+        else if (!warned && now - t0 > SF2C_RQUEUE_N_2000000000ULL_C95E) {
             warned = true;
             static int n;
-            if (n++ < 20)
-                LOG("[rq] %s: waiting %llu ms (queued %llu, done %llu, running %llu, presents pending %d)\n", what,
-                    (unsigned long long)((now - t0) / 1000000), (unsigned long long)q_enq, (unsigned long long)q_done,
+            if (n++ < SF2C_RQUEUE_N_20_F5CA)
+                LOG(SF2C_RQUEUE_S_RQ_S_WAITING_LLU_MS_QUEUED_L_D79E, what,
+                    (unsigned long long)((now - t0) / SF2C_RQUEUE_N_1000000_6CCE), (unsigned long long)q_enq, (unsigned long long)q_done,
                     (unsigned long long)q_cur, presents_pending);
         }
     }
@@ -220,10 +221,10 @@ static void lock_timed(void) {  // (LARECOMP_LOG_PACE: the game thread's time wa
 static uint64_t enqueue(const Item *it, const uint64_t *fences, int nfences) {
     lock_timed();
     uint64_t t0 = 0;
-    if (!has_room(0)) { t0 = plat_now_ns(); wait_until(&cv_done, has_room, 0, false, "queue full"); }
+    if (!has_room(0)) { t0 = plat_now_ns(); wait_until(&cv_done, has_room, 0, false, SF2C_RQUEUE_S_QUEUE_FULL_66DE); }
     if (it->kind == IT_PRESENT) {
         if (!t0) t0 = plat_now_ns();
-        wait_until(&cv_done, no_present, 0, true, "present (the previous one to finish)");
+        wait_until(&cv_done, no_present, 0, true, SF2C_RQUEUE_S_PRESENT_THE_PREVIOUS_ONE_TO__8311);
         presents_pending++;
         last_present_q = q_enq + 1;
     }
@@ -243,7 +244,7 @@ static uint64_t enqueue(const Item *it, const uint64_t *fences, int nfences) {
 
 static void *run(void *arg) {
     (void)arg;
-    plat_thread_guest(44);  // (the game's GPU thread's class: performance cores on a Mac)
+    plat_thread_guest(SF2C_RQUEUE_N_44_71EE);  // (the game's GPU thread's class: performance cores on a Mac)
     plat_thread_perf_core(PLAT_PERF_RENDER);
     is_render = true;
     atomic_store(&render_tid, plat_host_thread_id());
@@ -262,17 +263,17 @@ static void *run(void *arg) {
         atomic_store_explicit(&cur_since, plat_now_ns(), memory_order_relaxed);
         pthread_mutex_unlock(&lock);
         static long stall_at = -1;  // (test) LARECOMP_RQ_STALL_AT=<item>: the thread stops there for 60 s (hang dump test)
-        if (stall_at < 0) stall_at = getenv("LARECOMP_RQ_STALL_AT") ? atol(getenv("LARECOMP_RQ_STALL_AT")) : 0;
-        if (stall_at && q == (uint64_t)stall_at) { rq_watch("LARECOMP_RQ_STALL_AT (test)", q); sleep(60); rq_watch(NULL, 0); }
+        if (stall_at < 0) stall_at = getenv(SF2C_RQUEUE_S_LARECOMP_RQ_STALL_AT_54FA) ? atol(getenv(SF2C_RQUEUE_S_LARECOMP_RQ_STALL_AT_54FA)) : 0;
+        if (stall_at && q == (uint64_t)stall_at) { rq_watch(SF2C_RQUEUE_S_LARECOMP_RQ_STALL_AT_TEST_755E, q); sleep(SF2C_RQUEUE_N_60_39FA); rq_watch(NULL, 0); }
         static int stats = -1;  // (LARECOMP_LOG_PACE) the thread's wall vs CPU time per item kind
-        if (stats < 0) stats = getenv("LARECOMP_LOG_PACE") != NULL;
+        if (stats < 0) stats = getenv(SF2C_RQUEUE_S_LARECOMP_LOG_PACE_ED01) != NULL;
         uint64_t c0 = stats ? plat_thread_cpu_ns() : 0, w0 = stats ? plat_now_ns() : 0;
         void *pool = backend_pool_push();
         static _Atomic(int) rq_tid;  // (diagnostics: the running thread's kernel TID, for cross-thread backtraces)
         atomic_store(&rq_tid, plat_host_thread_id());
         static int trace = -1;
-        if (trace < 0) trace = getenv("SF2_TRACE_RENDER") != NULL;
-        if (trace) LOG("[rq] item %llu kind=%d (%s) starting (handle=%llx)\n",
+        if (trace < 0) trace = getenv(SF2C_RQUEUE_S_SF2_TRACE_RENDER_5E88) != NULL;
+        if (trace) LOG(SF2C_RQUEUE_S_RQ_ITEM_LLU_KIND_D_S_STARTIN_C229,
                        (unsigned long long)q, it.kind, kind_name[it.kind], (unsigned long long)it.handle);
         switch (it.kind) {
         case IT_EXEC: backend_execute(it.handle); nvn_commands_release(it.commands); break;
@@ -282,7 +283,7 @@ static void *run(void *arg) {
         case IT_FLUSH: { extern void renderer_flush(void); renderer_flush(); break; }
         case IT_FINALIZE: nvn_texture_finalize(it.tex); break;
         }
-        if (trace) LOG("[rq] item %llu kind=%d (%s) finished\n", (unsigned long long)q, it.kind, kind_name[it.kind]);
+        if (trace) LOG(SF2C_RQUEUE_S_RQ_ITEM_LLU_KIND_D_S_FINISHE_98D3, (unsigned long long)q, it.kind, kind_name[it.kind]);
         atomic_store(&rq_tid, 0);  // (clearly not running while waiting: alive probes then see the idle loop)
         backend_pool_pop(pool);
         uint64_t gs = renderer_issued_seq(), c1 = plat_thread_cpu_ns();  // (its last submission; renderer_wait_seq waits for it)
@@ -291,23 +292,23 @@ static void *run(void *arg) {
             static uint64_t n[IT_COUNT], wall[IT_COUNT], cpu[IT_COUNT], items;
             int k = it.kind;
             n[k]++, wall[k] += plat_now_ns() - w0, cpu[k] += c1 - c0;
-            if (++items % 1200 == 0) {
+            if (++items % SF2C_RQUEUE_N_1200_1519 == 0) {
                 for (int i = 0; i < IT_COUNT; i++)
-                    if (n[i]) LOG("[rq] render thread %s items: %llu, avg %.3f ms wall, %.3f ms CPU\n", kind_name[i],
-                                  (unsigned long long)n[i], wall[i] / 1e6 / n[i], cpu[i] / 1e6 / n[i]);
+                    if (n[i]) LOG(SF2C_RQUEUE_S_RQ_RENDER_THREAD_S_ITEMS_LLU_8D77, kind_name[i],
+                                  (unsigned long long)n[i], wall[i] / SF2C_RQUEUE_N_1E6_8C96 / n[i], cpu[i] / SF2C_RQUEUE_N_1E6_8C96 / n[i]);
                 memset(n, 0, sizeof n), memset(wall, 0, sizeof wall), memset(cpu, 0, sizeof cpu);
             }
         }
         {   // (debug) LARECOMP_RQ_TRACE=<frame>: that frame's and the next 2 frames' items, times in ms from its first
             static long tr_at = -1;
             static uint64_t tr_t0;
-            if (tr_at < 0) tr_at = getenv("LARECOMP_RQ_TRACE") ? atol(getenv("LARECOMP_RQ_TRACE")) : 0;
-            if (tr_at && exec_frame >= (uint64_t)tr_at && exec_frame < (uint64_t)tr_at + 3) {
+            if (tr_at < 0) tr_at = getenv(SF2C_RQUEUE_S_LARECOMP_RQ_TRACE_50B2) ? atol(getenv(SF2C_RQUEUE_S_LARECOMP_RQ_TRACE_50B2)) : 0;
+            if (tr_at && exec_frame >= (uint64_t)tr_at && exec_frame < (uint64_t)tr_at + SF2C_RQUEUE_N_3_4E07) {
                 uint64_t now = plat_now_ns(), e = enq_ns[q % RQ_HIST];
-                if (!tr_t0) tr_t0 = e / 1000000000ull * 1000000000ull;
-                LOG("[rq-trace] frame %llu item %llu %s: queued %.3f started %.3f done %.3f (gpu submission %llu)\n",
-                    (unsigned long long)exec_frame, (unsigned long long)q, kind_name[it.kind], (e - tr_t0) / 1e6,
-                    (atomic_load(&cur_since) - tr_t0) / 1e6, (now - tr_t0) / 1e6, (unsigned long long)gs);
+                if (!tr_t0) tr_t0 = e / SF2C_RQUEUE_N_1000000000ULL_E860 * SF2C_RQUEUE_N_1000000000ULL_E860;
+                LOG(SF2C_RQUEUE_S_RQ_TRACE_FRAME_LLU_ITEM_LLU__F184,
+                    (unsigned long long)exec_frame, (unsigned long long)q, kind_name[it.kind], (e - tr_t0) / SF2C_RQUEUE_N_1E6_8C96,
+                    (atomic_load(&cur_since) - tr_t0) / SF2C_RQUEUE_N_1E6_8C96, (now - tr_t0) / SF2C_RQUEUE_N_1E6_8C96, (unsigned long long)gs);
                 rq_trace_t0 = tr_t0;
             }
         }
@@ -331,10 +332,10 @@ static void *run(void *arg) {
 
 // The sync objects a list's fences signal (CMD_FENCE_SYNC records, also in the lists it calls): numbered when it's
 // queued, as the game may wait on one before the thread reaches the list.
-typedef struct { uint64_t v[32], *p; int n, cap; } Fences;
+typedef struct { uint64_t v[SF2C_RQUEUE_N_32_E29C], *p; int n, cap; } Fences;
 static void fences_add(Fences *f, uint64_t guest) {
     if (f->n == f->cap) {
-        int nc = f->cap * 2;
+        int nc = f->cap * SF2C_RQUEUE_N_2_D473;
         uint64_t *np = malloc(sizeof *np * (size_t)nc);
         memcpy(np, f->p, sizeof *np * (size_t)f->n);
         if (f->p != f->v) free(f->p);
@@ -344,14 +345,14 @@ static void fences_add(Fences *f, uint64_t guest) {
 }
 static void prescan(uint64_t handle, Fences *f, int depth) {
     uint64_t p = handle;
-    for (int guard = 0; guard < 10000000; guard++) {
+    for (int guard = 0; guard < SF2C_RQUEUE_N_10000000_FA95; guard++) {
         const CmdRec *r = (const CmdRec *)(uintptr_t)p;
         switch (r->op) {
         case CMD_END: return;
         case CMD_JUMP: p = r->x[0]; continue;
         case CMD_CALL: {
             const uint64_t *h = (const uint64_t *)r->extra;
-            for (uint64_t i = 0; i < r->x[0] && depth < 8; i++) prescan(h[i], f, depth + 1);
+            for (uint64_t i = 0; i < r->x[0] && depth < SF2C_RQUEUE_N_8_2C62; i++) prescan(h[i], f, depth + 1);
             break;
         }
         case CMD_FENCE_SYNC:
@@ -365,7 +366,7 @@ static void prescan(uint64_t handle, Fences *f, int depth) {
 
 uint64_t rq_submit(uint64_t handle) {
     NvnCommands *commands = nvn_commands_acquire(handle);
-    Fences f = {.n = 0, .cap = 32};
+    Fences f = {.n = 0, .cap = SF2C_RQUEUE_N_32_E29C};
     f.p = f.v;
     prescan(handle, &f, 0);
     Item it = {.kind = IT_EXEC, .handle = handle, .commands = commands};
@@ -417,7 +418,7 @@ uint64_t rq_wait_item(uint64_t q) {
     uint64_t t0 = plat_now_ns(), gs;
     lock_timed();
     if (q > q_enq) q = q_enq;
-    wait_until(&cv_done, item_done, q, true, "fence (its list not translated yet)");
+    wait_until(&cv_done, item_done, q, true, SF2C_RQUEUE_S_FENCE_ITS_LIST_NOT_TRANSLATE_3910);
     gs = q_done >= q ? gpu_seq_of[q % RQ_HIST] : renderer_issued_seq();  // (gave up: whatever is queued)
     pthread_mutex_unlock(&lock);
     g_rq_wait_ns += plat_now_ns() - t0;
@@ -467,7 +468,7 @@ void rq_drain(void) {
     if (rq_current_item()) return;  // (the thread itself: a flush from inside an item)
     uint64_t t0 = plat_now_ns();
     lock_timed();
-    wait_until(&cv_done, all_done, 0, false, "drain (every queued item)");
+    wait_until(&cv_done, all_done, 0, false, SF2C_RQUEUE_S_DRAIN_EVERY_QUEUED_ITEM_D0FE);
     pthread_mutex_unlock(&lock);
     g_rq_wait_ns += plat_now_ns() - t0;
 }
@@ -483,10 +484,10 @@ void rq_stop(void) {
     pthread_cond_broadcast(&cv_work);
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
-    ts.tv_sec += 3;
+    ts.tv_sec += SF2C_RQUEUE_N_3_4E07;
     while (!atomic_load(&parked))
         if (pthread_cond_timedwait(&cv_done, &lock, &ts) != 0 && !atomic_load(&parked)) {
-            LOG("[rq] quit: the render thread did not stop in 3 s (running item %llu)\n", (unsigned long long)q_cur);
+            LOG(SF2C_RQUEUE_S_RQ_QUIT_THE_RENDER_THREAD_DI_2246, (unsigned long long)q_cur);
             break;
         }
     pthread_mutex_unlock(&lock);
@@ -504,34 +505,34 @@ static void hang_state(const char *pfx) {
     uint64_t now = plat_now_ns();
     extern uint64_t renderer_present_count(void);
     bool locked = false;
-    for (int i = 0; i < 100 && !(locked = pthread_mutex_trylock(&lock) == 0); i++) usleep(1000);
+    for (int i = 0; i < SF2C_RQUEUE_N_100_AD57 && !(locked = pthread_mutex_trylock(&lock) == 0); i++) usleep(SF2C_RQUEUE_N_1000_4051);
     uint64_t enq = q_enq, done = q_done, cur = q_cur, cs = atomic_load(&cur_since);
     int pp = presents_pending;
     if (locked) pthread_mutex_unlock(&lock);
-    LOG("%s render thread %s; queued %llu, done %llu, running %llu%s%s (for %llu ms), presents pending %d, "
-        "presents done %llu, game frames %llu, backend submissions %llu%s\n", pfx,
-        atomic_load(&on) > 0 ? "on" : "off", (unsigned long long)enq, (unsigned long long)done, (unsigned long long)cur,
-        cur ? " " : "", cur ? kind_name[kind_of[cur % RQ_HIST] % IT_COUNT] : "",
-        cur && cs < now ? (unsigned long long)((now - cs) / 1000000) : 0ull, pp,
+    LOG(SF2C_RQUEUE_S_S_RENDER_THREAD_S_QUEUED_LLU_62C9
+        SF2C_RQUEUE_S_PRESENTS_DONE_LLU_GAME_FRAME_E5A1, pfx,
+        atomic_load(&on) > 0 ? SF2C_RQUEUE_S_ON_990C : SF2C_RQUEUE_S_OFF_9F3B, (unsigned long long)enq, (unsigned long long)done, (unsigned long long)cur,
+        cur ? SF2C_RQUEUE_S_EMPTY_5210 : SF2C_RQUEUE_S_EMPTY_12AE, cur ? kind_name[kind_of[cur % RQ_HIST] % IT_COUNT] : SF2C_RQUEUE_S_EMPTY_12AE,
+        cur && cs < now ? (unsigned long long)((now - cs) / SF2C_RQUEUE_N_1000000_6CCE) : SF2C_RQUEUE_N_0ULL_DF1B, pp,
         (unsigned long long)atomic_load(&presents_done), (unsigned long long)renderer_present_count(),
-        (unsigned long long)renderer_submit_seq(), locked ? "" : " (queue lock held 100+ ms: read without it)");
+        (unsigned long long)renderer_submit_seq(), locked ? SF2C_RQUEUE_S_EMPTY_12AE : SF2C_RQUEUE_S_QUEUE_LOCK_HELD_100_MS_READ__9ED8);
     if (enq) {
-        char b[600];
+        char b[SF2C_RQUEUE_N_600_284B];
         int n = 0;
-        uint64_t from = enq > 24 ? enq - 23 : 1;
-        for (uint64_t q = from; q <= enq && n < (int)sizeof b - 32; q++)
-            n += snprintf(b + n, sizeof b - (size_t)n, " %llu:%s", (unsigned long long)q, kind_name[kind_of[q % RQ_HIST] % IT_COUNT]);
-        LOG("%s render queue, last items:%s\n", pfx, b);
+        uint64_t from = enq > SF2C_RQUEUE_N_24_C235 ? enq - SF2C_RQUEUE_N_23_535F : 1;
+        for (uint64_t q = from; q <= enq && n < (int)sizeof b - SF2C_RQUEUE_N_32_E29C; q++)
+            n += snprintf(b + n, sizeof b - (size_t)n, SF2C_RQUEUE_S_LLU_S_550C, (unsigned long long)q, kind_name[kind_of[q % RQ_HIST] % IT_COUNT]);
+        LOG(SF2C_RQUEUE_S_S_RENDER_QUEUE_LAST_ITEMS_S__9ADC, pfx, b);
     }
     int nw = atomic_load(&nwatch);
     if (nw > NWATCH) nw = NWATCH;
     for (int i = 0; i < nw; i++) {
         const char *w = atomic_load(&watches[i].what);
         uint64_t since = atomic_load(&watches[i].since);
-        if (w) LOG("%s %s: waiting on %s (%llu) for %llu ms\n", pfx, watches[i].name, w,
+        if (w) LOG(SF2C_RQUEUE_S_S_S_WAITING_ON_S_LLU_FOR_LLU_B09B, pfx, watches[i].name, w,
                    (unsigned long long)atomic_load(&watches[i].arg),
-                   (unsigned long long)(since < now ? (now - since) / 1000000 : 0));
-        else LOG("%s %s: no noted wait\n", pfx, watches[i].name);
+                   (unsigned long long)(since < now ? (now - since) / SF2C_RQUEUE_N_1000000_6CCE : 0));
+        else LOG(SF2C_RQUEUE_S_S_S_NO_NOTED_WAIT_N_D46C, pfx, watches[i].name);
     }
     // The render thread's actual host stack: a stuck exec shows up here even with no noted kernel wait.
     int host_tid = atomic_load(&render_tid);
@@ -551,12 +552,12 @@ static bool hang_check(uint64_t limit, char *why, size_t nwhy) {
     uint64_t f = renderer_present_count() + atomic_load(&presents_done);
     if (f != last_frames || g_rt_unwind) last_frames = f, frames_at = now, reported_stall = false;
     bool hit = false;  // (one reason per check: the dump shows every wait anyway)
-    if (!f && !reported_first && now - t_start > 2 * limit) {  // (the first frame: twice the time, loading)
+    if (!f && !reported_first && now - t_start > SF2C_RQUEUE_N_2_D473 * limit) {  // (the first frame: twice the time, loading)
         reported_first = hit = true;
-        snprintf(why, nwhy, "no frame presented since the GPU device was set up");
+        snprintf(why, nwhy, SF2C_RQUEUE_S_NO_FRAME_PRESENTED_SINCE_THE_D5E4);
     } else if (f && !reported_stall && now - frames_at > limit) {
         reported_stall = hit = true;
-        snprintf(why, nwhy, "presenting stopped");
+        snprintf(why, nwhy, SF2C_RQUEUE_S_PRESENTING_STOPPED_A003);
     }
     int nw = atomic_load(&nwatch);
     if (nw > NWATCH) nw = NWATCH;
@@ -569,8 +570,8 @@ static bool hang_check(uint64_t limit, char *why, size_t nwhy) {
             reported_since[i] = since;
             if (hit) continue;
             hit = true;
-            snprintf(why, nwhy, "%s: one wait for %llu s (%s)", watches[i].name,
-                     (unsigned long long)((now - since) / 1000000000ull), w);
+            snprintf(why, nwhy, SF2C_RQUEUE_S_S_ONE_WAIT_FOR_LLU_S_S_EB81, watches[i].name,
+                     (unsigned long long)((now - since) / SF2C_RQUEUE_N_1000000000ULL_E860), w);
         }
     }
     return hit;

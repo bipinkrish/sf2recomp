@@ -1,3 +1,4 @@
+#include "../constants/nvn.h"
 // NVN command buffers: commands are recorded into the guest-provided command memory as CmdRec
 // records, so the game's own memory management and out-of-memory callbacks work as designed.
 // A command handle is the guest address of a list's first record.
@@ -6,7 +7,7 @@
 
 #include "nvn.h"
 
-#define JUMP_RESERVE (sizeof(CmdRec) + 8)
+#define JUMP_RESERVE (sizeof(CmdRec) + SF2C_CMDBUF_N_8_2C62)
 
 static NvnCmdBuf *cb_of(uint64_t guest) { return HOST(NvnCmdBuf, guest); }
 
@@ -33,7 +34,7 @@ static CmdRec *raw_rec(uint64_t at, uint32_t op, uint32_t size) {
 
 NVN(nvnCommandBufferAddCommandMemory) {
     NvnCmdBuf *cb = cb_of(A(0));
-    uint64_t mem = HOST(NvnPool, A(1))->storage + A(2), size = A(3);
+    uint64_t mem = HOST(NvnPool, A(1))->storage + A(SF2C_CMDBUF_N_2_D473), size = A(SF2C_CMDBUF_N_3_4E07);
     if (cb->recording && cb->mem) {
         // chain the list being recorded into the new chunk
         CmdRec *j = raw_rec(cb->mem + cb->used, CMD_JUMP, sizeof(CmdRec));
@@ -50,9 +51,9 @@ NVN(nvnCommandBufferGetCommandMemoryFree) {
     NvnCmdBuf *cb = cb_of(A(0));
     RET(cb->size > cb->used + JUMP_RESERVE ? cb->size - cb->used - JUMP_RESERVE : 0);
 }
-NVN(nvnCommandBufferGetControlMemorySize) { RET(0x10000); }
+NVN(nvnCommandBufferGetControlMemorySize) { RET(SF2C_CMDBUF_N_0X10000_4939); }
 NVN(nvnCommandBufferGetControlMemoryUsed) { RET(0); }
-NVN(nvnCommandBufferGetControlMemoryFree) { RET(0x10000); }
+NVN(nvnCommandBufferGetControlMemoryFree) { RET(SF2C_CMDBUF_N_0X10000_4939); }
 NVN(nvnCommandBufferSetMemoryCallback) { cb_of(A(0))->callback = A(1); }
 NVN(nvnCommandBufferGetMemoryCallback) { RET(cb_of(A(0))->callback); }
 NVN(nvnCommandBufferSetMemoryCallbackData) { cb_of(A(0))->callback_data = A(1); }
@@ -62,15 +63,15 @@ NVN(nvnCommandBufferSetCommandMemoryCallbackEnabled) { (void)c; }
 // Reserve a record. May call back into the guest for more memory, so callers snapshot their
 // arguments first.
 static CmdRec *rec(Cpu *c, NvnCmdBuf *cb, uint32_t op, uint32_t extra) {
-    uint32_t size = (uint32_t)((sizeof(CmdRec) + extra + 7) & ~7u);
+    uint32_t size = (uint32_t)((sizeof(CmdRec) + extra + SF2C_CMDBUF_N_7_7902) & ~SF2C_CMDBUF_N_7U_7330);
     for (int tries = 0; !cb->mem || cb->used + size + JUMP_RESERVE > cb->size; tries++) {
-        if (!cb->callback || tries == 2) FATAL("nvn: out of command memory (need %u)\n", size);
-        uint64_t saved[8];
+        if (!cb->callback || tries == SF2C_CMDBUF_N_2_D473) FATAL(SF2C_CMDBUF_S_NVN_OUT_OF_COMMAND_MEMORY_NE_42D3, size);
+        uint64_t saved[SF2C_CMDBUF_N_8_2C62];
         memcpy(saved, c->x, sizeof saved);
         c->x[0] = cb->guest;
         c->x[1] = 0;  // NVN_COMMAND_BUFFER_MEMORY_EVENT_OUT_OF_COMMAND_MEMORY
-        c->x[2] = size + JUMP_RESERVE;
-        c->x[3] = cb->callback_data;
+        c->x[SF2C_CMDBUF_N_2_D473] = size + JUMP_RESERVE;
+        c->x[SF2C_CMDBUF_N_3_4E07] = cb->callback_data;
         guest_call(c, cb->callback);
         memcpy(c->x, saved, sizeof saved);
     }
@@ -98,11 +99,11 @@ NVN(nvnCommandBufferEndRecording) {
 NVN(nvnCommandBufferIsRecording) { RET(cb_of(A(0))->recording); }
 
 // ---- generic recorders
-typedef struct { uint64_t x[8]; float f[4]; } Snap;
+typedef struct { uint64_t x[SF2C_CMDBUF_N_8_2C62]; float f[SF2C_CMDBUF_N_4_4B22]; } Snap;
 static Snap snap(Cpu *c) {
     Snap s;
     memcpy(s.x, c->x, sizeof s.x);
-    for (int i = 0; i < 4; i++) s.f[i] = *(float *)&c->v[i];
+    for (int i = 0; i < SF2C_CMDBUF_N_4_4B22; i++) s.f[i] = *(float *)&c->v[i];
     return s;
 }
 static CmdRec *record(Cpu *c, uint32_t op, uint32_t extra, Snap *s) {
@@ -125,61 +126,61 @@ NVN(nvnCommandBufferBindProgram) {
     Snap s = snap(c);
     CmdRec *r = record(c, CMD_BIND_PROGRAM, 0, &s);
     r->x[0] = (uint64_t)(uintptr_t)HOST(NvnProgram, s.x[1]);  // host program
-    r->x[1] = s.x[2];  // NVNshaderStageBits
+    r->x[1] = s.x[SF2C_CMDBUF_N_2_D473];  // NVNshaderStageBits
 }
-NVN(nvnCommandBufferBindBlendState) { record_copy(c, CMD_BIND_BLEND, 1, 8); }
-NVN(nvnCommandBufferBindChannelMaskState) { record_copy(c, CMD_BIND_CHANNEL_MASK, 1, 4); }
-NVN(nvnCommandBufferBindColorState) { record_copy(c, CMD_BIND_COLOR, 1, 4); }
-NVN(nvnCommandBufferBindDepthStencilState) { record_copy(c, CMD_BIND_DEPTH_STENCIL, 1, 8); }
-NVN(nvnCommandBufferBindMultisampleState) { record_copy(c, CMD_BIND_MULTISAMPLE, 1, 0x18); }
-NVN(nvnCommandBufferBindPolygonState) { record_copy(c, CMD_BIND_POLYGON, 1, 4); }
-NVN(nvnCommandBufferBindVertexAttribState) { record_copy(c, CMD_BIND_VERTEX_ATTRIB, 2, (uint32_t)A(1) * 4); }
-NVN(nvnCommandBufferBindVertexStreamState) { record_copy(c, CMD_BIND_VERTEX_STREAM, 2, (uint32_t)A(1) * 8); }
+NVN(nvnCommandBufferBindBlendState) { record_copy(c, CMD_BIND_BLEND, 1, SF2C_CMDBUF_N_8_2C62); }
+NVN(nvnCommandBufferBindChannelMaskState) { record_copy(c, CMD_BIND_CHANNEL_MASK, 1, SF2C_CMDBUF_N_4_4B22); }
+NVN(nvnCommandBufferBindColorState) { record_copy(c, CMD_BIND_COLOR, 1, SF2C_CMDBUF_N_4_4B22); }
+NVN(nvnCommandBufferBindDepthStencilState) { record_copy(c, CMD_BIND_DEPTH_STENCIL, 1, SF2C_CMDBUF_N_8_2C62); }
+NVN(nvnCommandBufferBindMultisampleState) { record_copy(c, CMD_BIND_MULTISAMPLE, 1, SF2C_CMDBUF_N_0X18_D47C); }
+NVN(nvnCommandBufferBindPolygonState) { record_copy(c, CMD_BIND_POLYGON, 1, SF2C_CMDBUF_N_4_4B22); }
+NVN(nvnCommandBufferBindVertexAttribState) { record_copy(c, CMD_BIND_VERTEX_ATTRIB, SF2C_CMDBUF_N_2_D473, (uint32_t)A(1) * SF2C_CMDBUF_N_4_4B22); }
+NVN(nvnCommandBufferBindVertexStreamState) { record_copy(c, CMD_BIND_VERTEX_STREAM, SF2C_CMDBUF_N_2_D473, (uint32_t)A(1) * SF2C_CMDBUF_N_8_2C62); }
 
 // (cmd, first, count, const NVNbufferRange*) and the single-binding forms
-NVN(nvnCommandBufferBindVertexBuffers) { record_copy(c, CMD_BIND_VERTEX_BUFFERS, 3, (uint32_t)A(2) * 16); }
+NVN(nvnCommandBufferBindVertexBuffers) { record_copy(c, CMD_BIND_VERTEX_BUFFERS, SF2C_CMDBUF_N_3_4E07, (uint32_t)A(SF2C_CMDBUF_N_2_D473) * SF2C_CMDBUF_N_16_B17E); }
 NVN(nvnCommandBufferBindVertexBuffer) {
     Snap s = snap(c);
-    CmdRec *r = record(c, CMD_BIND_VERTEX_BUFFERS, 16, &s);
+    CmdRec *r = record(c, CMD_BIND_VERTEX_BUFFERS, SF2C_CMDBUF_N_16_B17E, &s);
     r->x[0] = s.x[1]; r->x[1] = 1;
-    memcpy(r->extra, &s.x[2], 16);
+    memcpy(r->extra, &s.x[SF2C_CMDBUF_N_2_D473], SF2C_CMDBUF_N_16_B17E);
 }
 // (cmd, stage, first, count, const NVNbufferRange*)
-NVN(nvnCommandBufferBindUniformBuffers) { record_copy(c, CMD_BIND_UNIFORM_BUFFERS, 4, (uint32_t)A(3) * 16); }
+NVN(nvnCommandBufferBindUniformBuffers) { record_copy(c, CMD_BIND_UNIFORM_BUFFERS, SF2C_CMDBUF_N_4_4B22, (uint32_t)A(SF2C_CMDBUF_N_3_4E07) * SF2C_CMDBUF_N_16_B17E); }
 NVN(nvnCommandBufferBindUniformBuffer) {
     Snap s = snap(c);
-    CmdRec *r = record(c, CMD_BIND_UNIFORM_BUFFERS, 16, &s);
-    r->x[0] = s.x[1]; r->x[1] = s.x[2]; r->x[2] = 1;
-    memcpy(r->extra, &s.x[3], 16);
+    CmdRec *r = record(c, CMD_BIND_UNIFORM_BUFFERS, SF2C_CMDBUF_N_16_B17E, &s);
+    r->x[0] = s.x[1]; r->x[1] = s.x[SF2C_CMDBUF_N_2_D473]; r->x[SF2C_CMDBUF_N_2_D473] = 1;
+    memcpy(r->extra, &s.x[SF2C_CMDBUF_N_3_4E07], SF2C_CMDBUF_N_16_B17E);
 }
-NVN(nvnCommandBufferBindStorageBuffers) { record_copy(c, CMD_BIND_STORAGE_BUFFERS, 4, (uint32_t)A(3) * 16); }
+NVN(nvnCommandBufferBindStorageBuffers) { record_copy(c, CMD_BIND_STORAGE_BUFFERS, SF2C_CMDBUF_N_4_4B22, (uint32_t)A(SF2C_CMDBUF_N_3_4E07) * SF2C_CMDBUF_N_16_B17E); }
 NVN(nvnCommandBufferBindStorageBuffer) {
     Snap s = snap(c);
-    CmdRec *r = record(c, CMD_BIND_STORAGE_BUFFERS, 16, &s);
-    r->x[0] = s.x[1]; r->x[1] = s.x[2]; r->x[2] = 1;
-    memcpy(r->extra, &s.x[3], 16);
+    CmdRec *r = record(c, CMD_BIND_STORAGE_BUFFERS, SF2C_CMDBUF_N_16_B17E, &s);
+    r->x[0] = s.x[1]; r->x[1] = s.x[SF2C_CMDBUF_N_2_D473]; r->x[SF2C_CMDBUF_N_2_D473] = 1;
+    memcpy(r->extra, &s.x[SF2C_CMDBUF_N_3_4E07], SF2C_CMDBUF_N_16_B17E);
 }
 // (cmd, stage, first, count, const handle*)
-NVN(nvnCommandBufferBindTextures) { record_copy(c, CMD_BIND_TEXTURES, 4, (uint32_t)A(3) * 8); }
+NVN(nvnCommandBufferBindTextures) { record_copy(c, CMD_BIND_TEXTURES, SF2C_CMDBUF_N_4_4B22, (uint32_t)A(SF2C_CMDBUF_N_3_4E07) * SF2C_CMDBUF_N_8_2C62); }
 NVN(nvnCommandBufferBindTexture) {
     Snap s = snap(c);
-    CmdRec *r = record(c, CMD_BIND_TEXTURES, 8, &s);
-    r->x[0] = s.x[1]; r->x[1] = s.x[2]; r->x[2] = 1;
-    memcpy(r->extra, &s.x[3], 8);
+    CmdRec *r = record(c, CMD_BIND_TEXTURES, SF2C_CMDBUF_N_8_2C62, &s);
+    r->x[0] = s.x[1]; r->x[1] = s.x[SF2C_CMDBUF_N_2_D473]; r->x[SF2C_CMDBUF_N_2_D473] = 1;
+    memcpy(r->extra, &s.x[SF2C_CMDBUF_N_3_4E07], SF2C_CMDBUF_N_8_2C62);
 }
-NVN(nvnCommandBufferBindImages) { record_copy(c, CMD_BIND_IMAGES, 4, (uint32_t)A(3) * 8); }
+NVN(nvnCommandBufferBindImages) { record_copy(c, CMD_BIND_IMAGES, SF2C_CMDBUF_N_4_4B22, (uint32_t)A(SF2C_CMDBUF_N_3_4E07) * SF2C_CMDBUF_N_8_2C62); }
 NVN(nvnCommandBufferBindImage) {
     Snap s = snap(c);
-    CmdRec *r = record(c, CMD_BIND_IMAGES, 8, &s);
-    r->x[0] = s.x[1]; r->x[1] = s.x[2]; r->x[2] = 1;
-    memcpy(r->extra, &s.x[3], 8);
+    CmdRec *r = record(c, CMD_BIND_IMAGES, SF2C_CMDBUF_N_8_2C62, &s);
+    r->x[0] = s.x[1]; r->x[1] = s.x[SF2C_CMDBUF_N_2_D473]; r->x[SF2C_CMDBUF_N_2_D473] = 1;
+    memcpy(r->extra, &s.x[SF2C_CMDBUF_N_3_4E07], SF2C_CMDBUF_N_8_2C62);
 }
-NVN(nvnCommandBufferBindSeparateTextures) { record_copy(c, CMD_BIND_TEXTURES, 4, (uint32_t)A(3) * 8); }
+NVN(nvnCommandBufferBindSeparateTextures) { record_copy(c, CMD_BIND_TEXTURES, SF2C_CMDBUF_N_4_4B22, (uint32_t)A(SF2C_CMDBUF_N_3_4E07) * SF2C_CMDBUF_N_8_2C62); }
 NVN(nvnCommandBufferBindSeparateTexture) {
     Snap s = snap(c);
-    CmdRec *r = record(c, CMD_BIND_TEXTURES, 8, &s);
-    r->x[0] = s.x[1]; r->x[1] = s.x[2]; r->x[2] = 1;
-    memcpy(r->extra, &s.x[3], 8);
+    CmdRec *r = record(c, CMD_BIND_TEXTURES, SF2C_CMDBUF_N_8_2C62, &s);
+    r->x[0] = s.x[1]; r->x[1] = s.x[SF2C_CMDBUF_N_2_D473]; r->x[SF2C_CMDBUF_N_2_D473] = 1;
+    memcpy(r->extra, &s.x[SF2C_CMDBUF_N_3_4E07], SF2C_CMDBUF_N_8_2C62);
 }
 NVN(nvnCommandBufferBindSeparateSamplers) { (void)c; }
 NVN(nvnCommandBufferBindSeparateSampler) { (void)c; }
@@ -201,9 +202,9 @@ NVN(nvnCommandBufferSetSamplerPool) {
 // SetRenderTargets(cmd, n, colors[], colorViews[], depth, depthView)
 // extra: { u64 tex[8]; NvnTextureView views[8]; u8 has_view[8]; u64 depth; NvnTextureView dview; u8 has_dview }
 typedef struct {
-    uint64_t tex[8];
-    NvnTextureView views[8];
-    uint8_t has_view[8];
+    uint64_t tex[SF2C_CMDBUF_N_8_2C62];
+    NvnTextureView views[SF2C_CMDBUF_N_8_2C62];
+    uint8_t has_view[SF2C_CMDBUF_N_8_2C62];
     uint64_t depth;
     NvnTextureView dview;
     uint8_t has_dview;
@@ -211,9 +212,9 @@ typedef struct {
 NVN(nvnCommandBufferSetRenderTargets) {
     Snap s = snap(c);
     int n = (int)s.x[1];
-    if (n > 8) n = 8;
+    if (n > SF2C_CMDBUF_N_8_2C62) n = SF2C_CMDBUF_N_8_2C62;
     RtRec rt = {0};
-    const uint64_t *colors = (const uint64_t *)(uintptr_t)s.x[2], *views = (const uint64_t *)(uintptr_t)s.x[3];
+    const uint64_t *colors = (const uint64_t *)(uintptr_t)s.x[SF2C_CMDBUF_N_2_D473], *views = (const uint64_t *)(uintptr_t)s.x[SF2C_CMDBUF_N_3_4E07];
     for (int i = 0; i < n; i++) {
         rt.tex[i] = colors && colors[i] ? (uint64_t)(uintptr_t)HOST(NvnTexture, colors[i]) : 0;
         nvn_commands_texture(cb_of(s.x[0])->commands, (NvnTexture *)(uintptr_t)rt.tex[i]);
@@ -223,11 +224,11 @@ NVN(nvnCommandBufferSetRenderTargets) {
             nvn_texture_note_view((NvnTexture *)(uintptr_t)rt.tex[i], &rt.views[i]);
         }
     }
-    rt.depth = s.x[4] ? (uint64_t)(uintptr_t)HOST(NvnTexture, s.x[4]) : 0;
+    rt.depth = s.x[SF2C_CMDBUF_N_4_4B22] ? (uint64_t)(uintptr_t)HOST(NvnTexture, s.x[SF2C_CMDBUF_N_4_4B22]) : 0;
     nvn_commands_texture(cb_of(s.x[0])->commands, (NvnTexture *)(uintptr_t)rt.depth);
-    if (s.x[5]) {
+    if (s.x[SF2C_CMDBUF_N_5_EF2D]) {
         rt.has_dview = 1;
-        memcpy(&rt.dview, (void *)(uintptr_t)s.x[5], sizeof(NvnTextureView));
+        memcpy(&rt.dview, (void *)(uintptr_t)s.x[SF2C_CMDBUF_N_5_EF2D], sizeof(NvnTextureView));
         nvn_texture_note_view((NvnTexture *)(uintptr_t)rt.depth, &rt.dview);
     }
     CmdRec *r = record(c, CMD_SET_RENDER_TARGETS, sizeof rt, &s);
@@ -236,33 +237,33 @@ NVN(nvnCommandBufferSetRenderTargets) {
 }
 
 // viewports/scissors/depth ranges
-NVN(nvnCommandBufferSetViewports) { record_copy(c, CMD_SET_VIEWPORTS, 3, (uint32_t)A(2) * 16); }
+NVN(nvnCommandBufferSetViewports) { record_copy(c, CMD_SET_VIEWPORTS, SF2C_CMDBUF_N_3_4E07, (uint32_t)A(SF2C_CMDBUF_N_2_D473) * SF2C_CMDBUF_N_16_B17E); }
 NVN(nvnCommandBufferSetViewport) {
     Snap s = snap(c);
-    CmdRec *r = record(c, CMD_SET_VIEWPORTS, 16, &s);
-    float v[4] = {(float)(int32_t)s.x[1], (float)(int32_t)s.x[2], (float)(int32_t)s.x[3], (float)(int32_t)s.x[4]};
+    CmdRec *r = record(c, CMD_SET_VIEWPORTS, SF2C_CMDBUF_N_16_B17E, &s);
+    float v[SF2C_CMDBUF_N_4_4B22] = {(float)(int32_t)s.x[1], (float)(int32_t)s.x[SF2C_CMDBUF_N_2_D473], (float)(int32_t)s.x[SF2C_CMDBUF_N_3_4E07], (float)(int32_t)s.x[SF2C_CMDBUF_N_4_4B22]};
     r->x[0] = 0; r->x[1] = 1;
-    memcpy(r->extra, v, 16);
+    memcpy(r->extra, v, SF2C_CMDBUF_N_16_B17E);
 }
-NVN(nvnCommandBufferSetScissors) { record_copy(c, CMD_SET_SCISSORS, 3, (uint32_t)A(2) * 16); }
+NVN(nvnCommandBufferSetScissors) { record_copy(c, CMD_SET_SCISSORS, SF2C_CMDBUF_N_3_4E07, (uint32_t)A(SF2C_CMDBUF_N_2_D473) * SF2C_CMDBUF_N_16_B17E); }
 NVN(nvnCommandBufferSetScissor) {
     Snap s = snap(c);
-    CmdRec *r = record(c, CMD_SET_SCISSORS, 16, &s);
-    int32_t v[4] = {(int32_t)s.x[1], (int32_t)s.x[2], (int32_t)s.x[3], (int32_t)s.x[4]};
+    CmdRec *r = record(c, CMD_SET_SCISSORS, SF2C_CMDBUF_N_16_B17E, &s);
+    int32_t v[SF2C_CMDBUF_N_4_4B22] = {(int32_t)s.x[1], (int32_t)s.x[SF2C_CMDBUF_N_2_D473], (int32_t)s.x[SF2C_CMDBUF_N_3_4E07], (int32_t)s.x[SF2C_CMDBUF_N_4_4B22]};
     r->x[0] = 0; r->x[1] = 1;
-    memcpy(r->extra, v, 16);
+    memcpy(r->extra, v, SF2C_CMDBUF_N_16_B17E);
 }
-NVN(nvnCommandBufferSetDepthRanges) { record_copy(c, CMD_SET_DEPTH_RANGES, 3, (uint32_t)A(2) * 8); }
+NVN(nvnCommandBufferSetDepthRanges) { record_copy(c, CMD_SET_DEPTH_RANGES, SF2C_CMDBUF_N_3_4E07, (uint32_t)A(SF2C_CMDBUF_N_2_D473) * SF2C_CMDBUF_N_8_2C62); }
 NVN(nvnCommandBufferSetDepthRange) {
     Snap s = snap(c);
-    CmdRec *r = record(c, CMD_SET_DEPTH_RANGES, 8, &s);
+    CmdRec *r = record(c, CMD_SET_DEPTH_RANGES, SF2C_CMDBUF_N_8_2C62, &s);
     r->x[0] = 0; r->x[1] = 1;
-    memcpy(r->extra, s.f, 8);
+    memcpy(r->extra, s.f, SF2C_CMDBUF_N_8_2C62);
 }
-NVN(nvnCommandBufferSetBlendColor) { record_copy(c, CMD_SET_BLEND_COLOR, 1, 16); }
-NVN(nvnCommandBufferSetStencilRef) { Snap s = snap(c); CmdRec *r = record(c, CMD_SET_STENCIL, 0, &s); r->x[6] = 0; }
-NVN(nvnCommandBufferSetStencilMask) { Snap s = snap(c); CmdRec *r = record(c, CMD_SET_STENCIL, 0, &s); r->x[6] = 1; }
-NVN(nvnCommandBufferSetStencilValueMask) { Snap s = snap(c); CmdRec *r = record(c, CMD_SET_STENCIL, 0, &s); r->x[6] = 2; }
+NVN(nvnCommandBufferSetBlendColor) { record_copy(c, CMD_SET_BLEND_COLOR, 1, SF2C_CMDBUF_N_16_B17E); }
+NVN(nvnCommandBufferSetStencilRef) { Snap s = snap(c); CmdRec *r = record(c, CMD_SET_STENCIL, 0, &s); r->x[SF2C_CMDBUF_N_6_E7F6] = 0; }
+NVN(nvnCommandBufferSetStencilMask) { Snap s = snap(c); CmdRec *r = record(c, CMD_SET_STENCIL, 0, &s); r->x[SF2C_CMDBUF_N_6_E7F6] = 1; }
+NVN(nvnCommandBufferSetStencilValueMask) { Snap s = snap(c); CmdRec *r = record(c, CMD_SET_STENCIL, 0, &s); r->x[SF2C_CMDBUF_N_6_E7F6] = SF2C_CMDBUF_N_2_D473; }
 PLAIN(nvnCommandBufferSetPrimitiveRestart, CMD_SET_PRIMITIVE_RESTART)
 PLAIN(nvnCommandBufferSetAlphaRef, CMD_SET_ALPHA_REF)
 PLAIN(nvnCommandBufferSetDepthBounds, CMD_SET_DEPTH_BOUNDS)
@@ -309,84 +310,84 @@ NVN(nvnCommandBufferGetCopyRowStride) { RET(copy_row_stride); }
 NVN(nvnCommandBufferGetCopyImageStride) { RET(copy_image_stride); }
 
 // ---- clears
-NVN(nvnCommandBufferClearColor) { record_copy(c, CMD_CLEAR_COLOR, 2, 16); }
-NVN(nvnCommandBufferClearColori) { CmdRec *r = record_copy(c, CMD_CLEAR_COLOR, 2, 16); r->x[5] = 1; }
-NVN(nvnCommandBufferClearColorui) { CmdRec *r = record_copy(c, CMD_CLEAR_COLOR, 2, 16); r->x[5] = 2; }
+NVN(nvnCommandBufferClearColor) { record_copy(c, CMD_CLEAR_COLOR, SF2C_CMDBUF_N_2_D473, SF2C_CMDBUF_N_16_B17E); }
+NVN(nvnCommandBufferClearColori) { CmdRec *r = record_copy(c, CMD_CLEAR_COLOR, SF2C_CMDBUF_N_2_D473, SF2C_CMDBUF_N_16_B17E); r->x[SF2C_CMDBUF_N_5_EF2D] = 1; }
+NVN(nvnCommandBufferClearColorui) { CmdRec *r = record_copy(c, CMD_CLEAR_COLOR, SF2C_CMDBUF_N_2_D473, SF2C_CMDBUF_N_16_B17E); r->x[SF2C_CMDBUF_N_5_EF2D] = SF2C_CMDBUF_N_2_D473; }
 PLAIN(nvnCommandBufferClearDepthStencil, CMD_CLEAR_DEPTH_STENCIL)
 // ClearTexture(cmd, texture, view, region, color, mask)
-typedef struct { uint64_t tex; NvnTextureView view; uint8_t has_view; int32_t region[6]; float color[4]; } ClearTexRec;
+typedef struct { uint64_t tex; NvnTextureView view; uint8_t has_view; int32_t region[SF2C_CMDBUF_N_6_E7F6]; float color[SF2C_CMDBUF_N_4_4B22]; } ClearTexRec;
 static void clear_texture(Cpu *c, int kind) {
     Snap s = snap(c);
     ClearTexRec ct = {0};
     ct.tex = (uint64_t)(uintptr_t)HOST(NvnTexture, s.x[1]);
     nvn_commands_texture(cb_of(s.x[0])->commands, (NvnTexture *)(uintptr_t)ct.tex);
-    if (s.x[2]) { ct.has_view = 1; memcpy(&ct.view, (void *)(uintptr_t)s.x[2], sizeof ct.view); nvn_texture_note_view((NvnTexture *)(uintptr_t)ct.tex, &ct.view); }
-    if (s.x[3]) memcpy(ct.region, (void *)(uintptr_t)s.x[3], sizeof ct.region);
-    if (s.x[4]) memcpy(ct.color, (void *)(uintptr_t)s.x[4], 16);
+    if (s.x[SF2C_CMDBUF_N_2_D473]) { ct.has_view = 1; memcpy(&ct.view, (void *)(uintptr_t)s.x[SF2C_CMDBUF_N_2_D473], sizeof ct.view); nvn_texture_note_view((NvnTexture *)(uintptr_t)ct.tex, &ct.view); }
+    if (s.x[SF2C_CMDBUF_N_3_4E07]) memcpy(ct.region, (void *)(uintptr_t)s.x[SF2C_CMDBUF_N_3_4E07], sizeof ct.region);
+    if (s.x[SF2C_CMDBUF_N_4_4B22]) memcpy(ct.color, (void *)(uintptr_t)s.x[SF2C_CMDBUF_N_4_4B22], SF2C_CMDBUF_N_16_B17E);
     CmdRec *r = record(c, CMD_CLEAR_TEXTURE, sizeof ct, &s);
-    r->x[6] = (uint64_t)kind;
+    r->x[SF2C_CMDBUF_N_6_E7F6] = (uint64_t)kind;
     memcpy(r->extra, &ct, sizeof ct);
 }
 NVN(nvnCommandBufferClearTexture) { clear_texture(c, 0); }
 NVN(nvnCommandBufferClearTexturei) { clear_texture(c, 1); }
-NVN(nvnCommandBufferClearTextureui) { clear_texture(c, 2); }
+NVN(nvnCommandBufferClearTextureui) { clear_texture(c, SF2C_CMDBUF_N_2_D473); }
 PLAIN(nvnCommandBufferClearBuffer, CMD_CLEAR_BUFFER)
 // DiscardColor(cmdbuf, index): the target's contents become undefined. On the Switch a discarded (compressed)
 // target reads back cleared; areas the game then leaves undrawn (e.g. a pit after a floor tile falls away) stay
 // black there. Treated as a clear to (0,0,0,0) (LARECOMP_KEEP_DISCARD=1: old no-op behaviour).
 NVN(nvnCommandBufferDiscardColor) {
     static int keep = -1, logged;
-    if (keep < 0) keep = getenv("LARECOMP_KEEP_DISCARD") != NULL;
-    if (logged < 5) { logged++; LOG("[nvn] DiscardColor index %llu%s\n", (unsigned long long)c->x[1], keep ? " (kept)" : " -> clear"); }
+    if (keep < 0) keep = getenv(SF2C_CMDBUF_S_LARECOMP_KEEP_DISCARD_3335) != NULL;
+    if (logged < SF2C_CMDBUF_N_5_EF2D) { logged++; LOG(SF2C_CMDBUF_S_NVN_DISCARDCOLOR_INDEX_LLU_S_0AB6, (unsigned long long)c->x[1], keep ? SF2C_CMDBUF_S_KEPT_F05B : SF2C_CMDBUF_S_CLEAR_5F40); }
     if (keep) return;
     Snap s = snap(c);
-    CmdRec *r = record(c, CMD_CLEAR_COLOR, 16, &s);
-    memset(r->extra, 0, 16);
-    r->x[2] = 0xF;  // all channels
-    r->x[5] = 0;    // float clear
+    CmdRec *r = record(c, CMD_CLEAR_COLOR, SF2C_CMDBUF_N_16_B17E, &s);
+    memset(r->extra, 0, SF2C_CMDBUF_N_16_B17E);
+    r->x[SF2C_CMDBUF_N_2_D473] = SF2C_CMDBUF_N_0XF_7419;  // all channels
+    r->x[SF2C_CMDBUF_N_5_EF2D] = 0;    // float clear
 }
 NVN(nvnCommandBufferDiscardDepthStencil) { (void)c; }
 
 NVN(nvnCommandBufferDrawArrays) {
-    static int ndraw; if (ndraw++ < 20) LOG("[cmdbuf] DrawArrays count=%llu\n", (unsigned long long)c->x[3]);
-    Snap s = snap(c); CmdRec *r = record(c, CMD_DRAW_ARRAYS, 0, &s); r->x[3] = 0; r->x[4] = 1;
+    static int ndraw; if (ndraw++ < SF2C_CMDBUF_N_20_F5CA) LOG(SF2C_CMDBUF_S_CMDBUF_DRAWARRAYS_COUNT_LLU__D5F2, (unsigned long long)c->x[SF2C_CMDBUF_N_3_4E07]);
+    Snap s = snap(c); CmdRec *r = record(c, CMD_DRAW_ARRAYS, 0, &s); r->x[SF2C_CMDBUF_N_3_4E07] = 0; r->x[SF2C_CMDBUF_N_4_4B22] = 1;
 }
 NVN(nvnCommandBufferDrawArraysInstanced) {
-    static int ndraw; if (ndraw++ < 20) LOG("[cmdbuf] DrawArraysInstanced count=%llu\n", (unsigned long long)c->x[3]);
+    static int ndraw; if (ndraw++ < SF2C_CMDBUF_N_20_F5CA) LOG(SF2C_CMDBUF_S_CMDBUF_DRAWARRAYSINSTANCED_C_E045, (unsigned long long)c->x[SF2C_CMDBUF_N_3_4E07]);
     Snap s = snap(c); record(c, CMD_DRAW_ARRAYS, 0, &s);
 }
 // Debug: LARECOMP_TRACE_COUNT=<n> logs the guest call chain of indexed draws with n indices.
 static void trace_draw(Cpu *c, uint64_t count) {
-    static int ndraw; if (ndraw++ < 20) LOG("[cmdbuf] DrawElements count=%llu lr=%llx\n", (unsigned long long)count, (unsigned long long)c->x[30]);
-    static long want = -2;
-    if (want == -2) want = getenv("LARECOMP_TRACE_COUNT") ? atol(getenv("LARECOMP_TRACE_COUNT")) : -1;
+    static int ndraw; if (ndraw++ < SF2C_CMDBUF_N_20_F5CA) LOG(SF2C_CMDBUF_S_CMDBUF_DRAWELEMENTS_COUNT_LL_FC3A, (unsigned long long)count, (unsigned long long)c->x[SF2C_CMDBUF_N_30_624B]);
+    static long want = -SF2C_CMDBUF_N_2_D473;
+    if (want == -SF2C_CMDBUF_N_2_D473) want = getenv(SF2C_CMDBUF_S_LARECOMP_TRACE_COUNT_D3AB) ? atol(getenv(SF2C_CMDBUF_S_LARECOMP_TRACE_COUNT_D3AB)) : -1;
     if (want < 0 || (long)count != want) return;
     static int n;
-    if (n++ > 40) return;
-    LOG("[trace] draw count %llu lr %llx chain:", (unsigned long long)count, (unsigned long long)c->x[30]);
-    uint64_t fp = c->x[29];
-    for (int i = 0; i < 14 && fp >= 0x7000000000ull && fp < 0x8000000000ull && (fp & 7) == 0; i++) {
-        uint64_t next = *(uint64_t *)(uintptr_t)fp, lr = *(uint64_t *)(uintptr_t)(fp + 8);
-        LOG(" %llx", (unsigned long long)lr);
+    if (n++ > SF2C_CMDBUF_N_40_D59E) return;
+    LOG(SF2C_CMDBUF_S_TRACE_DRAW_COUNT_LLU_LR_LLX__B2BF, (unsigned long long)count, (unsigned long long)c->x[SF2C_CMDBUF_N_30_624B]);
+    uint64_t fp = c->x[SF2C_CMDBUF_N_29_3513];
+    for (int i = 0; i < SF2C_CMDBUF_N_14_8527 && fp >= SF2C_CMDBUF_N_0X7000000000ULL_65B2 && fp < SF2C_CMDBUF_N_0X8000000000ULL_6587 && (fp & SF2C_CMDBUF_N_7_7902) == 0; i++) {
+        uint64_t next = *(uint64_t *)(uintptr_t)fp, lr = *(uint64_t *)(uintptr_t)(fp + SF2C_CMDBUF_N_8_2C62);
+        LOG(SF2C_CMDBUF_S_LLX_3290, (unsigned long long)lr);
         if (next <= fp) break;
         fp = next;
     }
-    LOG("\n");
+    LOG(SF2C_CMDBUF_S_N_D7A5);
 }
 
 NVN(nvnCommandBufferDrawElements) {
-    trace_draw(c, c->x[3]);
+    trace_draw(c, c->x[SF2C_CMDBUF_N_3_4E07]);
     Snap s = snap(c);
     CmdRec *r = record(c, CMD_DRAW_ELEMENTS, 0, &s);
-    r->x[4] = 0; r->x[5] = 0; r->x[6] = 1;  // base vertex, base instance, instances
+    r->x[SF2C_CMDBUF_N_4_4B22] = 0; r->x[SF2C_CMDBUF_N_5_EF2D] = 0; r->x[SF2C_CMDBUF_N_6_E7F6] = 1;  // base vertex, base instance, instances
 }
 NVN(nvnCommandBufferDrawElementsBaseVertex) {
-    trace_draw(c, c->x[3]);
+    trace_draw(c, c->x[SF2C_CMDBUF_N_3_4E07]);
     Snap s = snap(c);
     CmdRec *r = record(c, CMD_DRAW_ELEMENTS, 0, &s);
-    r->x[5] = 0; r->x[6] = 1;
+    r->x[SF2C_CMDBUF_N_5_EF2D] = 0; r->x[SF2C_CMDBUF_N_6_E7F6] = 1;
 }
-NVN(nvnCommandBufferDrawElementsInstanced) { trace_draw(c, c->x[3]); Snap s = snap(c); record(c, CMD_DRAW_ELEMENTS, 0, &s); }
+NVN(nvnCommandBufferDrawElementsInstanced) { trace_draw(c, c->x[SF2C_CMDBUF_N_3_4E07]); Snap s = snap(c); record(c, CMD_DRAW_ELEMENTS, 0, &s); }
 PLAIN(nvnCommandBufferDrawArraysIndirect, CMD_DRAW_ARRAYS_INDIRECT)
 PLAIN(nvnCommandBufferDrawElementsIndirect, CMD_DRAW_ELEMENTS_INDIRECT)
 NVN(nvnCommandBufferMultiDrawArraysIndirectCount) { (void)c; }
@@ -401,7 +402,7 @@ NVN(nvnCommandBufferPauseTransformFeedback) { (void)c; }
 NVN(nvnCommandBufferResumeTransformFeedback) { (void)c; }
 
 // ---- copies
-typedef struct { uint64_t tex; NvnTextureView view; uint8_t has_view; int32_t region[6]; } TexRef;
+typedef struct { uint64_t tex; NvnTextureView view; uint8_t has_view; int32_t region[SF2C_CMDBUF_N_6_E7F6]; } TexRef;
 static void tex_ref(NvnCmdBuf *cb, TexRef *t, uint64_t tex, uint64_t view, uint64_t region) {
     t->tex = tex ? (uint64_t)(uintptr_t)HOST(NvnTexture, tex) : 0;
     nvn_commands_texture(cb->commands, (NvnTexture *)(uintptr_t)t->tex);
@@ -411,39 +412,39 @@ static void tex_ref(NvnCmdBuf *cb, TexRef *t, uint64_t tex, uint64_t view, uint6
 NVN(nvnCommandBufferCopyBufferToTexture) {  // (cmd, src, dst, dstView, dstRegion, flags)
     Snap s = snap(c);
     TexRef t = {0};
-    tex_ref(cb_of(s.x[0]), &t, s.x[2], s.x[3], s.x[4]);
+    tex_ref(cb_of(s.x[0]), &t, s.x[SF2C_CMDBUF_N_2_D473], s.x[SF2C_CMDBUF_N_3_4E07], s.x[SF2C_CMDBUF_N_4_4B22]);
     CmdRec *r = record(c, CMD_COPY_BUFFER_TO_TEXTURE, sizeof t, &s);
     memcpy(r->extra, &t, sizeof t);
 }
 NVN(nvnCommandBufferCopyTextureToBuffer) {  // (cmd, src, srcView, srcRegion, dst, flags)
     Snap s = snap(c);
     TexRef t = {0};
-    tex_ref(cb_of(s.x[0]), &t, s.x[1], s.x[2], s.x[3]);
+    tex_ref(cb_of(s.x[0]), &t, s.x[1], s.x[SF2C_CMDBUF_N_2_D473], s.x[SF2C_CMDBUF_N_3_4E07]);
     CmdRec *r = record(c, CMD_COPY_TEXTURE_TO_BUFFER, sizeof t, &s);
     memcpy(r->extra, &t, sizeof t);
 }
 NVN(nvnCommandBufferCopyTextureToTexture) {  // (cmd, src, srcView, srcRegion, dst, dstView, dstRegion, flags)
     Snap s = snap(c);
-    TexRef t[2] = {{0}};
-    tex_ref(cb_of(s.x[0]), &t[0], s.x[1], s.x[2], s.x[3]);
-    tex_ref(cb_of(s.x[0]), &t[1], s.x[4], s.x[5], s.x[6]);
+    TexRef t[SF2C_CMDBUF_N_2_D473] = {{0}};
+    tex_ref(cb_of(s.x[0]), &t[0], s.x[1], s.x[SF2C_CMDBUF_N_2_D473], s.x[SF2C_CMDBUF_N_3_4E07]);
+    tex_ref(cb_of(s.x[0]), &t[1], s.x[SF2C_CMDBUF_N_4_4B22], s.x[SF2C_CMDBUF_N_5_EF2D], s.x[SF2C_CMDBUF_N_6_E7F6]);
     CmdRec *r = record(c, CMD_COPY_TEXTURE_TO_TEXTURE, sizeof t, &s);
     memcpy(r->extra, t, sizeof t);
 }
 PLAIN(nvnCommandBufferCopyBufferToBuffer, CMD_COPY_BUFFER_TO_BUFFER)
 NVN(nvnCommandBufferDownsample) {
     Snap s = snap(c);
-    TexRef t[2] = {{0}};
+    TexRef t[SF2C_CMDBUF_N_2_D473] = {{0}};
     tex_ref(cb_of(s.x[0]), &t[0], s.x[1], 0, 0);
-    tex_ref(cb_of(s.x[0]), &t[1], s.x[2], 0, 0);
+    tex_ref(cb_of(s.x[0]), &t[1], s.x[SF2C_CMDBUF_N_2_D473], 0, 0);
     CmdRec *r = record(c, CMD_DOWNSAMPLE, sizeof t, &s);
     memcpy(r->extra, t, sizeof t);
 }
 NVN(nvnCommandBufferDownsampleTextureView) {
     Snap s = snap(c);
-    TexRef t[2] = {{0}};
-    tex_ref(cb_of(s.x[0]), &t[0], s.x[1], s.x[2], 0);
-    tex_ref(cb_of(s.x[0]), &t[1], s.x[3], s.x[4], 0);
+    TexRef t[SF2C_CMDBUF_N_2_D473] = {{0}};
+    tex_ref(cb_of(s.x[0]), &t[0], s.x[1], s.x[SF2C_CMDBUF_N_2_D473], 0);
+    tex_ref(cb_of(s.x[0]), &t[1], s.x[SF2C_CMDBUF_N_3_4E07], s.x[SF2C_CMDBUF_N_4_4B22], 0);
     CmdRec *r = record(c, CMD_DOWNSAMPLE, sizeof t, &s);
     memcpy(r->extra, t, sizeof t);
 }
@@ -451,7 +452,7 @@ NVN(nvnCommandBufferTiledDownsample) { (void)c; }
 NVN(nvnCommandBufferTiledDownsampleTextureView) { (void)c; }
 NVN(nvnCommandBufferResolveDepthBuffer) { (void)c; }
 // UpdateUniformBuffer(cmd, buffer, size, offset, dataSize, data)
-NVN(nvnCommandBufferUpdateUniformBuffer) { record_copy(c, CMD_UPDATE_UNIFORM_BUFFER, 5, (uint32_t)A(4)); }
+NVN(nvnCommandBufferUpdateUniformBuffer) { record_copy(c, CMD_UPDATE_UNIFORM_BUFFER, SF2C_CMDBUF_N_5_EF2D, (uint32_t)A(SF2C_CMDBUF_N_4_4B22)); }
 
 // ---- synchronization and misc
 NVN(nvnCommandBufferFenceSync) {
@@ -468,9 +469,9 @@ NVN(nvnCommandBufferReportValue) { (void)c; }
 NVN(nvnCommandBufferResetCounter) { (void)c; }
 static void call_commands(Cpu *c) {
     NvnCmdBuf *cb = cb_of(A(0));
-    const uint64_t *handles = AP(2);
+    const uint64_t *handles = AP(SF2C_CMDBUF_N_2_D473);
     for (uint64_t i = 0; i < A(1); ++i) nvn_commands_call(cb->commands, handles[i]);
-    record_copy(c, CMD_CALL, 2, (uint32_t)A(1) * 8);
+    record_copy(c, CMD_CALL, SF2C_CMDBUF_N_2_D473, (uint32_t)A(1) * SF2C_CMDBUF_N_8_2C62);
 }
 NVN(nvnCommandBufferCallCommands) { call_commands(c); }
 NVN(nvnCommandBufferCopyCommands) { call_commands(c); }

@@ -1,3 +1,4 @@
+#include "constants/core.h"
 // Host OS layer: desktop platforms and 64-bit Android.
 #pragma once
 #include <stdbool.h>
@@ -15,7 +16,7 @@
 #endif
 
 #ifdef __cplusplus
-extern "C" {
+extern SF2C_PLATFORM_S_C_C2E8 {
 #endif
 
 // ---- guest address space
@@ -34,9 +35,9 @@ int plat_written_pages(uint64_t addr, uint64_t size, uint64_t *pages, int max, u
 #ifdef __linux__
 void plat_write_tracking_off(const char *why);  // tracking off from now on (unless LARECOMP_WRITE_TRACKING=1)
 #endif
-enum { PLAT_PROT_NONE = 0, PLAT_PROT_READ = 1, PLAT_PROT_RW = 3 };
+enum { PLAT_PROT_NONE = 0, PLAT_PROT_READ = 1, PLAT_PROT_RW = SF2C_PLATFORM_N_3_4E07 };
 int plat_protect(uint64_t addr, uint64_t size, int prot);  // 0 on success
-#define PLAT_PAGE 0x4000ull  // largest page size we deal with (macOS 16K; multiple of Windows' 4K)
+#define PLAT_PAGE SF2C_PLATFORM_N_0X4000ULL_E24A  // largest page size we deal with (macOS 16K; multiple of Windows' 4K)
 
 // ---- time
 uint64_t plat_now_ns(void);                // monotonic
@@ -61,9 +62,9 @@ void plat_init(void);                                // first thing in main()
 // The machine, for the log's first "[info]" line (runtime/main.c): nothing that identifies the player (no user name,
 // no paths). Fields left empty / 0 when unknown.
 typedef struct {
-    char os[128];          // "macOS 15.4 (arm64)", "SteamOS 3.6.19 (x86_64, kernel 6.5.0-valve22)"
-    char cpu[128];         // "Apple M3 Max"
-    char cores_detail[48]; // optional, after the core count: "12P + 4E"
+    char os[SF2C_PLATFORM_N_128_2747];          // "macOS 15.4 (arm64)", "SteamOS 3.6.19 (x86_64, kernel 6.5.0-valve22)"
+    char cpu[SF2C_PLATFORM_N_128_2747];         // "Apple M3 Max"
+    char cores_detail[SF2C_PLATFORM_N_48_9801]; // optional, after the core count: "12P + 4E"
     int cores, threads;    // physical cores, hardware threads
     uint64_t ram;          // bytes
     const char *package;   // ".app", "AppImage", "zip"; NULL: a build run from its folder
@@ -84,17 +85,17 @@ void plat_terminate(void);  // end the process now, skipping DLL teardown (exit 
 typedef intptr_t PlatProc;  // 0 = failed to start
 PlatProc plat_spawn(const char *const argv[], const char *log_path, bool append_log);
 int plat_proc_wait(PlatProc p, bool block);  // exit code, or -1 while still running (block = false)
-#define PLAT_PROC_SIGNALED 256               // + N: ended by signal N instead of exiting (not on Windows)
+#define PLAT_PROC_SIGNALED SF2C_PLATFORM_N_256_51E8               // + N: ended by signal N instead of exiting (not on Windows)
 void plat_proc_kill(PlatProc p);             // end it and what it started (then it's gone: no wait)
 bool plat_remove_tree(const char *dir);      // rm -rf
 // dir is synced by OneDrive (Windows: under a OneDrive folder, or a cloud file); false on other systems
 bool plat_onedrive_synced(const char *dir);
 #ifdef _WIN32
-#define PLAT_EXE_SUFFIX ".exe"
-#define PLAT_VENV_PYTHON "venv/Scripts/python.exe"  // relative to the venv's parent
+#define PLAT_EXE_SUFFIX SF2C_PLATFORM_PLAT_EXE_SUFFIX_8418E474
+#define PLAT_VENV_PYTHON SF2C_PLATFORM_S_VENV_SCRIPTS_PYTHON_EXE_1A88  // relative to the venv's parent
 #else
-#define PLAT_EXE_SUFFIX ""
-#define PLAT_VENV_PYTHON "venv/bin/python"
+#define PLAT_EXE_SUFFIX SF2C_PLATFORM_PLAT_EXE_SUFFIX_12AE32CB
+#define PLAT_VENV_PYTHON SF2C_PLATFORM_PLAT_VENV_PYTHON
 #endif
 
 // ---- diagnostics

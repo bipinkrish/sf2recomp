@@ -1,3 +1,4 @@
+#include "../constants/platform.h"
 // POSIX bits mingw-w64 lacks (included via runtime/platform.h on Windows only).
 // Build with -D_FILE_OFFSET_BITS=64 so off_t / stat sizes are 64-bit (game data files can be large).
 #pragma once
@@ -19,7 +20,7 @@ static inline int setenv(const char *k, const char *v, int overwrite) {
     if (!overwrite && getenv(k)) return 0;
     return _putenv_s(k, v);
 }
-static inline int unsetenv(const char *k) { return _putenv_s(k, ""); }
+static inline int unsetenv(const char *k) { return _putenv_s(k, SF2C_WIN_COMPAT_S_EMPTY_12AE); }
 
 static inline int fsync(int fd) { return _commit(fd); }
 
@@ -33,7 +34,7 @@ static inline uint32_t arc4random(void) {
 }
 
 static inline uint32_t arc4random_uniform(uint32_t n) {
-    if (n < 2) return 0;
+    if (n < SF2C_WIN_COMPAT_N_2_D473) return 0;
     uint32_t min = -n % n, r;  // reject the low values that would bias the modulo
     do r = arc4random(); while (r < min);
     return r % n;
@@ -70,7 +71,7 @@ static inline int plat_mkdir(const char *p, int mode) { (void)mode; return _mkdi
 // embedded UTF-8/longPathAware manifest is required by the UCRT file APIs.
 #include <limits.h>
 #undef PATH_MAX
-#define PATH_MAX 4096
+#define PATH_MAX SF2C_WIN_COMPAT_PATH_MAX
 // Existing files/directories, with symlinks and junctions resolved. Always uses
 // forward slashes, including for UNC paths, to match the runtime's path joins.
 char *realpath(const char *p, char *out);

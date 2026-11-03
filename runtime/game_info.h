@@ -1,10 +1,10 @@
+#include "constants/core.h"
 // Original game control metadata, read from the user's extraction at startup.
 #pragma once
 #include <stdint.h>
 
-#define SF2_APP_NAME "Shadow Fight 2 (sf2recomp)"
-#define SF2_APP_ID "org.sf2recomp.ShadowFight2"
-
+#define SF2_APP_NAME SF2C_GAME_INFO_SF2_APP_NAME
+#define SF2_APP_ID SF2C_GAME_INFO_SF2_APP_ID
 void game_info_load(const char *game_root);
 const char *game_display_version(void);  // empty if original NACP unavailable
 const char *game_window_title(void);

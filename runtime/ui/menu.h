@@ -1,9 +1,10 @@
+#include "../constants/ui.h"
 #pragma once
 #include <stdbool.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
-extern "C" {
+extern SF2C_MENU_S_C_C2E8 {
 #endif
 
 typedef union SDL_Event SDL_Event;

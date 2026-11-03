@@ -1,3 +1,4 @@
+#include "constants/core.h"
 // Runtime-internal declarations.
 #pragma once
 #include <pthread.h>
@@ -10,8 +11,8 @@
 
 // One write per line: stderr is unbuffered (main.c / platform: crash logs aren't lost), and Windows' CRT then wrote a
 // formatted line as dozens of separate WriteFile calls - the 2-second stats line cost ~40 ms, a hitch every 2 s.
-static inline void __attribute__((format(printf, 1, 2))) rt_log(const char *fmt, ...) {
-    char b[2048];
+static inline void __attribute__((format(printf, 1, SF2C_RT_N_2_D473))) rt_log(const char *fmt, ...) {
+    char b[SF2C_RT_N_2048_BFA0];
     va_list ap;
     va_start(ap, fmt);
     int n = vsnprintf(b, sizeof b, fmt, ap);
@@ -28,20 +29,20 @@ static inline void __attribute__((format(printf, 1, 2))) rt_log(const char *fmt,
 // ---- address space layout (guest addresses == host addresses)
 // macOS reserves 0x2_0000_0000-0x70_0000_0000, and guest addresses must fit in 39 bits, so the
 // guest lives in a 12.5 GB window at 0x70_0000_0000 claimed at startup (see main.c).
-#define GUEST_LO     0x7000000000ull
-#define GUEST_HI     0x7320000000ull
-#define MAIN_BASE    0x7000000000ull
-#define SDK_BASE     0x7004000000ull
-#define HLE_BASE     0x7080000000ull   // fake addresses for host-implemented functions
-#define HLE_SIZE     0x0000100000ull
-#define TLS_BASE     0x7090000000ull
-#define TLS_SIZE     0x0000100000ull
-#define HLE_HEAP     0x7092000000ull   // guest-visible memory owned by host code
-#define HLE_HEAP_SIZE 0x000E000000ull
-#define ALIAS_BASE   0x7100000000ull   // alias region (svcMapMemory targets)
-#define ALIAS_SIZE   0x0100000000ull
-#define HEAP_BASE    0x7240000000ull
-#define HEAP_MAX     0x00D0000000ull   // 3.25 GB
+#define GUEST_LO     SF2C_RT_N_0X7000000000ULL_65B2
+#define GUEST_HI     SF2C_RT_N_0X7320000000ULL_D186
+#define MAIN_BASE    SF2C_RT_N_0X7000000000ULL_65B2
+#define SDK_BASE     SF2C_RT_N_0X7004000000ULL_4805
+#define HLE_BASE     SF2C_RT_N_0X7080000000ULL_BF09   // fake addresses for host-implemented functions
+#define HLE_SIZE     SF2C_RT_N_0X0000100000ULL_677C
+#define TLS_BASE     SF2C_RT_N_0X7090000000ULL_76A8
+#define TLS_SIZE     SF2C_RT_N_0X0000100000ULL_677C
+#define HLE_HEAP     SF2C_RT_N_0X7092000000ULL_BDF6   // guest-visible memory owned by host code
+#define HLE_HEAP_SIZE SF2C_RT_HLE_HEAP_SIZE
+#define ALIAS_BASE   SF2C_RT_N_0X7100000000ULL_A15E   // alias region (svcMapMemory targets)
+#define ALIAS_SIZE   SF2C_RT_N_0X0100000000ULL_A561
+#define HEAP_BASE    SF2C_RT_N_0X7240000000ULL_194E
+#define HEAP_MAX     SF2C_RT_N_0X00D0000000ULL_6FF9   // 3.25 GB
 
 // ---- loader.c
 typedef struct Module {
@@ -52,7 +53,7 @@ typedef struct Module {
     uint64_t symtab, strtab, nsyms;
 } Module;
 
-extern Module g_modules[4];
+extern Module g_modules[SF2C_RT_N_4_4B22];
 extern int g_nmodules;
 void loader_load(const char *exefs_dir);  // (again after a reboot: modules are reloaded into wiped memory)
 uint64_t loader_find_symbol(const char *name);
@@ -73,7 +74,7 @@ void rt_guest_eh_reset(void);
 bool main_eh_lookup(uint64_t site, uint64_t type, uint64_t *pad, uint64_t *selector);
 bool sdk_eh_lookup(uint64_t site, uint64_t type, uint64_t *pad, uint64_t *selector);
 // runtime/crash_explain.c: the fatal line / crash spot, and the player's explanation of it (the crash dialog)
-void rt_fatal_msg(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+void rt_fatal_msg(const char *fmt, ...) __attribute__((format(printf, 1, SF2C_RT_N_2_D473)));
 void rt_crash_fault(const char *what, uint64_t fa, uint64_t pc);
 void rt_crash_explain(char *out, size_t n, const char *log_path);
 extern int rt_romfs_files;

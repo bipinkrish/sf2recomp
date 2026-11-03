@@ -1,3 +1,4 @@
+#include "../constants/services.h"
 // audren:u (audio renderer) and audout:u.
 #include <stdlib.h>
 #include <string.h>
@@ -18,10 +19,9 @@
 // Voices decode PCM16 / ADPCM wave buffers, resample to 48 kHz, and mix into their destination mix's
 // buffers; sub mixes route into their destination; the final mix feeds the device sink, which we
 // downmix to stereo and push to an SDL audio stream. Effects and splitters are not implemented.
-#define WB_COUNT 4
-#define MIXBUF_MAX 24
-#define HIST 4
-
+#define WB_COUNT SF2C_AUDIO_WB_COUNT
+#define MIXBUF_MAX SF2C_AUDIO_MIXBUF_MAX
+#define HIST SF2C_AUDIO_HIST
 static atomic_bool movie_audio_active;
 
 // Keep menu/game streams from competing with the decoded cutscene soundtrack. The movie's own SDL stream is separate.
@@ -42,7 +42,7 @@ typedef struct {  // per channel resource, "VoiceUpdateState"
     float fraction;
     int16_t hist[HIST];
     int16_t pred_scale, h0, h1;
-    float bq[2][2];  // biquad filter state per voice filter
+    float bq[SF2C_AUDIO_N_2_D473][SF2C_AUDIO_N_2_D473];  // biquad filter state per voice filter
 } ChanState;
 
 typedef struct {
@@ -57,11 +57,11 @@ typedef struct {
     float pitch, volume, prev_volume;
     int32_t mix_id;
     uint32_t splitter_id;
-    uint32_t chan_ids[6];
+    uint32_t chan_ids[SF2C_AUDIO_N_6_E7F6];
     uint64_t ds_addr;
     uint16_t behaviour;
-    uint8_t bq_on[2], bq_reset[2];
-    float bq[2][5];  // a0 a1 a2 b1 b2
+    uint8_t bq_on[SF2C_AUDIO_N_2_D473], bq_reset[SF2C_AUDIO_N_2_D473];
+    float bq[SF2C_AUDIO_N_2_D473][SF2C_AUDIO_N_5_EF2D];  // a0 a1 a2 b1 b2
     WaveBuf wb[WB_COUNT];
 } Voice;
 
@@ -90,7 +90,7 @@ typedef struct {
     ChanState *chst;
     Mix *mix;
     uint32_t nmix;
-    uint8_t sink_used, sink_inputs, sink_input[6];
+    uint8_t sink_used, sink_inputs, sink_input[SF2C_AUDIO_N_6_E7F6];
     Effect *fx;
     SDL_AudioStream *stream;
     FILE *wav;
@@ -103,17 +103,17 @@ static float clampf(float v, float lo, float hi) { return v < lo ? lo : v > hi ?
 
 // One sample of DSP ADPCM at absolute sample index s (frames of 8 bytes: header + 14 nibbles).
 static int16_t adpcm_next(const uint8_t *data, uint64_t size, uint32_t s, const int16_t *coefs, ChanState *cs) {
-    uint32_t frame = s / 14, n = s % 14;
-    uint64_t hdr = (uint64_t)frame * 8;
-    if (hdr + 1 + n / 2 >= size) return 0;
+    uint32_t frame = s / SF2C_AUDIO_N_14_8527, n = s % SF2C_AUDIO_N_14_8527;
+    uint64_t hdr = (uint64_t)frame * SF2C_AUDIO_N_8_2C62;
+    if (hdr + 1 + n / SF2C_AUDIO_N_2_D473 >= size) return 0;
     uint8_t ps = data[hdr];
-    int scale = ps & 15, ci = (ps >> 4) & 7;
-    uint8_t b = data[hdr + 1 + n / 2];
-    int nib = (n & 1) ? (int8_t)(b << 4) >> 4 : (int8_t)b >> 4;
-    int pred = coefs[ci * 2] * cs->h0 + coefs[ci * 2 + 1] * cs->h1;
-    int v = ((nib * (2048 << scale)) + pred + 1024) >> 11;
-    if (v > 32767) v = 32767;
-    if (v < -32768) v = -32768;
+    int scale = ps & SF2C_AUDIO_N_15_E629, ci = (ps >> SF2C_AUDIO_N_4_4B22) & SF2C_AUDIO_N_7_7902;
+    uint8_t b = data[hdr + 1 + n / SF2C_AUDIO_N_2_D473];
+    int nib = (n & 1) ? (int8_t)(b << SF2C_AUDIO_N_4_4B22) >> SF2C_AUDIO_N_4_4B22 : (int8_t)b >> SF2C_AUDIO_N_4_4B22;
+    int pred = coefs[ci * SF2C_AUDIO_N_2_D473] * cs->h0 + coefs[ci * SF2C_AUDIO_N_2_D473 + 1] * cs->h1;
+    int v = ((nib * (SF2C_AUDIO_N_2048_BFA0 << scale)) + pred + SF2C_AUDIO_N_1024_E39E) >> SF2C_AUDIO_N_11_4FC8;
+    if (v > SF2C_AUDIO_N_32767_D844) v = SF2C_AUDIO_N_32767_D844;
+    if (v < -SF2C_AUDIO_N_32768_D196) v = -SF2C_AUDIO_N_32768_D196;
     cs->h1 = cs->h0;
     cs->h0 = (int16_t)v;
     return (int16_t)v;
@@ -135,9 +135,9 @@ static int decode_voice(Voice *v, int ch, ChanState *cs, int16_t *out, int need)
     while (y < need) {
         if (!cs->valid[idx]) break;  // starving
         WaveBuf *wb = &v->wb[idx];
-        if (cs->offset == 0 && v->fmt == 6 && wb->ctx) {
+        if (cs->offset == 0 && v->fmt == SF2C_AUDIO_N_6_E7F6 && wb->ctx) {
             const int16_t *c = (const int16_t *)(uintptr_t)wb->ctx;
-            cs->pred_scale = c[0]; cs->h0 = c[1]; cs->h1 = c[2];
+            cs->pred_scale = c[0]; cs->h0 = c[1]; cs->h1 = c[SF2C_AUDIO_N_2_D473];
         }
         uint32_t start = wb->start, end = wb->end;
         if (cs->loop_count > 0 && wb->loop_start && wb->loop_end && wb->loop_start <= wb->loop_end) {
@@ -150,23 +150,23 @@ static int decode_voice(Voice *v, int ch, ChanState *cs, int16_t *out, int need)
         int want = need - y < avail ? need - y : avail;
         const uint8_t *data = (const uint8_t *)(uintptr_t)wb->addr;
         if (data && wb->size) {
-            if (v->fmt == 2) {  // PCM16 interleaved
+            if (v->fmt == SF2C_AUDIO_N_2_D473) {  // PCM16 interleaved
                 const int16_t *pcm = (const int16_t *)data;
-                uint64_t nsamp = wb->size / 2 / v->chans;
+                uint64_t nsamp = wb->size / SF2C_AUDIO_N_2_D473 / v->chans;
                 for (; n < want; n++) {
                     uint64_t s = (uint64_t)start + cs->offset + n;
                     if (s >= nsamp) break;
                     out[y + n] = pcm[s * v->chans + ch];
                 }
-            } else if (v->fmt == 6 && coefs) {
+            } else if (v->fmt == SF2C_AUDIO_N_6_E7F6 && coefs) {
                 for (; n < want; n++) out[y + n] = adpcm_next(data, wb->size, start + cs->offset + n, coefs, cs);
-            } else if (v->fmt == 3) {  // PCM float
+            } else if (v->fmt == SF2C_AUDIO_N_3_4E07) {  // PCM float
                 const float *pcm = (const float *)data;
-                uint64_t nsamp = wb->size / 4 / v->chans;
+                uint64_t nsamp = wb->size / SF2C_AUDIO_N_4_4B22 / v->chans;
                 for (; n < want; n++) {
                     uint64_t s = (uint64_t)start + cs->offset + n;
                     if (s >= nsamp) break;
-                    out[y + n] = (int16_t)clampf(pcm[s * v->chans + ch] * 32767.f, -32768.f, 32767.f);
+                    out[y + n] = (int16_t)clampf(pcm[s * v->chans + ch] * SF2C_AUDIO_N_32767_F_099A, -SF2C_AUDIO_N_32768_F_7EA1, SF2C_AUDIO_N_32767_F_099A);
                 }
             }
         }
@@ -191,7 +191,7 @@ static int decode_voice(Voice *v, int ch, ChanState *cs, int16_t *out, int need)
 
 // UpdateParametersForCommandGeneration: returns whether the voice should be played this frame.
 static int voice_prepare(Renderer *r, Voice *v) {
-    int nch = v->chans > 6 ? 6 : v->chans;
+    int nch = v->chans > SF2C_AUDIO_N_6_E7F6 ? SF2C_AUDIO_N_6_E7F6 : v->chans;
     if (v->is_new) {
         for (int c = 0; c < nch; c++) memset(&r->chst[v->chan_ids[c] % r->voices], 0, sizeof(ChanState));
         v->prev_volume = v->volume;
@@ -221,7 +221,7 @@ static int voice_prepare(Renderer *r, Voice *v) {
         for (int i = 0; i < WB_COUNT; i++) if (p->valid[i]) return 1;
         return 0;
     }
-    if (v->play_state == 2) {  // stopping: drop everything queued
+    if (v->play_state == SF2C_AUDIO_N_2_D473) {  // stopping: drop everything queued
         for (int i = 0; i < WB_COUNT; i++) {
             v->wb[i].sent = 1;
             for (int c = 0; c < nch; c++) {
@@ -284,7 +284,7 @@ static float dd_update(DecayDelay *d, float v) {
 }
 
 typedef struct {
-    uint8_t input[6], output[6];
+    uint8_t input[SF2C_AUDIO_N_6_E7F6], output[SF2C_AUDIO_N_6_E7F6];
     uint16_t ch_max, ch;
     int32_t sample_rate, early_mode, early_gain, pre_delay, late_mode, late_gain, decay_time, hf_decay_ratio,
         coloration, reverb_gain, out_gain, dry_gain;
@@ -292,31 +292,31 @@ typedef struct {
 
 typedef struct {
     int ready;
-    uint8_t raw[0x44];  // last parameter bytes seen
+    uint8_t raw[SF2C_AUDIO_N_0X44_E723];  // last parameter bytes seen
     ReverbParam p;
-    DelayLine fdn[4], pre, fc;
-    DecayDelay decay[4];
-    uint32_t early_time[10], pre_time;
-    float early_gain[10], hf_direct[4], hf_prev[4], prev_fb[4];
+    DelayLine fdn[SF2C_AUDIO_N_4_4B22], pre, fc;
+    DecayDelay decay[SF2C_AUDIO_N_4_4B22];
+    uint32_t early_time[SF2C_AUDIO_N_10_4A44], pre_time;
+    float early_gain[SF2C_AUDIO_N_10_4A44], hf_direct[SF2C_AUDIO_N_4_4B22], hf_prev[SF2C_AUDIO_N_4_4B22], prev_fb[SF2C_AUDIO_N_4_4B22];
 } Reverb;
 
-static const float rv_fdn_times[20] = {53.953247f, 79.192566f, 116.238770f, 130.615295f, 53.953247f, 79.192566f,
-    116.238770f, 170.615295f, 5, 10, 5, 10, 47.03f, 71, 103, 170, 53.953247f, 79.192566f, 116.238770f, 170.615295f};
-static const float rv_decay_times[20] = {7, 9, 13, 17, 7, 9, 13, 17, 1, 1, 1, 1, 7, 7, 13, 9, 7, 9, 13, 17};
-static const float rv_early_times[50] = {0.0f, 3.5f, 2.8f, 3.9f, 2.7f, 13.4f, 7.9f, 8.4f, 9.9f, 12.0f,
-    0.0f, 11.8f, 5.5f, 11.2f, 10.4f, 38.1f, 22.2f, 29.6f, 21.2f, 24.8f,
-    0.0f, 41.5f, 20.5f, 41.3f, 0.0f, 29.5f, 33.8f, 45.2f, 46.8f, 0.0f,
-    33.1f, 43.3f, 22.8f, 37.9f, 14.9f, 35.3f, 17.9f, 34.2f, 0.0f, 43.3f, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-static const float rv_early_gain[50] = {0.70f, 0.68f, 0.70f, 0.68f, 0.70f, 0.68f, 0.70f, 0.68f, 0.68f, 0.68f,
-    0.70f, 0.68f, 0.70f, 0.68f, 0.70f, 0.68f, 0.68f, 0.68f, 0.68f, 0.68f,
-    0.50f, 0.70f, 0.70f, 0.68f, 0.50f, 0.68f, 0.68f, 0.70f, 0.68f, 0.00f,
-    0.93f, 0.92f, 0.87f, 0.86f, 0.94f, 0.81f, 0.80f, 0.77f, 0.76f, 0.65f, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-static const float rv_pre_times[5] = {12.5f, 40.0f, 50.0f, 50.0f, 0.0f};
+static const float rv_fdn_times[SF2C_AUDIO_N_20_F5CA] = {SF2C_AUDIO_N_53_953247F_F0AA, SF2C_AUDIO_N_79_192566F_5EAB, SF2C_AUDIO_N_116_238770F_06A6, SF2C_AUDIO_N_130_615295F_BC48, SF2C_AUDIO_N_53_953247F_F0AA, SF2C_AUDIO_N_79_192566F_5EAB,
+    SF2C_AUDIO_N_116_238770F_06A6, SF2C_AUDIO_N_170_615295F_5A57, SF2C_AUDIO_N_5_EF2D, SF2C_AUDIO_N_10_4A44, SF2C_AUDIO_N_5_EF2D, SF2C_AUDIO_N_10_4A44, SF2C_AUDIO_N_47_03F_BBF2, SF2C_AUDIO_N_71_7F22, SF2C_AUDIO_N_103_454F, SF2C_AUDIO_N_170_734D, SF2C_AUDIO_N_53_953247F_F0AA, SF2C_AUDIO_N_79_192566F_5EAB, SF2C_AUDIO_N_116_238770F_06A6, SF2C_AUDIO_N_170_615295F_5A57};
+static const float rv_decay_times[SF2C_AUDIO_N_20_F5CA] = {SF2C_AUDIO_N_7_7902, SF2C_AUDIO_N_9_1958, SF2C_AUDIO_N_13_3FDB, SF2C_AUDIO_N_17_4523, SF2C_AUDIO_N_7_7902, SF2C_AUDIO_N_9_1958, SF2C_AUDIO_N_13_3FDB, SF2C_AUDIO_N_17_4523, 1, 1, 1, 1, SF2C_AUDIO_N_7_7902, SF2C_AUDIO_N_7_7902, SF2C_AUDIO_N_13_3FDB, SF2C_AUDIO_N_9_1958, SF2C_AUDIO_N_7_7902, SF2C_AUDIO_N_9_1958, SF2C_AUDIO_N_13_3FDB, SF2C_AUDIO_N_17_4523};
+static const float rv_early_times[SF2C_AUDIO_N_50_1A65] = {SF2C_AUDIO_N_0_0F_6895, SF2C_AUDIO_N_3_5F_8924, SF2C_AUDIO_N_2_8F_E8D4, SF2C_AUDIO_N_3_9F_48FA, SF2C_AUDIO_N_2_7F_B3C8, SF2C_AUDIO_N_13_4F_BBBE, SF2C_AUDIO_N_7_9F_3640, SF2C_AUDIO_N_8_4F_8B36, SF2C_AUDIO_N_9_9F_C2F3, SF2C_AUDIO_N_12_0F_4418,
+    SF2C_AUDIO_N_0_0F_6895, SF2C_AUDIO_N_11_8F_B092, SF2C_AUDIO_N_5_5F_84EC, SF2C_AUDIO_N_11_2F_A81E, SF2C_AUDIO_N_10_4F_EC75, SF2C_AUDIO_N_38_1F_AB68, SF2C_AUDIO_N_22_2F_37BE, SF2C_AUDIO_N_29_6F_5F8D, SF2C_AUDIO_N_21_2F_6343, SF2C_AUDIO_N_24_8F_4279,
+    SF2C_AUDIO_N_0_0F_6895, SF2C_AUDIO_N_41_5F_CF04, SF2C_AUDIO_N_20_5F_6968, SF2C_AUDIO_N_41_3F_6BA8, SF2C_AUDIO_N_0_0F_6895, SF2C_AUDIO_N_29_5F_3E9C, SF2C_AUDIO_N_33_8F_1E3B, SF2C_AUDIO_N_45_2F_4AC8, SF2C_AUDIO_N_46_8F_A562, SF2C_AUDIO_N_0_0F_6895,
+    SF2C_AUDIO_N_33_1F_FD7F, SF2C_AUDIO_N_43_3F_906F, SF2C_AUDIO_N_22_8F_2BB7, SF2C_AUDIO_N_37_9F_1A68, SF2C_AUDIO_N_14_9F_E8A9, SF2C_AUDIO_N_35_3F_5686, SF2C_AUDIO_N_17_9F_7802, SF2C_AUDIO_N_34_2F_34DE, SF2C_AUDIO_N_0_0F_6895, SF2C_AUDIO_N_43_3F_906F, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static const float rv_early_gain[SF2C_AUDIO_N_50_1A65] = {SF2C_AUDIO_N_0_70F_658D, SF2C_AUDIO_N_0_68F_DDB5, SF2C_AUDIO_N_0_70F_658D, SF2C_AUDIO_N_0_68F_DDB5, SF2C_AUDIO_N_0_70F_658D, SF2C_AUDIO_N_0_68F_DDB5, SF2C_AUDIO_N_0_70F_658D, SF2C_AUDIO_N_0_68F_DDB5, SF2C_AUDIO_N_0_68F_DDB5, SF2C_AUDIO_N_0_68F_DDB5,
+    SF2C_AUDIO_N_0_70F_658D, SF2C_AUDIO_N_0_68F_DDB5, SF2C_AUDIO_N_0_70F_658D, SF2C_AUDIO_N_0_68F_DDB5, SF2C_AUDIO_N_0_70F_658D, SF2C_AUDIO_N_0_68F_DDB5, SF2C_AUDIO_N_0_68F_DDB5, SF2C_AUDIO_N_0_68F_DDB5, SF2C_AUDIO_N_0_68F_DDB5, SF2C_AUDIO_N_0_68F_DDB5,
+    SF2C_AUDIO_N_0_50F_08F1, SF2C_AUDIO_N_0_70F_658D, SF2C_AUDIO_N_0_70F_658D, SF2C_AUDIO_N_0_68F_DDB5, SF2C_AUDIO_N_0_50F_08F1, SF2C_AUDIO_N_0_68F_DDB5, SF2C_AUDIO_N_0_68F_DDB5, SF2C_AUDIO_N_0_70F_658D, SF2C_AUDIO_N_0_68F_DDB5, SF2C_AUDIO_N_0_00F_A65B,
+    SF2C_AUDIO_N_0_93F_2B83, SF2C_AUDIO_N_0_92F_C109, SF2C_AUDIO_N_0_87F_FEAA, SF2C_AUDIO_N_0_86F_9ECE, SF2C_AUDIO_N_0_94F_72F4, SF2C_AUDIO_N_0_81F_C8B3, SF2C_AUDIO_N_0_80F_2FA7, SF2C_AUDIO_N_0_77F_90D4, SF2C_AUDIO_N_0_76F_7D5F, SF2C_AUDIO_N_0_65F_E225, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static const float rv_pre_times[SF2C_AUDIO_N_5_EF2D] = {SF2C_AUDIO_N_12_5F_9D47, SF2C_AUDIO_N_40_0F_BA4D, SF2C_AUDIO_N_50_0F_36FB, SF2C_AUDIO_N_50_0F_36FB, SF2C_AUDIO_N_0_0F_6895};
 
-static float q14(int32_t v) { return v / 16384.0f; }
+static float q14(int32_t v) { return v / SF2C_AUDIO_N_16384_0F_EB94; }
 static uint32_t rv_rate(const ReverbParam *p) {
     uint32_t sr = (uint32_t)q14(p->sample_rate);  // samples per millisecond
-    return sr && sr <= 192 ? sr : 48;
+    return sr && sr <= SF2C_AUDIO_N_192_EB3B ? sr : SF2C_AUDIO_N_48_9801;
 }
 
 static void reverb_update(Reverb *rv) {
@@ -324,95 +324,95 @@ static void reverb_update(Reverb *rv) {
     uint32_t sr = rv_rate(p);
     float pre_ms = q14(p->pre_delay), early_gain = q14(p->early_gain), coloration = q14(p->coloration);
     float decay_time = q14(p->decay_time);
-    int em = p->early_mode >= 0 && p->early_mode < 5 ? p->early_mode : 4;
-    int lm = p->late_mode >= 0 && p->late_mode < 5 ? p->late_mode : 0;
-    for (int i = 0; i < 10; i++) {
+    int em = p->early_mode >= 0 && p->early_mode < SF2C_AUDIO_N_5_EF2D ? p->early_mode : SF2C_AUDIO_N_4_4B22;
+    int lm = p->late_mode >= 0 && p->late_mode < SF2C_AUDIO_N_5_EF2D ? p->late_mode : 0;
+    for (int i = 0; i < SF2C_AUDIO_N_10_4A44; i++) {
         uint32_t t = (uint32_t)roundf(sr * (rv_early_times[i] + pre_ms));
         rv->early_time[i] = (t < rv->pre.max ? t : rv->pre.max) + 1;
         rv->early_gain[i] = rv_early_gain[i] * early_gain;
     }
-    if (p->ch == 2) { rv->early_gain[4] *= 0.5f; rv->early_gain[5] *= 0.5f; }
+    if (p->ch == SF2C_AUDIO_N_2_D473) { rv->early_gain[SF2C_AUDIO_N_4_4B22] *= SF2C_AUDIO_N_0_5F_2DB0; rv->early_gain[SF2C_AUDIO_N_5_EF2D] *= SF2C_AUDIO_N_0_5F_2DB0; }
     uint32_t pt = (uint32_t)roundf(sr * (rv_pre_times[em] + pre_ms));
     rv->pre_time = pt < rv->pre.max ? pt : rv->pre.max;
-    float hf_ratio = q14(p->hf_decay_ratio), hf_cos = cosf(1280.0f / sr);
-    for (int i = 0; i < 4; i++) {
-        dl_set(&rv->fdn[i], rv_fdn_times[lm * 4 + i]);
-        dl_set(&rv->decay[i].dl, rv_decay_times[lm * 4 + i]);
-        float a = -3.0f * (rv->decay[i].dl.count + rv->fdn[i].count);
-        float b = decay_time > 0 ? a / (decay_time * sr) : -1000.0f;
+    float hf_ratio = q14(p->hf_decay_ratio), hf_cos = cosf(SF2C_AUDIO_N_1280_0F_7ADA / sr);
+    for (int i = 0; i < SF2C_AUDIO_N_4_4B22; i++) {
+        dl_set(&rv->fdn[i], rv_fdn_times[lm * SF2C_AUDIO_N_4_4B22 + i]);
+        dl_set(&rv->decay[i].dl, rv_decay_times[lm * SF2C_AUDIO_N_4_4B22 + i]);
+        float a = -SF2C_AUDIO_N_3_0F_70A4 * (rv->decay[i].dl.count + rv->fdn[i].count);
+        float b = decay_time > 0 ? a / (decay_time * sr) : -SF2C_AUDIO_N_1000_0F_2FBA;
         float c, d;
-        if (hf_ratio < 0.995f && hf_ratio > 0) {
-            float e = powf(10.0f, (((1.0f / hf_ratio) - 1.0f) * 2) / 100 * (b / 10));
-            float f = 1.0f - e, g = 2.0f - (e * 2 * hf_cos);
-            float h = sqrtf(fmaxf(0, g * g - f * f * 4));
-            c = f != 0 ? (g - h) / (f * 2) : 0;
-            d = 1.0f - c;
+        if (hf_ratio < SF2C_AUDIO_N_0_995F_9B8C && hf_ratio > 0) {
+            float e = powf(SF2C_AUDIO_N_10_0F_BE4E, (((SF2C_AUDIO_N_1_0F_CA71 / hf_ratio) - SF2C_AUDIO_N_1_0F_CA71) * SF2C_AUDIO_N_2_D473) / SF2C_AUDIO_N_100_AD57 * (b / SF2C_AUDIO_N_10_4A44));
+            float f = SF2C_AUDIO_N_1_0F_CA71 - e, g = SF2C_AUDIO_N_2_0F_2E19 - (e * SF2C_AUDIO_N_2_D473 * hf_cos);
+            float h = sqrtf(fmaxf(0, g * g - f * f * SF2C_AUDIO_N_4_4B22));
+            c = f != 0 ? (g - h) / (f * SF2C_AUDIO_N_2_D473) : 0;
+            d = SF2C_AUDIO_N_1_0F_CA71 - c;
         } else {
             c = 0;
             d = 1;
         }
-        rv->hf_direct[i] = powf(10.0f, b / 1000) * d * 0.7071f;
+        rv->hf_direct[i] = powf(SF2C_AUDIO_N_10_0F_BE4E, b / SF2C_AUDIO_N_1000_4051) * d * SF2C_AUDIO_N_0_7071F_4960;
         rv->hf_prev[i] = c;
         rv->prev_fb[i] = 0;
-        rv->decay[i].rate = 0.6f * (1.0f - coloration);
+        rv->decay[i].rate = SF2C_AUDIO_N_0_6F_6EB9 * (SF2C_AUDIO_N_1_0F_CA71 - coloration);
     }
 }
 
 static void reverb_init(Reverb *rv) {
     uint32_t sr = rv_rate(&rv->p);
-    for (int i = 0; i < 4; i++) {
-        dl_init(&rv->fdn[i], sr, rv_fdn_times[16 + i]);
-        dl_init(&rv->decay[i].dl, sr, rv_decay_times[16 + i]);
+    for (int i = 0; i < SF2C_AUDIO_N_4_4B22; i++) {
+        dl_init(&rv->fdn[i], sr, rv_fdn_times[SF2C_AUDIO_N_16_B17E + i]);
+        dl_init(&rv->decay[i].dl, sr, rv_decay_times[SF2C_AUDIO_N_16_B17E + i]);
     }
-    dl_init(&rv->pre, sr, 150.0f);  // long pre-delay needs REV3+... 350 ms
-    dl_init(&rv->fc, sr, 5.0f);
+    dl_init(&rv->pre, sr, SF2C_AUDIO_N_150_0F_7DA6);  // long pre-delay needs REV3+... 350 ms
+    dl_init(&rv->fc, sr, SF2C_AUDIO_N_5_0F_6796);
     reverb_update(rv);
     rv->ready = 1;
 }
 
 static void reverb_process(Reverb *rv, float *const *in, float *const *out, uint32_t n) {
-    static const int8_t oe1[10] = {0}, te[10] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-    static const int8_t o1[4] = {0}, tf1[4] = {0, 1, 2, 3};
-    static const int8_t oe2[10] = {0, 0, 1, 1, 0, 1, 0, 0, 1, 1}, o2[4] = {0, 0, 1, 1}, tf2[4] = {2, 0, 3, 1};
-    static const int8_t oe4[10] = {0, 0, 1, 1, 0, 1, 2, 2, 3, 3}, o4[4] = {0, 1, 2, 3}, tf4[4] = {0, 1, 2, 3};
-    static const int8_t oe6[20] = {0, 5, 0, 5, 1, 5, 1, 5, 4, 5, 4, 5, 2, 5, 2, 5, 3, 5, 3, 5};
-    static const int8_t te6[20] = {0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9};
-    static const int8_t o6[6] = {0, 1, 2, 3, 4, 5}, tf6[6] = {0, 1, 2, 3, -1, 3};
+    static const int8_t oe1[SF2C_AUDIO_N_10_4A44] = {0}, te[SF2C_AUDIO_N_10_4A44] = {0, 1, SF2C_AUDIO_N_2_D473, SF2C_AUDIO_N_3_4E07, SF2C_AUDIO_N_4_4B22, SF2C_AUDIO_N_5_EF2D, SF2C_AUDIO_N_6_E7F6, SF2C_AUDIO_N_7_7902, SF2C_AUDIO_N_8_2C62, SF2C_AUDIO_N_9_1958};
+    static const int8_t o1[SF2C_AUDIO_N_4_4B22] = {0}, tf1[SF2C_AUDIO_N_4_4B22] = {0, 1, SF2C_AUDIO_N_2_D473, SF2C_AUDIO_N_3_4E07};
+    static const int8_t oe2[SF2C_AUDIO_N_10_4A44] = {0, 0, 1, 1, 0, 1, 0, 0, 1, 1}, o2[SF2C_AUDIO_N_4_4B22] = {0, 0, 1, 1}, tf2[SF2C_AUDIO_N_4_4B22] = {SF2C_AUDIO_N_2_D473, 0, SF2C_AUDIO_N_3_4E07, 1};
+    static const int8_t oe4[SF2C_AUDIO_N_10_4A44] = {0, 0, 1, 1, 0, 1, SF2C_AUDIO_N_2_D473, SF2C_AUDIO_N_2_D473, SF2C_AUDIO_N_3_4E07, SF2C_AUDIO_N_3_4E07}, o4[SF2C_AUDIO_N_4_4B22] = {0, 1, SF2C_AUDIO_N_2_D473, SF2C_AUDIO_N_3_4E07}, tf4[SF2C_AUDIO_N_4_4B22] = {0, 1, SF2C_AUDIO_N_2_D473, SF2C_AUDIO_N_3_4E07};
+    static const int8_t oe6[SF2C_AUDIO_N_20_F5CA] = {0, SF2C_AUDIO_N_5_EF2D, 0, SF2C_AUDIO_N_5_EF2D, 1, SF2C_AUDIO_N_5_EF2D, 1, SF2C_AUDIO_N_5_EF2D, SF2C_AUDIO_N_4_4B22, SF2C_AUDIO_N_5_EF2D, SF2C_AUDIO_N_4_4B22, SF2C_AUDIO_N_5_EF2D, SF2C_AUDIO_N_2_D473, SF2C_AUDIO_N_5_EF2D, SF2C_AUDIO_N_2_D473, SF2C_AUDIO_N_5_EF2D, SF2C_AUDIO_N_3_4E07, SF2C_AUDIO_N_5_EF2D, SF2C_AUDIO_N_3_4E07, SF2C_AUDIO_N_5_EF2D};
+    static const int8_t te6[SF2C_AUDIO_N_20_F5CA] = {0, 0, 1, 1, SF2C_AUDIO_N_2_D473, SF2C_AUDIO_N_2_D473, SF2C_AUDIO_N_3_4E07, SF2C_AUDIO_N_3_4E07, SF2C_AUDIO_N_4_4B22, SF2C_AUDIO_N_4_4B22, SF2C_AUDIO_N_5_EF2D, SF2C_AUDIO_N_5_EF2D, SF2C_AUDIO_N_6_E7F6, SF2C_AUDIO_N_6_E7F6, SF2C_AUDIO_N_7_7902, SF2C_AUDIO_N_7_7902, SF2C_AUDIO_N_8_2C62, SF2C_AUDIO_N_8_2C62, SF2C_AUDIO_N_9_1958, SF2C_AUDIO_N_9_1958};
+    static const int8_t o6[SF2C_AUDIO_N_6_E7F6] = {0, 1, SF2C_AUDIO_N_2_D473, SF2C_AUDIO_N_3_4E07, SF2C_AUDIO_N_4_4B22, SF2C_AUDIO_N_5_EF2D}, tf6[SF2C_AUDIO_N_6_E7F6] = {0, 1, SF2C_AUDIO_N_2_D473, SF2C_AUDIO_N_3_4E07, -1, SF2C_AUDIO_N_3_4E07};
     int ch = rv->p.ch;
     const int8_t *oe, *tel, *o, *tf;
     int ne, nf;
     switch (ch) {
-    case 1: oe = oe1; tel = te; o = o1; tf = tf1; ne = 10; nf = 4; break;
-    case 2: oe = oe2; tel = te; o = o2; tf = tf2; ne = 10; nf = 4; break;
-    case 4: oe = oe4; tel = te; o = o4; tf = tf4; ne = 10; nf = 4; break;
-    case 6: oe = oe6; tel = te6; o = o6; tf = tf6; ne = 20; nf = 6; break;
+    case 1: oe = oe1; tel = te; o = o1; tf = tf1; ne = SF2C_AUDIO_N_10_4A44; nf = SF2C_AUDIO_N_4_4B22; break;
+    case SF2C_AUDIO_N_2_D473: oe = oe2; tel = te; o = o2; tf = tf2; ne = SF2C_AUDIO_N_10_4A44; nf = SF2C_AUDIO_N_4_4B22; break;
+    case SF2C_AUDIO_N_4_4B22: oe = oe4; tel = te; o = o4; tf = tf4; ne = SF2C_AUDIO_N_10_4A44; nf = SF2C_AUDIO_N_4_4B22; break;
+    case SF2C_AUDIO_N_6_E7F6: oe = oe6; tel = te6; o = o6; tf = tf6; ne = SF2C_AUDIO_N_20_F5CA; nf = SF2C_AUDIO_N_6_E7F6; break;
     default: return;
     }
     float reverb_gain = q14(rv->p.reverb_gain), late_gain = q14(rv->p.late_gain);
     float out_gain = q14(rv->p.out_gain), dry_gain = q14(rv->p.dry_gain);
     for (uint32_t s = 0; s < n; s++) {
-        float ov[6] = {0}, fb[4], fo[4], cin[6];
+        float ov[SF2C_AUDIO_N_6_E7F6] = {0}, fb[SF2C_AUDIO_N_4_4B22], fo[SF2C_AUDIO_N_4_4B22], cin[SF2C_AUDIO_N_6_E7F6];
         for (int i = 0; i < ne; i++) ov[oe[i]] += dl_tap_unsafe(&rv->pre, rv->early_time[tel[i]], 0) * rv->early_gain[tel[i]];
-        if (ch == 6) ov[5] *= 0.2f;
+        if (ch == SF2C_AUDIO_N_6_E7F6) ov[SF2C_AUDIO_N_5_EF2D] *= SF2C_AUDIO_N_0_2F_ED8E;
         float pre = 0;
-        for (int c = 0; c < ch; c++) { cin[c] = in[c][s] * 64; pre += cin[c] * reverb_gain; }
+        for (int c = 0; c < ch; c++) { cin[c] = in[c][s] * SF2C_AUDIO_N_64_A68B; pre += cin[c] * reverb_gain; }
         dl_update(&rv->pre, pre);
         float late = dl_tap(&rv->pre, rv->pre_time) * late_gain;
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < SF2C_AUDIO_N_4_4B22; i++) {
             fo[i] = dl_read(&rv->fdn[i]) * rv->hf_direct[i] + rv->prev_fb[i] * rv->hf_prev[i];
             rv->prev_fb[i] = fo[i];
         }
-        fb[0] = fo[2] + fo[1];
-        fb[1] = -fo[0] - fo[3];
-        fb[2] = fo[0] - fo[3];
-        fb[3] = fo[1] - fo[2];
-        for (int i = 0; i < 4; i++) {
+        fb[0] = fo[SF2C_AUDIO_N_2_D473] + fo[1];
+        fb[1] = -fo[0] - fo[SF2C_AUDIO_N_3_4E07];
+        fb[SF2C_AUDIO_N_2_D473] = fo[0] - fo[SF2C_AUDIO_N_3_4E07];
+        fb[SF2C_AUDIO_N_3_4E07] = fo[1] - fo[SF2C_AUDIO_N_2_D473];
+        for (int i = 0; i < SF2C_AUDIO_N_4_4B22; i++) {
             fo[i] = dd_update(&rv->decay[i], fb[i] + late);
             dl_update(&rv->fdn[i], fo[i]);
         }
         for (int i = 0; i < nf; i++) if (tf[i] >= 0) ov[o[i]] += fo[tf[i]];
-        if (ch == 6) ov[4] += dl_update(&rv->fc, (fo[2] - fo[3]) * 0.5f);
-        for (int c = 0; c < ch; c++) out[c][s] = (ov[c] * out_gain + cin[c] * dry_gain) / 64;
+        if (ch == SF2C_AUDIO_N_6_E7F6) ov[SF2C_AUDIO_N_4_4B22] += dl_update(&rv->fc, (fo[SF2C_AUDIO_N_2_D473] - fo[SF2C_AUDIO_N_3_4E07]) * SF2C_AUDIO_N_0_5F_2DB0);
+        for (int c = 0; c < ch; c++) out[c][s] = (ov[c] * out_gain + cin[c] * dry_gain) / SF2C_AUDIO_N_64_A68B;
     }
 }
 
@@ -427,26 +427,26 @@ struct Effect {
 static void effect_update(Effect *fx, const uint8_t *e) {
     if (fx->type != e[0]) memset(&fx->rv.p, 0, sizeof fx->rv.p), fx->rv.ready = 0;
     fx->type = e[0];
-    fx->enabled = e[2];
-    memcpy(&fx->mix_id, e + 4, 4);
-    memcpy(&fx->order, e + 0x18, 4);
-    if (fx->type != 4) return;
-    const uint8_t *d = e + 0x20;
+    fx->enabled = e[SF2C_AUDIO_N_2_D473];
+    memcpy(&fx->mix_id, e + SF2C_AUDIO_N_4_4B22, SF2C_AUDIO_N_4_4B22);
+    memcpy(&fx->order, e + SF2C_AUDIO_N_0X18_D47C, SF2C_AUDIO_N_4_4B22);
+    if (fx->type != SF2C_AUDIO_N_4_4B22) return;
+    const uint8_t *d = e + SF2C_AUDIO_N_0X20_A766;
     uint16_t ch_max, ch;
-    memcpy(&ch_max, d + 12, 2);
-    memcpy(&ch, d + 14, 2);
-    if (ch_max != 1 && ch_max != 2 && ch_max != 4 && ch_max != 6) return;
-    if (ch != 1 && ch != 2 && ch != 4 && ch != 6) return;
+    memcpy(&ch_max, d + SF2C_AUDIO_N_12_6B51, SF2C_AUDIO_N_2_D473);
+    memcpy(&ch, d + SF2C_AUDIO_N_14_8527, SF2C_AUDIO_N_2_D473);
+    if (ch_max != 1 && ch_max != SF2C_AUDIO_N_2_D473 && ch_max != SF2C_AUDIO_N_4_4B22 && ch_max != SF2C_AUDIO_N_6_E7F6) return;
+    if (ch != 1 && ch != SF2C_AUDIO_N_2_D473 && ch != SF2C_AUDIO_N_4_4B22 && ch != SF2C_AUDIO_N_6_E7F6) return;
     if (e[1] || !fx->rv.ready) {
         memcpy(fx->rv.raw, d, sizeof fx->rv.raw);
         memcpy(&fx->rv.p, d, sizeof fx->rv.p);
-        if (getenv("LARECOMP_AUDIO_LOG"))
-            LOG("[audren] reverb init: ch %u rate %d early %d/%d pre %d late %d/%d decay %d hf %d col %d gains %d/%d/%d\n",
+        if (getenv(SF2C_AUDIO_S_LARECOMP_AUDIO_LOG_866C))
+            LOG(SF2C_AUDIO_S_AUDREN_REVERB_INIT_CH_U_RATE_307A,
                 ch, fx->rv.p.sample_rate, fx->rv.p.early_mode, fx->rv.p.early_gain, fx->rv.p.pre_delay,
                 fx->rv.p.late_mode, fx->rv.p.late_gain, fx->rv.p.decay_time, fx->rv.p.hf_decay_ratio,
                 fx->rv.p.coloration, fx->rv.p.reverb_gain, fx->rv.p.out_gain, fx->rv.p.dry_gain);
         reverb_init(&fx->rv);
-    } else if (memcmp(fx->rv.raw, d, 0x40)) {  // parameters changed (status byte at 0x40 ignored)
+    } else if (memcmp(fx->rv.raw, d, SF2C_AUDIO_N_0X40_1AF3)) {  // parameters changed (status byte at 0x40 ignored)
         memcpy(fx->rv.raw, d, sizeof fx->rv.raw);
         memcpy(&fx->rv.p, d, sizeof fx->rv.p);
         reverb_update(&fx->rv);
@@ -458,9 +458,9 @@ static void apply_effects(Renderer *r, int32_t mix_id, Mix *m) {
     for (uint32_t order = 0; order < r->effects; order++) {
         for (uint32_t i = 0; i < r->effects; i++) {
             Effect *fx = &r->fx[i];
-            if (fx->type != 4 || fx->mix_id != mix_id || fx->order != order || !fx->rv.ready) continue;
+            if (fx->type != SF2C_AUDIO_N_4_4B22 || fx->mix_id != mix_id || fx->order != order || !fx->rv.ready) continue;
             int ch = fx->rv.p.ch;
-            float *in[6], *out[6];
+            float *in[SF2C_AUDIO_N_6_E7F6], *out[SF2C_AUDIO_N_6_E7F6];
             int ok = 1;
             for (int c = 0; c < ch; c++) {
                 if (fx->rv.p.input[c] >= m->bufs || fx->rv.p.output[c] >= m->bufs) ok = 0;
@@ -469,10 +469,10 @@ static void apply_effects(Renderer *r, int32_t mix_id, Mix *m) {
             }
             if (!ok) continue;
             static int no_reverb = -1;
-            if (no_reverb < 0) no_reverb = getenv("LARECOMP_NO_REVERB") ? 1 : 0;
+            if (no_reverb < 0) no_reverb = getenv(SF2C_AUDIO_S_LARECOMP_NO_REVERB_0417) ? 1 : 0;
             static int toggle = -1;
-            if (toggle < 0) toggle = getenv("LARECOMP_REVERB_TOGGLE") ? atoi(getenv("LARECOMP_REVERB_TOGGLE")) : 0;
-            int off = no_reverb || !g_settings.reverb || (toggle && (r->elapsed_frames / toggle) % 2);
+            if (toggle < 0) toggle = getenv(SF2C_AUDIO_S_LARECOMP_REVERB_TOGGLE_C8DB) ? atoi(getenv(SF2C_AUDIO_S_LARECOMP_REVERB_TOGGLE_C8DB)) : 0;
+            int off = no_reverb || !g_settings.reverb || (toggle && (r->elapsed_frames / toggle) % SF2C_AUDIO_N_2_D473);
             if (fx->enabled && !off) reverb_process(&fx->rv, in, out, N);
             else
                 for (int c = 0; c < ch; c++) if (in[c] != out[c]) memcpy(out[c], in[c], N * sizeof(float));
@@ -481,15 +481,15 @@ static void apply_effects(Renderer *r, int32_t mix_id, Mix *m) {
 }
 
 static int hf_log = -1;
-static double hf[1024];
+static double hf[SF2C_AUDIO_N_1024_E39E];
 
 static void render_frame(Renderer *r, float *stereo) {
-    if (hf_log < 0) hf_log = getenv("LARECOMP_AUDIO_HF") ? 1 : 0;
+    if (hf_log < 0) hf_log = getenv(SF2C_AUDIO_S_LARECOMP_AUDIO_HF_BDB2) ? 1 : 0;
     uint32_t N = r->sample_count;
     for (uint32_t m = 0; m < r->nmix; m++)
         if (r->mix[m].buf) memset(r->mix[m].buf, 0, sizeof(float) * MIXBUF_MAX * N);
-    int16_t tmp[HIST + 4096];
-    float smp[4096];
+    int16_t tmp[HIST + SF2C_AUDIO_N_4096_8B92];
+    float smp[SF2C_AUDIO_N_4096_8B92];
     for (uint32_t vi = 0; vi < r->voices; vi++) {
         Voice *v = &r->voice[vi];
         if (!v->in_use) continue;
@@ -497,37 +497,37 @@ static void render_frame(Renderer *r, float *stereo) {
         if (!play || v->wb_count == 0 || v->drop) continue;
         Mix *dst = find_mix(r, v->mix_id);
         float ratio = (float)v->rate / r->sample_rate * v->pitch;
-        if (!(ratio > 0) || ratio > 8) ratio = 1;
-        int nch = v->chans > 6 ? 6 : v->chans;
+        if (!(ratio > 0) || ratio > SF2C_AUDIO_N_8_2C62) ratio = 1;
+        int nch = v->chans > SF2C_AUDIO_N_6_E7F6 ? SF2C_AUDIO_N_6_E7F6 : v->chans;
         for (int c = 0; c < nch; c++) {
             uint32_t rid = v->chan_ids[c] % r->voices;
             ChanState *cs = &r->chst[rid];
             ChanRes *cr = &r->chres[rid];
             int need = (int)(cs->fraction + ratio * N);
-            if (need > 4096) need = 4096;
+            if (need > SF2C_AUDIO_N_4096_8B92) need = SF2C_AUDIO_N_4096_8B92;
             memcpy(tmp, cs->hist, sizeof cs->hist);
             int got = decode_voice(v, c, cs, tmp + HIST, need);
-            if (got < need) memset(tmp + HIST + got, 0, (need - got) * 2);
+            if (got < need) memset(tmp + HIST + got, 0, (need - got) * SF2C_AUDIO_N_2_D473);
             float pos = cs->fraction;
             for (uint32_t i = 0; i < N; i++, pos += ratio) {
                 int k = (int)pos;
                 float f = pos - k;
-                if (k + 3 > need + HIST - 1) k = need + HIST - 4;
-                float y0 = tmp[k], y1 = tmp[k + 1], y2 = tmp[k + 2], y3 = tmp[k + 3];
-                if (ratio == 1.0f && f == 0) { smp[i] = y1; continue; }
+                if (k + SF2C_AUDIO_N_3_4E07 > need + HIST - 1) k = need + HIST - SF2C_AUDIO_N_4_4B22;
+                float y0 = tmp[k], y1 = tmp[k + 1], y2 = tmp[k + SF2C_AUDIO_N_2_D473], y3 = tmp[k + SF2C_AUDIO_N_3_4E07];
+                if (ratio == SF2C_AUDIO_N_1_0F_CA71 && f == 0) { smp[i] = y1; continue; }
                 // 4-point Hermite between y1 and y2
-                float c1 = 0.5f * (y2 - y0), c2 = y0 - 2.5f * y1 + 2 * y2 - 0.5f * y3;
-                float c3 = 0.5f * (y3 - y0) + 1.5f * (y1 - y2);
+                float c1 = SF2C_AUDIO_N_0_5F_2DB0 * (y2 - y0), c2 = y0 - SF2C_AUDIO_N_2_5F_240A * y1 + SF2C_AUDIO_N_2_D473 * y2 - SF2C_AUDIO_N_0_5F_2DB0 * y3;
+                float c3 = SF2C_AUDIO_N_0_5F_2DB0 * (y3 - y0) + SF2C_AUDIO_N_1_5F_DF85 * (y1 - y2);
                 smp[i] = ((c3 * f + c2) * f + c1) * f + y1;
             }
-            for (int fi = 0; fi < 2; fi++) {
+            for (int fi = 0; fi < SF2C_AUDIO_N_2_D473; fi++) {
                 if (!v->bq_on[fi]) continue;
                 float *st = cs->bq[fi], *k = v->bq[fi];
                 if (v->bq_reset[fi]) st[0] = st[1] = 0;
                 for (uint32_t i = 0; i < N; i++) {
                     float in = smp[i], o = in * k[0] + st[0];
-                    st[0] = in * k[1] + o * k[3] + st[1];
-                    st[1] = in * k[2] + o * k[4];
+                    st[0] = in * k[1] + o * k[SF2C_AUDIO_N_3_4E07] + st[1];
+                    st[1] = in * k[SF2C_AUDIO_N_2_D473] + o * k[SF2C_AUDIO_N_4_4B22];
                     smp[i] = o;
                 }
             }
@@ -536,14 +536,14 @@ static void render_frame(Renderer *r, float *stereo) {
             memcpy(cs->hist, tmp + need, sizeof cs->hist);
             if (hf_log) {
                 // Goertzel power around 19.6 kHz (scaled by volume)
-                double w = 2 * M_PI * 19582.0 / r->sample_rate, cw = 2 * cos(w), q1 = 0, q2 = 0;
+                double w = SF2C_AUDIO_N_2_D473 * M_PI * SF2C_AUDIO_N_19582_0_2495 / r->sample_rate, cw = SF2C_AUDIO_N_2_D473 * cos(w), q1 = 0, q2 = 0;
                 for (uint32_t i = 0; i < N; i++) { double q0 = cw * q1 - q2 + smp[i]; q2 = q1; q1 = q0; }
                 double e = (q1 * q1 + q2 * q2 - q1 * q2 * cw) * v->volume * v->volume / N;
                 hf[vi] += e;
             }
             if (!dst) continue;
-            static int solo = -2;
-            if (solo == -2) solo = getenv("LARECOMP_AUDIO_SOLO") ? atoi(getenv("LARECOMP_AUDIO_SOLO")) : -1;
+            static int solo = -SF2C_AUDIO_N_2_D473;
+            if (solo == -SF2C_AUDIO_N_2_D473) solo = getenv(SF2C_AUDIO_S_LARECOMP_AUDIO_SOLO_74D4) ? atoi(getenv(SF2C_AUDIO_S_LARECOMP_AUDIO_SOLO_74D4)) : -1;
             if (solo >= 0 && (int)vi != solo) continue;
             for (uint32_t b = 0; b < dst->bufs && b < MIXBUF_MAX; b++) {
                 float g0 = v->prev_volume * cr->prev[b], g1 = v->volume * cr->mix[b];
@@ -559,28 +559,28 @@ static void render_frame(Renderer *r, float *stereo) {
         v->bq_reset[0] = v->bq_reset[1] = 0;
         v->prev_volume = v->volume;
     }
-    if (hf_log && r->elapsed_frames % 200 == 0) {
-        LOG("[audren] hf f%llu:", (unsigned long long)r->elapsed_frames);
+    if (hf_log && r->elapsed_frames % SF2C_AUDIO_N_200_27BA == 0) {
+        LOG(SF2C_AUDIO_S_AUDREN_HF_F_LLU_0A0C, (unsigned long long)r->elapsed_frames);
         for (uint32_t k = 0; k < r->voices; k++)
-            if (hf[k] > 1e6)
-                LOG(" v%u=%.0f(%llx bq %d%d %.3f/%.3f fmt %u rate %u pitch %.3f)", k, hf[k] / 1e6,
+            if (hf[k] > SF2C_AUDIO_N_1E6_8C96)
+                LOG(SF2C_AUDIO_S_V_U_0F_LLX_BQ_D_D_3F_3F_FMT__B4C3, k, hf[k] / SF2C_AUDIO_N_1E6_8C96,
                     (unsigned long long)r->voice[k].wb[0].addr, r->voice[k].bq_on[0], r->voice[k].bq_on[1],
-                    r->voice[k].bq[1][0], r->voice[k].bq[1][3], r->voice[k].fmt, r->voice[k].rate, r->voice[k].pitch);
-        LOG("\n");
+                    r->voice[k].bq[1][0], r->voice[k].bq[1][SF2C_AUDIO_N_3_4E07], r->voice[k].fmt, r->voice[k].rate, r->voice[k].pitch);
+        LOG(SF2C_AUDIO_S_N_D7A5);
         memset(hf, 0, sizeof hf);
     }
     // sub mixes, deepest first
-    int depth[64] = {0};
+    int depth[SF2C_AUDIO_N_64_A68B] = {0};
     int maxd = 0;
-    for (uint32_t m = 1; m < r->nmix && m < 64; m++) {
+    for (uint32_t m = 1; m < r->nmix && m < SF2C_AUDIO_N_64_A68B; m++) {
         if (!r->mix[m].used) continue;
         int d = 0;
-        for (Mix *x = &r->mix[m]; x && d < 64; x = find_mix(r, x->dest)) { if (x == &r->mix[0]) break; d++; }
+        for (Mix *x = &r->mix[m]; x && d < SF2C_AUDIO_N_64_A68B; x = find_mix(r, x->dest)) { if (x == &r->mix[0]) break; d++; }
         depth[m] = d;
         if (d > maxd) maxd = d;
     }
     for (int d = maxd; d >= 1; d--) {
-        for (uint32_t m = 1; m < r->nmix && m < 64; m++) {
+        for (uint32_t m = 1; m < r->nmix && m < SF2C_AUDIO_N_64_A68B; m++) {
             Mix *s = &r->mix[m];
             if (!s->used || depth[m] != d) continue;
             apply_effects(r, (int32_t)m, s);
@@ -599,67 +599,67 @@ static void render_frame(Renderer *r, float *stereo) {
     Mix *f = find_mix(r, 0);
     if (f) apply_effects(r, 0, f);
     for (uint32_t i = 0; i < N; i++) {
-        float ch[6] = {0};
+        float ch[SF2C_AUDIO_N_6_E7F6] = {0};
         if (f && r->sink_used)
-            for (int c = 0; c < r->sink_inputs && c < 6; c++)
+            for (int c = 0; c < r->sink_inputs && c < SF2C_AUDIO_N_6_E7F6; c++)
                 if (r->sink_input[c] < f->bufs) ch[c] = f->buf[r->sink_input[c] * N + i] * f->volume;
         float L = ch[0], R = ch[1];
-        if (r->sink_inputs >= 6) {
-            L += 0.707f * ch[2] + 0.251f * ch[3] + 0.707f * ch[4];
-            R += 0.707f * ch[2] + 0.251f * ch[3] + 0.707f * ch[5];
+        if (r->sink_inputs >= SF2C_AUDIO_N_6_E7F6) {
+            L += SF2C_AUDIO_N_0_707F_D12F * ch[SF2C_AUDIO_N_2_D473] + SF2C_AUDIO_N_0_251F_84A9 * ch[SF2C_AUDIO_N_3_4E07] + SF2C_AUDIO_N_0_707F_D12F * ch[SF2C_AUDIO_N_4_4B22];
+            R += SF2C_AUDIO_N_0_707F_D12F * ch[SF2C_AUDIO_N_2_D473] + SF2C_AUDIO_N_0_251F_84A9 * ch[SF2C_AUDIO_N_3_4E07] + SF2C_AUDIO_N_0_707F_D12F * ch[SF2C_AUDIO_N_5_EF2D];
         }
-        stereo[i * 2] = clampf(L / 32768.f, -1, 1);
-        stereo[i * 2 + 1] = clampf(R / 32768.f, -1, 1);
+        stereo[i * SF2C_AUDIO_N_2_D473] = clampf(L / SF2C_AUDIO_N_32768_F_7EA1, -1, 1);
+        stereo[i * SF2C_AUDIO_N_2_D473 + 1] = clampf(R / SF2C_AUDIO_N_32768_F_7EA1, -1, 1);
     }
 }
 
 // Output gain: menu volume times LARECOMP_AUDIO_GAIN (applied live).
 static void apply_gain(SDL_AudioStream *st) {
     static double env = -1;
-    if (env < 0) env = getenv("LARECOMP_AUDIO_GAIN") ? atof(getenv("LARECOMP_AUDIO_GAIN")) : 1.0;
+    if (env < 0) env = getenv(SF2C_AUDIO_S_LARECOMP_AUDIO_GAIN_1F0B) ? atof(getenv(SF2C_AUDIO_S_LARECOMP_AUDIO_GAIN_1F0B)) : 1.0;
     float g = (float)(env * g_settings.volume);
-    if (atomic_load(&movie_audio_active)) g = 0.0f;
+    if (atomic_load(&movie_audio_active)) g = SF2C_AUDIO_N_0_0F_6895;
     if (st && SDL_GetAudioStreamGain(st) != g) SDL_SetAudioStreamGain(st, g);
 }
 
 static void wav_header(FILE *f, uint32_t bytes) {
-    uint32_t h[11] = {0x46464952, 36 + bytes, 0x45564157, 0x20746d66, 16, 0x00020003, 48000, 48000 * 8,
-                      0x00200008, 0x61746164, bytes};
+    uint32_t h[SF2C_AUDIO_N_11_4FC8] = {SF2C_AUDIO_N_0X46464952_D2A4, SF2C_AUDIO_N_36_76A5 + bytes, SF2C_AUDIO_N_0X45564157_9E42, SF2C_AUDIO_N_0X20746D66_0B3F, SF2C_AUDIO_N_16_B17E, SF2C_AUDIO_N_0X00020003_637B, SF2C_AUDIO_N_48000_5D1D, SF2C_AUDIO_N_48000_5D1D * SF2C_AUDIO_N_8_2C62,
+                      SF2C_AUDIO_N_0X00200008_3B4F, SF2C_AUDIO_N_0X61746164_097C, bytes};
     fseek(f, 0, SEEK_SET);
-    fwrite(h, 4, 11, f);
+    fwrite(h, SF2C_AUDIO_N_4_4B22, SF2C_AUDIO_N_11_4FC8, f);
     fseek(f, 0, SEEK_END);
 }
 
 static void *renderer_tick(void *arg) {
     Renderer *r = arg;
-    float out[2 * 4096];
-    uint32_t N = r->sample_count > 4096 ? 4096 : r->sample_count;
-    int frame_bytes = (int)(N * 2 * sizeof(float));
+    float out[SF2C_AUDIO_N_2_D473 * SF2C_AUDIO_N_4096_8B92];
+    uint32_t N = r->sample_count > SF2C_AUDIO_N_4096_8B92 ? SF2C_AUDIO_N_4096_8B92 : r->sample_count;
+    int frame_bytes = (int)(N * SF2C_AUDIO_N_2_D473 * sizeof(float));
     uint64_t next = 0;
     struct timespec now;
-    int target = 4 * frame_bytes;  // queued audio to keep ahead of the device: >= 2 device periods
+    int target = SF2C_AUDIO_N_4_4B22 * frame_bytes;  // queued audio to keep ahead of the device: >= 2 device periods
     if (r->stream) {
         SDL_AudioSpec dev;
         int dev_frames = 0;
         if (SDL_GetAudioDeviceFormat(SDL_GetAudioStreamDevice(r->stream), &dev, &dev_frames) && dev_frames > 0) {
-            int t = (2 * dev_frames * (int)r->sample_rate / (dev.freq ? dev.freq : 48000) + (int)N) * 2 * (int)sizeof(float);
+            int t = (SF2C_AUDIO_N_2_D473 * dev_frames * (int)r->sample_rate / (dev.freq ? dev.freq : SF2C_AUDIO_N_48000_5D1D) + (int)N) * SF2C_AUDIO_N_2_D473 * (int)sizeof(float);
             if (t > target) target = t;
-            LOG("[audren] device %d Hz, %d frames/period; queue target %d samples\n", dev.freq, dev_frames,
-                target / (2 * (int)sizeof(float)));
+            LOG(SF2C_AUDIO_S_AUDREN_DEVICE_D_HZ_D_FRAMES__C330, dev.freq, dev_frames,
+                target / (SF2C_AUDIO_N_2_D473 * (int)sizeof(float)));
         }
     }
     while (!r->quit) {
         if (r->stream) {
             while (SDL_GetAudioStreamQueued(r->stream) >= target && !r->quit) {
-                struct timespec ts = {0, 1000000};
+                struct timespec ts = {0, SF2C_AUDIO_N_1000000_6CCE};
                 nanosleep(&ts, NULL);
             }
         } else {
             clock_gettime(CLOCK_MONOTONIC, &now);
-            uint64_t t = now.tv_sec * 1000000000ull + now.tv_nsec;
+            uint64_t t = now.tv_sec * SF2C_AUDIO_N_1000000000ULL_E860 + now.tv_nsec;
             if (!next) next = t;
             if (next > t) { struct timespec ts = {0, (long)(next - t)}; nanosleep(&ts, NULL); }
-            next += (uint64_t)N * 1000000000ull / r->sample_rate;
+            next += (uint64_t)N * SF2C_AUDIO_N_1000000000ULL_E860 / r->sample_rate;
         }
         pthread_mutex_lock(&r->lock);
         if (r->state == 0) {
@@ -673,7 +673,7 @@ static void *renderer_tick(void *arg) {
         if (r->wav && r->state == 0) {
             fwrite(out, 1, frame_bytes, r->wav);
             r->wav_bytes += frame_bytes;
-            if ((r->elapsed_frames & 255) == 0) { wav_header(r->wav, r->wav_bytes); fflush(r->wav); }
+            if ((r->elapsed_frames & SF2C_AUDIO_N_255_9556) == 0) { wav_header(r->wav, r->wav_bytes); fflush(r->wav); }
         }
         pthread_mutex_lock(&g_klock);
         kernel_signal(r->event);
@@ -683,135 +683,135 @@ static void *renderer_tick(void *arg) {
 }
 
 static void update_voice(Renderer *r, Voice *v, const uint8_t *p, uint8_t *out) {
-    uint8_t is_new = p[8];
+    uint8_t is_new = p[SF2C_AUDIO_N_8_2C62];
     if (is_new) {
         memset(v, 0, sizeof *v);
         v->play_state = 1;
         v->mix_id = -1;
-        v->splitter_id = 0xFFFFFFFF;
+        v->splitter_id = SF2C_AUDIO_N_0XFFFFFFFF_BEFA;
         for (int i = 0; i < WB_COUNT; i++) v->wb[i].sent = 1;
         v->is_new = 1;
     }
     v->in_use = 1;
-    uint8_t ps = p[10];
+    uint8_t ps = p[SF2C_AUDIO_N_10_4A44];
     if (ps == 0) v->play_state = 0;
-    else if (ps == 1) { if (v->play_state != 1) v->play_state = 2; }
-    else if (ps == 2) v->play_state = 3;
-    v->fmt = p[11];
-    memcpy(&v->rate, p + 12, 4);
+    else if (ps == 1) { if (v->play_state != 1) v->play_state = SF2C_AUDIO_N_2_D473; }
+    else if (ps == SF2C_AUDIO_N_2_D473) v->play_state = SF2C_AUDIO_N_3_4E07;
+    v->fmt = p[SF2C_AUDIO_N_11_4FC8];
+    memcpy(&v->rate, p + SF2C_AUDIO_N_12_6B51, SF2C_AUDIO_N_4_4B22);
     uint32_t ch;
-    memcpy(&ch, p + 24, 4);
-    v->chans = ch > 6 ? 6 : (uint8_t)ch;
-    memcpy(&v->pitch, p + 28, 4);
-    memcpy(&v->volume, p + 32, 4);
-    memcpy(&v->wb_count, p + 60, 4);
-    memcpy(&v->ds_addr, p + 72, 8);
-    memcpy(&v->mix_id, p + 88, 4);
-    memcpy(&v->splitter_id, p + 92, 4);
-    memcpy(v->chan_ids, p + 320, 24);
-    v->flush += p[345];
-    memcpy(&v->behaviour, p + 348, 2);
-    if (p[344]) v->drop = 0;
-    for (int f = 0; f < 2; f++) {  // BiquadFilterParameter: enable, reserved, s16 numerator[3], denominator[2] (Q14)
-        const uint8_t *b = p + 36 + f * 12;
+    memcpy(&ch, p + SF2C_AUDIO_N_24_C235, SF2C_AUDIO_N_4_4B22);
+    v->chans = ch > SF2C_AUDIO_N_6_E7F6 ? SF2C_AUDIO_N_6_E7F6 : (uint8_t)ch;
+    memcpy(&v->pitch, p + SF2C_AUDIO_N_28_59E1, SF2C_AUDIO_N_4_4B22);
+    memcpy(&v->volume, p + SF2C_AUDIO_N_32_E29C, SF2C_AUDIO_N_4_4B22);
+    memcpy(&v->wb_count, p + SF2C_AUDIO_N_60_39FA, SF2C_AUDIO_N_4_4B22);
+    memcpy(&v->ds_addr, p + SF2C_AUDIO_N_72_8722, SF2C_AUDIO_N_8_2C62);
+    memcpy(&v->mix_id, p + SF2C_AUDIO_N_88_8B94, SF2C_AUDIO_N_4_4B22);
+    memcpy(&v->splitter_id, p + SF2C_AUDIO_N_92_8241, SF2C_AUDIO_N_4_4B22);
+    memcpy(v->chan_ids, p + SF2C_AUDIO_N_320_8882, SF2C_AUDIO_N_24_C235);
+    v->flush += p[SF2C_AUDIO_N_345_DA70];
+    memcpy(&v->behaviour, p + SF2C_AUDIO_N_348_06B2, SF2C_AUDIO_N_2_D473);
+    if (p[SF2C_AUDIO_N_344_02E6]) v->drop = 0;
+    for (int f = 0; f < SF2C_AUDIO_N_2_D473; f++) {  // BiquadFilterParameter: enable, reserved, s16 numerator[3], denominator[2] (Q14)
+        const uint8_t *b = p + SF2C_AUDIO_N_36_76A5 + f * SF2C_AUDIO_N_12_6B51;
         if (b[0] && !v->bq_on[f]) {
             v->bq_reset[f] = 1;
-            if (getenv("LARECOMP_AUDIO_LOG")) {
-                int16_t k[5];
-                memcpy(k, b + 2, 10);
-                LOG("[audren] v%ld biquad%d on: %d %d %d / %d %d\n", (long)(v - r->voice), f, k[0], k[1], k[2], k[3], k[4]);
+            if (getenv(SF2C_AUDIO_S_LARECOMP_AUDIO_LOG_866C)) {
+                int16_t k[SF2C_AUDIO_N_5_EF2D];
+                memcpy(k, b + SF2C_AUDIO_N_2_D473, SF2C_AUDIO_N_10_4A44);
+                LOG(SF2C_AUDIO_S_AUDREN_V_LD_BIQUAD_D_ON_D_D__1CFA, (long)(v - r->voice), f, k[0], k[1], k[SF2C_AUDIO_N_2_D473], k[SF2C_AUDIO_N_3_4E07], k[SF2C_AUDIO_N_4_4B22]);
             }
         }
         v->bq_on[f] = b[0];
-        int16_t c[5];
-        memcpy(c, b + 2, 10);
-        for (int k = 0; k < 5; k++) v->bq[f][k] = c[k] / 16384.0f;
+        int16_t c[SF2C_AUDIO_N_5_EF2D];
+        memcpy(c, b + SF2C_AUDIO_N_2_D473, SF2C_AUDIO_N_10_4A44);
+        for (int k = 0; k < SF2C_AUDIO_N_5_EF2D; k++) v->bq[f][k] = c[k] / SF2C_AUDIO_N_16384_0F_EB94;
     }
-    if (v->splitter_id != 0xFFFFFFFF && v->mix_id < 0) {
+    if (v->splitter_id != SF2C_AUDIO_N_0XFFFFFFFF_BEFA && v->mix_id < 0) {
         static int warned;
-        if (!warned++) LOG("[audren] splitter destinations not implemented\n");
+        if (!warned++) LOG(SF2C_AUDIO_S_AUDREN_SPLITTER_DESTINATIONS_9676);
     }
     ChanState *cs0 = &r->chst[v->chan_ids[0] % r->voices];
     if (is_new)
         for (int c = 0; c < v->chans; c++) memset(r->chst[v->chan_ids[c] % r->voices].valid, 0, WB_COUNT);
     for (int i = 0; i < WB_COUNT; i++) {
-        const uint8_t *w = p + 96 + i * 0x38;
+        const uint8_t *w = p + SF2C_AUDIO_N_96_7B1A + i * SF2C_AUDIO_N_0X38_AE4F;
         WaveBuf *wb = &v->wb[i];
         if (!cs0->valid[i] && wb->sent) wb->addr = 0;
-        if (!w[26]) {  // !SentToServer: a new buffer for the DSP
-            memcpy(&wb->addr, w, 8);
-            memcpy(&wb->size, w + 8, 8);
-            memcpy(&wb->start, w + 16, 4);
-            memcpy(&wb->end, w + 20, 4);
-            wb->loop = w[24];
-            wb->eos = w[25];
-            memcpy(&wb->loop_count, w + 28, 4);
-            memcpy(&wb->ctx, w + 32, 8);
-            memcpy(&wb->loop_start, w + 48, 4);
-            memcpy(&wb->loop_end, w + 52, 4);
-            if ((r->revision >> 24) - '0' < 8) {  // WaveBuffer version 1: loop forever over [start, end)
+        if (!w[SF2C_AUDIO_N_26_5F9C]) {  // !SentToServer: a new buffer for the DSP
+            memcpy(&wb->addr, w, SF2C_AUDIO_N_8_2C62);
+            memcpy(&wb->size, w + SF2C_AUDIO_N_8_2C62, SF2C_AUDIO_N_8_2C62);
+            memcpy(&wb->start, w + SF2C_AUDIO_N_16_B17E, SF2C_AUDIO_N_4_4B22);
+            memcpy(&wb->end, w + SF2C_AUDIO_N_20_F5CA, SF2C_AUDIO_N_4_4B22);
+            wb->loop = w[SF2C_AUDIO_N_24_C235];
+            wb->eos = w[SF2C_AUDIO_N_25_B7A5];
+            memcpy(&wb->loop_count, w + SF2C_AUDIO_N_28_59E1, SF2C_AUDIO_N_4_4B22);
+            memcpy(&wb->ctx, w + SF2C_AUDIO_N_32_E29C, SF2C_AUDIO_N_8_2C62);
+            memcpy(&wb->loop_start, w + SF2C_AUDIO_N_48_9801, SF2C_AUDIO_N_4_4B22);
+            memcpy(&wb->loop_end, w + SF2C_AUDIO_N_52_41CF, SF2C_AUDIO_N_4_4B22);
+            if ((r->revision >> SF2C_AUDIO_N_24_C235) - SF2C_AUDIO_CH_0_59A9 < SF2C_AUDIO_N_8_2C62) {  // WaveBuffer version 1: loop forever over [start, end)
                 wb->loop_count = -1;
                 wb->loop_start = wb->loop_end = 0;
             }
             wb->sent = 0;
             static int dumped;
-            if (getenv("LARECOMP_AUDIO_DUMPWB") && !dumped && wb->size > 0x100000 && v->fmt == 6 && v->ds_addr) {
+            if (getenv(SF2C_AUDIO_S_LARECOMP_AUDIO_DUMPWB_5E0C) && !dumped && wb->size > SF2C_AUDIO_N_0X100000_0A2A && v->fmt == SF2C_AUDIO_N_6_E7F6 && v->ds_addr) {
                 dumped = 1;
-                FILE *f = fopen("build/wb_dump.bin", "wb");
+                FILE *f = fopen(SF2C_AUDIO_S_BUILD_WB_DUMP_BIN_BE1E, SF2C_AUDIO_S_WB_3D6A);
                 if (f) {
-                    uint32_t hdr[4] = {(uint32_t)wb->size, wb->start, wb->end, (uint32_t)(wb->ctx != 0)};
-                    fwrite(hdr, 4, 4, f);
-                    fwrite((const void *)(uintptr_t)v->ds_addr, 1, 32, f);
-                    int16_t ctx[3] = {0};
-                    if (wb->ctx) memcpy(ctx, (const void *)(uintptr_t)wb->ctx, 6);
-                    fwrite(ctx, 2, 3, f);
+                    uint32_t hdr[SF2C_AUDIO_N_4_4B22] = {(uint32_t)wb->size, wb->start, wb->end, (uint32_t)(wb->ctx != 0)};
+                    fwrite(hdr, SF2C_AUDIO_N_4_4B22, SF2C_AUDIO_N_4_4B22, f);
+                    fwrite((const void *)(uintptr_t)v->ds_addr, 1, SF2C_AUDIO_N_32_E29C, f);
+                    int16_t ctx[SF2C_AUDIO_N_3_4E07] = {0};
+                    if (wb->ctx) memcpy(ctx, (const void *)(uintptr_t)wb->ctx, SF2C_AUDIO_N_6_E7F6);
+                    fwrite(ctx, SF2C_AUDIO_N_2_D473, SF2C_AUDIO_N_3_4E07, f);
                     fwrite((const void *)(uintptr_t)wb->addr, 1, wb->size, f);
                     fclose(f);
-                    LOG("[audren] dumped wave buffer %llx (%llx bytes) ds %llx ctx %d %d %d\n", (unsigned long long)wb->addr,
-                        (unsigned long long)wb->size, (unsigned long long)v->ds_addr, ctx[0], ctx[1], ctx[2]);
+                    LOG(SF2C_AUDIO_S_AUDREN_DUMPED_WAVE_BUFFER_LL_EA75, (unsigned long long)wb->addr,
+                        (unsigned long long)wb->size, (unsigned long long)v->ds_addr, ctx[0], ctx[1], ctx[SF2C_AUDIO_N_2_D473]);
                 }
             }
             static int vlog = -1;
-            if (vlog < 0) vlog = getenv("LARECOMP_AUDIO_LOG") ? 1 : 0;
+            if (vlog < 0) vlog = getenv(SF2C_AUDIO_S_LARECOMP_AUDIO_LOG_866C) ? 1 : 0;
             if (vlog)
-                LOG("[audren] f%llu v%ld wb%d fmt %u rate %u ch %u pitch %.3f vol %.3f mix %d res %u addr %llx size %llx "
-                    "[%u,%u) loop %u/%d eos %u ctx %llx ds %llx\n", (unsigned long long)r->elapsed_frames,
+                LOG(SF2C_AUDIO_S_AUDREN_F_LLU_V_LD_WB_D_FMT_U_9994
+                    SF2C_AUDIO_S_U_U_LOOP_U_D_EOS_U_CTX_LLX_D_06B8, (unsigned long long)r->elapsed_frames,
                     (long)(v - r->voice), i, v->fmt, v->rate, v->chans, v->pitch, v->volume, v->mix_id, v->chan_ids[0],
                     (unsigned long long)wb->addr, (unsigned long long)wb->size, wb->start, wb->end, wb->loop,
                     wb->loop_count, wb->eos, (unsigned long long)wb->ctx, (unsigned long long)v->ds_addr);
             if (vlog && v->ds_addr) {
                 const int16_t *k = (const int16_t *)(uintptr_t)v->ds_addr;
-                LOG("[audren]   coefs v%ld:", (long)(v - r->voice));
-                for (int j = 0; j < 19; j++) LOG(" %d", k[j]);
-                LOG("\n");
+                LOG(SF2C_AUDIO_S_AUDREN_COEFS_V_LD_4306, (long)(v - r->voice));
+                for (int j = 0; j < SF2C_AUDIO_N_19_9400; j++) LOG(SF2C_AUDIO_S_D_7E40, k[j]);
+                LOG(SF2C_AUDIO_S_N_D7A5);
             }
         }
     }
     // VoiceOutStatus
     if (is_new || v->is_new) {
-        memset(out, 0, 0x10);
+        memset(out, 0, SF2C_AUDIO_N_0X10_BF9C);
     } else {
-        memcpy(out, &cs0->played, 8);
-        memcpy(out + 8, &cs0->consumed, 4);
-        out[12] = v->drop;
+        memcpy(out, &cs0->played, SF2C_AUDIO_N_8_2C62);
+        memcpy(out + SF2C_AUDIO_N_8_2C62, &cs0->consumed, SF2C_AUDIO_N_4_4B22);
+        out[SF2C_AUDIO_N_12_6B51] = v->drop;
     }
 }
 
 static void update_mix(Renderer *r, const uint8_t *p, int id) {
     if (id < 0 || (uint32_t)id >= r->nmix) return;
     Mix *m = &r->mix[id];
-    memcpy(&m->volume, p, 4);
-    memcpy(&m->bufs, p + 8, 4);
+    memcpy(&m->volume, p, SF2C_AUDIO_N_4_4B22);
+    memcpy(&m->bufs, p + SF2C_AUDIO_N_8_2C62, SF2C_AUDIO_N_4_4B22);
     if (m->bufs > MIXBUF_MAX) m->bufs = MIXBUF_MAX;
-    m->used = p[12];
-    memcpy(&m->dest, p + 0x924, 4);
-    memcpy(&m->dest_splitter, p + 0x928, 4);
-    memcpy(m->vol, p + 0x24, sizeof m->vol);
+    m->used = p[SF2C_AUDIO_N_12_6B51];
+    memcpy(&m->dest, p + SF2C_AUDIO_N_0X924_5BD2, SF2C_AUDIO_N_4_4B22);
+    memcpy(&m->dest_splitter, p + SF2C_AUDIO_N_0X928_3A34, SF2C_AUDIO_N_4_4B22);
+    memcpy(m->vol, p + SF2C_AUDIO_N_0X24_EB21, sizeof m->vol);
     if (!m->buf) m->buf = calloc(MIXBUF_MAX * r->sample_count, sizeof(float));
-    LOG("[audren] mix %d used %u vol %.3f bufs %u dest %d:", id, m->used, m->volume, m->bufs, m->dest);
+    LOG(SF2C_AUDIO_S_AUDREN_MIX_D_USED_U_VOL_3F_B_F1E1, id, m->used, m->volume, m->bufs, m->dest);
     for (int i = 0; i < MIXBUF_MAX * MIXBUF_MAX; i++)
-        if (m->vol[i] != 0) LOG(" %d>%d=%.3f", i / MIXBUF_MAX, i % MIXBUF_MAX, m->vol[i]);
-    LOG("\n");
+        if (m->vol[i] != 0) LOG(SF2C_AUDIO_S_D_D_3F_C146, i / MIXBUF_MAX, i % MIXBUF_MAX, m->vol[i]);
+    LOG(SF2C_AUDIO_S_N_D7A5);
 }
 
 // RequestUpdate: input is an UpdateDataHeader + sections; write a matching output.
@@ -821,150 +821,150 @@ static void request_update(Renderer *r, IpcReq *req, IpcResp *resp) {
     const uint8_t *ip = (const uint8_t *)(uintptr_t)in->addr;
     uint8_t *op = (uint8_t *)(uintptr_t)out->addr;
     const uint32_t *h = (const uint32_t *)ip;
-    uint32_t behavior_sz = h[1], pools_sz = h[2], voices_sz = h[3], chans_sz = h[4], effects_sz = h[5];
-    uint32_t mixes_sz = h[6], sinks_sz = h[7], perf_sz = h[8];
+    uint32_t behavior_sz = h[1], pools_sz = h[SF2C_AUDIO_N_2_D473], voices_sz = h[SF2C_AUDIO_N_3_4E07], chans_sz = h[SF2C_AUDIO_N_4_4B22], effects_sz = h[SF2C_AUDIO_N_5_EF2D];
+    uint32_t mixes_sz = h[SF2C_AUDIO_N_6_E7F6], sinks_sz = h[SF2C_AUDIO_N_7_7902], perf_sz = h[SF2C_AUDIO_N_8_2C62];
     {
         static int dump_n = -1;
         static long count;
-        if (dump_n < 0) dump_n = getenv("LARECOMP_AUDIO_DUMP") ? 1 : 0;
+        if (dump_n < 0) dump_n = getenv(SF2C_AUDIO_S_LARECOMP_AUDIO_DUMP_E9E4) ? 1 : 0;
         count++;
-        if (dump_n && (count == 300 || count == 2000 || count == 6000 || count == 12000)) {
-            char path[64];
-            snprintf(path, sizeof path, "build/audren_in_%ld.bin", count);
-            FILE *f = fopen(path, "wb");
+        if (dump_n && (count == SF2C_AUDIO_N_300_983B || count == SF2C_AUDIO_N_2000_81A8 || count == SF2C_AUDIO_N_6000_8D28 || count == SF2C_AUDIO_N_12000_C5D1)) {
+            char path[SF2C_AUDIO_N_64_A68B];
+            snprintf(path, sizeof path, SF2C_AUDIO_S_BUILD_AUDREN_IN_LD_BIN_9D39, count);
+            FILE *f = fopen(path, SF2C_AUDIO_S_WB_3D6A);
             if (f) { fwrite(ip, 1, in->size, f); fclose(f); }
-            LOG("[audren] dumped %s (%llu bytes, rev %08x)\n", path, (unsigned long long)in->size, r->revision);
+            LOG(SF2C_AUDIO_S_AUDREN_DUMPED_S_LLU_BYTES_RE_9138, path, (unsigned long long)in->size, r->revision);
         }
     }
-    uint32_t npools = pools_sz / 0x20, nvoices = voices_sz / 0x170, neffects = effects_sz / 0xC0;
-    uint32_t nchans = chans_sz / 0x70, nsinks = sinks_sz / 0x140;
+    uint32_t npools = pools_sz / SF2C_AUDIO_N_0X20_A766, nvoices = voices_sz / SF2C_AUDIO_N_0X170_9B54, neffects = effects_sz / SF2C_AUDIO_N_0XC0_EB51;
+    uint32_t nchans = chans_sz / SF2C_AUDIO_N_0X70_B0F6, nsinks = sinks_sz / SF2C_AUDIO_N_0X140_A49E;
     if (nvoices > r->voices) nvoices = r->voices;
     if (nchans > r->voices) nchans = r->voices;
     memset(op, 0, out->size);
     uint32_t *oh = (uint32_t *)op;
     oh[0] = h[0];
-    uint32_t o = 0x40;
+    uint32_t o = SF2C_AUDIO_N_0X40_1AF3;
     pthread_mutex_lock(&r->lock);
     // memory pools: acknowledge attach/detach requests
-    const uint8_t *pin = ip + 0x40 + behavior_sz;
-    oh[2] = npools * 0x10;
-    for (uint32_t i = 0; i < npools && o + 0x10 <= out->size; i++, o += 0x10) {
-        uint32_t st = *(const uint32_t *)(pin + i * 0x20 + 0x10);
-        *(uint32_t *)(op + o) = st == 4 ? 5 : st == 2 ? 3 : st;
+    const uint8_t *pin = ip + SF2C_AUDIO_N_0X40_1AF3 + behavior_sz;
+    oh[SF2C_AUDIO_N_2_D473] = npools * SF2C_AUDIO_N_0X10_BF9C;
+    for (uint32_t i = 0; i < npools && o + SF2C_AUDIO_N_0X10_BF9C <= out->size; i++, o += SF2C_AUDIO_N_0X10_BF9C) {
+        uint32_t st = *(const uint32_t *)(pin + i * SF2C_AUDIO_N_0X20_A766 + SF2C_AUDIO_N_0X10_BF9C);
+        *(uint32_t *)(op + o) = st == SF2C_AUDIO_N_4_4B22 ? SF2C_AUDIO_N_5_EF2D : st == SF2C_AUDIO_N_2_D473 ? SF2C_AUDIO_N_3_4E07 : st;
     }
     // voice channel resources
     const uint8_t *cin = pin + pools_sz;
     for (uint32_t i = 0; i < nchans; i++) {
-        const uint8_t *c = cin + i * 0x70;
+        const uint8_t *c = cin + i * SF2C_AUDIO_N_0X70_B0F6;
         uint32_t id;
-        memcpy(&id, c, 4);
+        memcpy(&id, c, SF2C_AUDIO_N_4_4B22);
         if (id >= r->voices) continue;
-        r->chres[id].used = c[0x64];
-        if (c[0x64]) memcpy(r->chres[id].mix, c + 4, sizeof r->chres[id].mix);
+        r->chres[id].used = c[SF2C_AUDIO_N_0X64_3246];
+        if (c[SF2C_AUDIO_N_0X64_3246]) memcpy(r->chres[id].mix, c + SF2C_AUDIO_N_4_4B22, sizeof r->chres[id].mix);
     }
     // voices
     const uint8_t *vin = cin + chans_sz;
-    oh[3] = r->voices * 0x10;
+    oh[SF2C_AUDIO_N_3_4E07] = r->voices * SF2C_AUDIO_N_0X10_BF9C;
     for (uint32_t i = 0; i < r->voices; i++) r->voice[i].in_use = 0;
-    for (uint32_t i = 0; i < nvoices && o + 0x10 <= out->size; i++, o += 0x10) {
-        const uint8_t *v = vin + i * 0x170;
-        if (v[9]) update_voice(r, &r->voice[i], v, op + o);
+    for (uint32_t i = 0; i < nvoices && o + SF2C_AUDIO_N_0X10_BF9C <= out->size; i++, o += SF2C_AUDIO_N_0X10_BF9C) {
+        const uint8_t *v = vin + i * SF2C_AUDIO_N_0X170_9B54;
+        if (v[SF2C_AUDIO_N_9_1958]) update_voice(r, &r->voice[i], v, op + o);
     }
     // effects (not processed): report them as enabled/disabled per request
     const uint8_t *ein = vin + voices_sz;
-    oh[5] = neffects * 0x10;
-    for (uint32_t i = 0; i < neffects && o + 0x10 <= out->size; i++, o += 0x10) {
-        const uint8_t *e = ein + i * 0xC0;
-        op[o] = e[2] ? 3 : 4;  // EffectState Enabled / Disabled
+    oh[SF2C_AUDIO_N_5_EF2D] = neffects * SF2C_AUDIO_N_0X10_BF9C;
+    for (uint32_t i = 0; i < neffects && o + SF2C_AUDIO_N_0X10_BF9C <= out->size; i++, o += SF2C_AUDIO_N_0X10_BF9C) {
+        const uint8_t *e = ein + i * SF2C_AUDIO_N_0XC0_EB51;
+        op[o] = e[SF2C_AUDIO_N_2_D473] ? SF2C_AUDIO_N_3_4E07 : SF2C_AUDIO_N_4_4B22;  // EffectState Enabled / Disabled
         if (i < r->effects) effect_update(&r->fx[i], e);
         static uint32_t seen_types;
-        if (e[0] && e[0] < 32 && !(seen_types & (1u << e[0]))) {
-            seen_types |= 1u << e[0];
-            LOG("[audren] effect type %u used%s: slot %u mix %d enabled %u\n", e[0], e[0] == 4 ? "" : " (not implemented)", i,
-                *(const int32_t *)(e + 4), e[2]);
+        if (e[0] && e[0] < SF2C_AUDIO_N_32_E29C && !(seen_types & (SF2C_AUDIO_N_1U_B8E6 << e[0]))) {
+            seen_types |= SF2C_AUDIO_N_1U_B8E6 << e[0];
+            LOG(SF2C_AUDIO_S_AUDREN_EFFECT_TYPE_U_USED_S__CAEF, e[0], e[0] == SF2C_AUDIO_N_4_4B22 ? SF2C_AUDIO_S_EMPTY_12AE : SF2C_AUDIO_S_NOT_IMPLEMENTED_6670, i,
+                *(const int32_t *)(e + SF2C_AUDIO_N_4_4B22), e[SF2C_AUDIO_N_2_D473]);
         }
-        if (e[0] && getenv("LARECOMP_AUDIO_LOG")) {
-            static uint8_t last[16][0xC0];
-            if (i < 16 && memcmp(last[i], e, 0xC0)) {
-                memcpy(last[i], e, 0xC0);
-                LOG("[audren] f%llu effect %u:", (unsigned long long)r->elapsed_frames, i);
-                for (int k = 0; k < 0x70; k += 4) LOG(" %08x", *(const uint32_t *)(e + k));
-                LOG("\n");
+        if (e[0] && getenv(SF2C_AUDIO_S_LARECOMP_AUDIO_LOG_866C)) {
+            static uint8_t last[SF2C_AUDIO_N_16_B17E][SF2C_AUDIO_N_0XC0_EB51];
+            if (i < SF2C_AUDIO_N_16_B17E && memcmp(last[i], e, SF2C_AUDIO_N_0XC0_EB51)) {
+                memcpy(last[i], e, SF2C_AUDIO_N_0XC0_EB51);
+                LOG(SF2C_AUDIO_S_AUDREN_F_LLU_EFFECT_U_EB57, (unsigned long long)r->elapsed_frames, i);
+                for (int k = 0; k < SF2C_AUDIO_N_0X70_B0F6; k += SF2C_AUDIO_N_4_4B22) LOG(SF2C_AUDIO_S_08X_981A, *(const uint32_t *)(e + k));
+                LOG(SF2C_AUDIO_S_N_D7A5);
             }
         }
     }
     const uint8_t *min = ein + effects_sz;
-    if (r->splitters && *(const uint32_t *)min == 0x48444E53) {
+    if (r->splitters && *(const uint32_t *)min == SF2C_AUDIO_N_0X48444E53_8845) {
         static int warned;
-        if (!warned++) LOG("[audren] splitter section present (ignored)\n");
+        if (!warned++) LOG(SF2C_AUDIO_S_AUDREN_SPLITTER_SECTION_PRES_FFBF);
     }
     // mixes: the section ends right before the sinks
-    const uint8_t *sin = ip + h[15] - perf_sz - sinks_sz;
+    const uint8_t *sin = ip + h[SF2C_AUDIO_N_15_E629] - perf_sz - sinks_sz;
     min = sin - mixes_sz;
-    if ((r->revision >> 24) - '0' >= 7 && *(const uint32_t *)min == 0xCAFEBABE) {
-        uint32_t n = *(const uint32_t *)(min + 4);
+    if ((r->revision >> SF2C_AUDIO_N_24_C235) - SF2C_AUDIO_CH_0_59A9 >= SF2C_AUDIO_N_7_7902 && *(const uint32_t *)min == SF2C_AUDIO_N_0XCAFEBABE_3A89) {
+        uint32_t n = *(const uint32_t *)(min + SF2C_AUDIO_N_4_4B22);
         for (uint32_t i = 0; i < n; i++) {
-            const uint8_t *m = min + 0x20 + i * 0x930;
+            const uint8_t *m = min + SF2C_AUDIO_N_0X20_A766 + i * SF2C_AUDIO_N_0X930_7948;
             int32_t id;
-            memcpy(&id, m + 16, 4);
+            memcpy(&id, m + SF2C_AUDIO_N_16_B17E, SF2C_AUDIO_N_4_4B22);
             update_mix(r, m, id);
         }
     } else {
-        for (uint32_t i = 0; i < mixes_sz / 0x930; i++) update_mix(r, min + i * 0x930, i);
+        for (uint32_t i = 0; i < mixes_sz / SF2C_AUDIO_N_0X930_7948; i++) update_mix(r, min + i * SF2C_AUDIO_N_0X930_7948, i);
     }
     // sinks
-    oh[7] = nsinks * 0x20;
-    for (uint32_t i = 0; i < nsinks; i++, o += 0x20) {
-        const uint8_t *s = sin + i * 0x140;
+    oh[SF2C_AUDIO_N_7_7902] = nsinks * SF2C_AUDIO_N_0X20_A766;
+    for (uint32_t i = 0; i < nsinks; i++, o += SF2C_AUDIO_N_0X20_A766) {
+        const uint8_t *s = sin + i * SF2C_AUDIO_N_0X140_A49E;
         if (s[0] == 1) {  // device sink
             r->sink_used = s[1];
             uint32_t n;
-            memcpy(&n, s + 0x20 + 0x100, 4);
-            r->sink_inputs = n > 6 ? 6 : n;
-            memcpy(r->sink_input, s + 0x124, 6);
+            memcpy(&n, s + SF2C_AUDIO_N_0X20_A766 + SF2C_AUDIO_N_0X100_BE6E, SF2C_AUDIO_N_4_4B22);
+            r->sink_inputs = n > SF2C_AUDIO_N_6_E7F6 ? SF2C_AUDIO_N_6_E7F6 : n;
+            memcpy(r->sink_input, s + SF2C_AUDIO_N_0X124_5B0A, SF2C_AUDIO_N_6_E7F6);
         }
     }
     uint64_t elapsed = r->elapsed_frames;
     pthread_mutex_unlock(&r->lock);
-    oh[8] = perf_sz ? 0x10 : 0;
-    o += oh[8];
-    oh[1] = 0xB0;  // behavior / error info
-    o += 0xB0;
-    oh[10] = 0x10;  // render info: elapsed frame count
-    if (o + 0x10 <= out->size) *(uint64_t *)(op + o) = elapsed;
-    o += 0x10;
-    oh[15] = o;
+    oh[SF2C_AUDIO_N_8_2C62] = perf_sz ? SF2C_AUDIO_N_0X10_BF9C : 0;
+    o += oh[SF2C_AUDIO_N_8_2C62];
+    oh[1] = SF2C_AUDIO_N_0XB0_497E;  // behavior / error info
+    o += SF2C_AUDIO_N_0XB0_497E;
+    oh[SF2C_AUDIO_N_10_4A44] = SF2C_AUDIO_N_0X10_BF9C;  // render info: elapsed frame count
+    if (o + SF2C_AUDIO_N_0X10_BF9C <= out->size) *(uint64_t *)(op + o) = elapsed;
+    o += SF2C_AUDIO_N_0X10_BF9C;
+    oh[SF2C_AUDIO_N_15_E629] = o;
     (void)resp;
 }
 
 static void renderer_open_output(Renderer *r) {
-    if (getenv("LARECOMP_AUDIO_WAV")) {
-        r->wav = fopen(getenv("LARECOMP_AUDIO_WAV"), "wb");
+    if (getenv(SF2C_AUDIO_S_LARECOMP_AUDIO_WAV_F745)) {
+        r->wav = fopen(getenv(SF2C_AUDIO_S_LARECOMP_AUDIO_WAV_F745), SF2C_AUDIO_S_WB_3D6A);
         if (r->wav) wav_header(r->wav, 0);
     }
-    if (getenv("LARECOMP_NO_AUDIO") && strcmp(getenv("LARECOMP_NO_AUDIO"), "0")) return;
-    if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) { LOG("[audren] SDL audio init failed: %s\n", SDL_GetError()); return; }
-    SDL_AudioSpec spec = {SDL_AUDIO_F32, 2, (int)r->sample_rate};
+    if (getenv(SF2C_AUDIO_S_LARECOMP_NO_AUDIO_8230) && strcmp(getenv(SF2C_AUDIO_S_LARECOMP_NO_AUDIO_8230), SF2C_AUDIO_S_0_9808)) return;
+    if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) { LOG(SF2C_AUDIO_S_AUDREN_SDL_AUDIO_INIT_FAILED_FA38, SDL_GetError()); return; }
+    SDL_AudioSpec spec = {SDL_AUDIO_F32, SF2C_AUDIO_N_2_D473, (int)r->sample_rate};
     r->stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, NULL, NULL);
-    if (!r->stream) { LOG("[audren] SDL audio open failed: %s\n", SDL_GetError()); return; }
-    if (getenv("LARECOMP_AUDIO_GAIN")) SDL_SetAudioStreamGain(r->stream, (float)atof(getenv("LARECOMP_AUDIO_GAIN")));
+    if (!r->stream) { LOG(SF2C_AUDIO_S_AUDREN_SDL_AUDIO_OPEN_FAILED_9841, SDL_GetError()); return; }
+    if (getenv(SF2C_AUDIO_S_LARECOMP_AUDIO_GAIN_1F0B)) SDL_SetAudioStreamGain(r->stream, (float)atof(getenv(SF2C_AUDIO_S_LARECOMP_AUDIO_GAIN_1F0B)));
     SDL_ResumeAudioStreamDevice(r->stream);
 }
 
 static void audio_renderer(Service *s, IpcReq *req, IpcResp *resp) {
     Renderer *r = s->state;
     switch (req->cmd) {
-    case 0: OUT(uint32_t, 0) = r->sample_rate; resp_size(resp, 4); break;
-    case 1: OUT(uint32_t, 0) = r->sample_count; resp_size(resp, 4); break;
-    case 2: OUT(uint32_t, 0) = r->mix_buffers; resp_size(resp, 4); break;
-    case 3: OUT(uint32_t, 0) = r->state; resp_size(resp, 4); break;
-    case 4: case 10: request_update(r, req, resp); break;
-    case 5: r->state = 0; break;
-    case 6: r->state = 1; break;
-    case 7: resp->copy_handles[resp->ncopy++] = r->event_r; break;
-    case 8: break;
-    case 9: OUT(uint32_t, 0) = 100; resp_size(resp, 4); break;
-    default: LOG("[audren] IAudioRenderer cmd %u (ok)\n", req->cmd);
+    case 0: OUT(uint32_t, 0) = r->sample_rate; resp_size(resp, SF2C_AUDIO_N_4_4B22); break;
+    case 1: OUT(uint32_t, 0) = r->sample_count; resp_size(resp, SF2C_AUDIO_N_4_4B22); break;
+    case SF2C_AUDIO_N_2_D473: OUT(uint32_t, 0) = r->mix_buffers; resp_size(resp, SF2C_AUDIO_N_4_4B22); break;
+    case SF2C_AUDIO_N_3_4E07: OUT(uint32_t, 0) = r->state; resp_size(resp, SF2C_AUDIO_N_4_4B22); break;
+    case SF2C_AUDIO_N_4_4B22: case SF2C_AUDIO_N_10_4A44: request_update(r, req, resp); break;
+    case SF2C_AUDIO_N_5_EF2D: r->state = 0; break;
+    case SF2C_AUDIO_N_6_E7F6: r->state = 1; break;
+    case SF2C_AUDIO_N_7_7902: resp->copy_handles[resp->ncopy++] = r->event_r; break;
+    case SF2C_AUDIO_N_8_2C62: break;
+    case SF2C_AUDIO_N_9_1958: OUT(uint32_t, 0) = SF2C_AUDIO_N_100_AD57; resp_size(resp, SF2C_AUDIO_N_4_4B22); break;
+    default: LOG(SF2C_AUDIO_S_AUDREN_IAUDIORENDERER_CMD_U__A4C9, req->cmd);
     }
 }
 
@@ -977,21 +977,21 @@ static uint32_t new_event_handle(void) {
 static void audio_device(Service *s, IpcReq *req, IpcResp *resp) {
     (void)s;
     switch (req->cmd) {
-    case 0: case 6: {  // ListAudioDeviceName(Auto)
+    case 0: case SF2C_AUDIO_N_6_E7F6: {  // ListAudioDeviceName(Auto)
         IpcBuf *b = out_buf(req, 0);
-        if (b && b->size >= 0x100) strcpy((char *)(uintptr_t)b->addr, "AudioTvOutput");
+        if (b && b->size >= SF2C_AUDIO_N_0X100_BE6E) strcpy((char *)(uintptr_t)b->addr, SF2C_AUDIO_S_AUDIOTVOUTPUT_B0FF);
         OUT(uint32_t, 0) = 1;
-        resp_size(resp, 4);
+        resp_size(resp, SF2C_AUDIO_N_4_4B22);
         break;
     }
-    case 3: case 10: {  // GetActiveAudioDeviceName(Auto)
+    case SF2C_AUDIO_N_3_4E07: case SF2C_AUDIO_N_10_4A44: {  // GetActiveAudioDeviceName(Auto)
         IpcBuf *b = out_buf(req, 0);
-        if (b && b->size) strncpy((char *)(uintptr_t)b->addr, "AudioTvOutput", b->size);
+        if (b && b->size) strncpy((char *)(uintptr_t)b->addr, SF2C_AUDIO_S_AUDIOTVOUTPUT_B0FF, b->size);
         break;
     }
-    case 4: case 11: case 12: resp->copy_handles[resp->ncopy++] = new_event_handle(); break;
-    case 5: OUT(uint32_t, 0) = 2; resp_size(resp, 4); break;  // GetActiveChannelCount
-    case 8: OUT(float, 0) = 1.0f; resp_size(resp, 4); break;
+    case SF2C_AUDIO_N_4_4B22: case SF2C_AUDIO_N_11_4FC8: case SF2C_AUDIO_N_12_6B51: resp->copy_handles[resp->ncopy++] = new_event_handle(); break;
+    case SF2C_AUDIO_N_5_EF2D: OUT(uint32_t, 0) = SF2C_AUDIO_N_2_D473; resp_size(resp, SF2C_AUDIO_N_4_4B22); break;  // GetActiveChannelCount
+    case SF2C_AUDIO_N_8_2C62: OUT(float, 0) = SF2C_AUDIO_N_1_0F_CA71; resp_size(resp, SF2C_AUDIO_N_4_4B22); break;
     default: break;
     }
 }
@@ -999,18 +999,18 @@ static void audio_device(Service *s, IpcReq *req, IpcResp *resp) {
 typedef struct AudioOut AudioOut;
 static void audio_track(Renderer *r, AudioOut *a);
 
-SERVICE("audren:u", audren_u) {
+SERVICE(SF2C_AUDIO_S_AUDREN_U_C818, audren_u) {
     (void)s;
     switch (req->cmd) {
     case 0: {  // OpenAudioRenderer(params, work size, aruid, pid, transfer mem, process)
         Renderer *r = calloc(1, sizeof *r);
         const uint32_t *p = (const uint32_t *)req->data;
-        r->sample_rate = p[0]; r->sample_count = p[1]; r->mix_buffers = p[2]; r->submixes = p[3];
-        r->voices = p[4]; r->sinks = p[5]; r->effects = p[6]; r->perf_frames = p[7];
-        r->splitters = p[9];
-        r->revision = p[12];
+        r->sample_rate = p[0]; r->sample_count = p[1]; r->mix_buffers = p[SF2C_AUDIO_N_2_D473]; r->submixes = p[SF2C_AUDIO_N_3_4E07];
+        r->voices = p[SF2C_AUDIO_N_4_4B22]; r->sinks = p[SF2C_AUDIO_N_5_EF2D]; r->effects = p[SF2C_AUDIO_N_6_E7F6]; r->perf_frames = p[SF2C_AUDIO_N_7_7902];
+        r->splitters = p[SF2C_AUDIO_N_9_1958];
+        r->revision = p[SF2C_AUDIO_N_12_6B51];
         r->state = 1;
-        if (r->voices > 1024) r->voices = 1024;
+        if (r->voices > SF2C_AUDIO_N_1024_E39E) r->voices = SF2C_AUDIO_N_1024_E39E;
         r->nmix = r->submixes + 1;
         pthread_mutex_init(&r->lock, NULL);
         r->voice = calloc(r->voices, sizeof(Voice));
@@ -1022,26 +1022,26 @@ SERVICE("audren:u", audren_u) {
         r->event = kernel_create_event_pair(&r->event_w, &r->event_r);
         pthread_create(&r->thread, NULL, renderer_tick, r);
         audio_track(r, NULL);
-        LOG("[audren] renderer %u Hz, %u samples/frame, %u voices, %u mixes, %u mix buffers, %u splitters, %u effects\n",
+        LOG(SF2C_AUDIO_S_AUDREN_RENDERER_U_HZ_U_SAMPL_9245,
             r->sample_rate, r->sample_count, r->voices, r->nmix, r->mix_buffers, r->splitters, r->effects);
-        ipc_return_object(resp, service_new("IAudioRenderer", audio_renderer, r));
+        ipc_return_object(resp, service_new(SF2C_AUDIO_S_IAUDIORENDERER_6CEF, audio_renderer, r));
         break;
     }
-    case 1: OUT(uint64_t, 0) = 0x1000000; resp_size(resp, 8); break;  // GetWorkBufferSize: 16 MB
-    case 2: case 4: ipc_return_object(resp, service_new("IAudioDevice", audio_device, NULL)); break;
-    default: LOG("[audren] cmd %u (ok)\n", req->cmd);
+    case 1: OUT(uint64_t, 0) = SF2C_AUDIO_N_0X1000000_771C; resp_size(resp, SF2C_AUDIO_N_8_2C62); break;  // GetWorkBufferSize: 16 MB
+    case SF2C_AUDIO_N_2_D473: case SF2C_AUDIO_N_4_4B22: ipc_return_object(resp, service_new(SF2C_AUDIO_S_IAUDIODEVICE_66FD, audio_device, NULL)); break;
+    default: LOG(SF2C_AUDIO_S_AUDREN_CMD_U_OK_N_C46D, req->cmd);
     }
 }
 
 // ------------------------------------------------------------------ audout (buffers released in real time)
 typedef struct AudioOut {
     uint32_t rate, channels, state;
-    uint64_t tags[64], sizes[64], datas[64];
+    uint64_t tags[SF2C_AUDIO_N_64_A68B], sizes[SF2C_AUDIO_N_64_A68B], datas[SF2C_AUDIO_N_64_A68B];
     SDL_AudioStream *stream;
     FILE *wav;
     uint32_t wav_bytes;
     int queued, released_n;
-    uint64_t released[64];
+    uint64_t released[SF2C_AUDIO_N_64_A68B];
     uint32_t ev_r, ev_w;
     KEvent *event;
     uint64_t played;
@@ -1053,12 +1053,12 @@ typedef struct AudioOut {
 
 // Every renderer / audio out of this boot: a reboot stops their threads (they read guest memory and signal this
 // boot's kernel events) and closes their output streams.
-static Renderer *g_rens[8];
-static AudioOut *g_outs[8];
+static Renderer *g_rens[SF2C_AUDIO_N_8_2C62];
+static AudioOut *g_outs[SF2C_AUDIO_N_8_2C62];
 static pthread_mutex_t g_track_lock = PTHREAD_MUTEX_INITIALIZER;
 static void audio_track(Renderer *r, AudioOut *a) {
     pthread_mutex_lock(&g_track_lock);
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < SF2C_AUDIO_N_8_2C62; i++) {
         if (r && !g_rens[i]) { g_rens[i] = r; r = NULL; }
         if (a && !g_outs[i]) { g_outs[i] = a; a = NULL; }
     }
@@ -1079,18 +1079,18 @@ static void audout_close(Service *s) {
     AudioOut *a = s->state;
     bool mine = false;
     pthread_mutex_lock(&g_track_lock);
-    for (int i = 0; i < 8; i++) if (g_outs[i] == a) { g_outs[i] = NULL; mine = true; }
+    for (int i = 0; i < SF2C_AUDIO_N_8_2C62; i++) if (g_outs[i] == a) { g_outs[i] = NULL; mine = true; }
     pthread_mutex_unlock(&g_track_lock);
     if (!mine) return;  // (a reboot already closed it)
     s->state = NULL;
     audout_free(a);
-    LOG("[audout] closed\n");
+    LOG(SF2C_AUDIO_S_AUDOUT_CLOSED_N_951E);
 }
 
 RT_ON_RESET(audio_reset) {
     atomic_store(&movie_audio_active, false);
     int n = 0;
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < SF2C_AUDIO_N_8_2C62; i++) {
         Renderer *r = g_rens[i];
         if (r) {
             r->quit = true;
@@ -1105,21 +1105,21 @@ RT_ON_RESET(audio_reset) {
         }
         if (g_outs[i]) { audout_free(g_outs[i]); g_outs[i] = NULL; n++; }
     }
-    LOG("[audio] reboot: %d outputs closed\n", n);
+    LOG(SF2C_AUDIO_S_AUDIO_REBOOT_D_OUTPUTS_CLOSE_C58A, n);
 }
 
 // Buffers are copied into an SDL stream and released once the stream has drained below its target, so the
 // stream plays the role of the hardware queue. Without a device, buffers are released in real time.
 static void *audout_thread(void *arg) {
     AudioOut *a = arg;
-    uint32_t ch = a->channels ? a->channels : 2;
+    uint32_t ch = a->channels ? a->channels : SF2C_AUDIO_N_2_D473;
     int target = 0;
     if (a->stream) {
         SDL_AudioSpec dev;
         int dev_frames = 0;
         if (!SDL_GetAudioDeviceFormat(SDL_GetAudioStreamDevice(a->stream), &dev, &dev_frames) || dev_frames <= 0)
-            dev_frames = 1024;
-        target = 2 * dev_frames * 2 * (int)ch;  // bytes of s16 at the source rate (close enough at 48 kHz)
+            dev_frames = SF2C_AUDIO_N_1024_E39E;
+        target = SF2C_AUDIO_N_2_D473 * dev_frames * SF2C_AUDIO_N_2_D473 * (int)ch;  // bytes of s16 at the source rate (close enough at 48 kHz)
     }
     while (!a->quit) {
         pthread_mutex_lock(&a->lock);
@@ -1132,10 +1132,10 @@ static void *audout_thread(void *arg) {
             // pair right after OpenAudioOut and parks on it forever otherwise — boots hang here.
             struct timespec cts;
             clock_gettime(CLOCK_MONOTONIC, &cts);
-            uint64_t tns = (uint64_t)cts.tv_sec * 1000000000ull + (uint64_t)cts.tv_nsec;
-            bool fire = tns - a->idle_tick_ns >= 8000000ull;
+            uint64_t tns = (uint64_t)cts.tv_sec * SF2C_AUDIO_N_1000000000ULL_E860 + (uint64_t)cts.tv_nsec;
+            bool fire = tns - a->idle_tick_ns >= SF2C_AUDIO_N_8000000ULL_CF6C;
             if (fire) a->idle_tick_ns = tns;
-            struct timespec ts = {0, 1000000};
+            struct timespec ts = {0, SF2C_AUDIO_N_1000000_6CCE};
             nanosleep(&ts, NULL);
             if (fire) {
                 pthread_mutex_lock(&g_klock);
@@ -1144,23 +1144,23 @@ static void *audout_thread(void *arg) {
             }
             continue;
         }
-        uint64_t frames = size / (2 * ch);
+        uint64_t frames = size / (SF2C_AUDIO_N_2_D473 * ch);
         if (a->stream) {
             apply_gain(a->stream);
             if (data) SDL_PutAudioStreamData(a->stream, (const void *)(uintptr_t)data, (int)size);
-            while (SDL_GetAudioStreamQueued(a->stream) > target && !a->quit) { struct timespec ts = {0, 1000000}; nanosleep(&ts, NULL); }
+            while (SDL_GetAudioStreamQueued(a->stream) > target && !a->quit) { struct timespec ts = {0, SF2C_AUDIO_N_1000000_6CCE}; nanosleep(&ts, NULL); }
         } else {
-            uint64_t ns = frames * 1000000000ull / (a->rate ? a->rate : 48000);
-            struct timespec ts = {(time_t)(ns / 1000000000ull), (long)(ns % 1000000000ull)};
+            uint64_t ns = frames * SF2C_AUDIO_N_1000000000ULL_E860 / (a->rate ? a->rate : SF2C_AUDIO_N_48000_5D1D);
+            struct timespec ts = {(time_t)(ns / SF2C_AUDIO_N_1000000000ULL_E860), (long)(ns % SF2C_AUDIO_N_1000000000ULL_E860)};
             nanosleep(&ts, NULL);
         }
         if (a->wav && data) { fwrite((const void *)(uintptr_t)data, 1, size, a->wav); a->wav_bytes += (uint32_t)size; }
         pthread_mutex_lock(&a->lock);
         if (a->queued && a->tags[0] == tag) {
-            if (a->released_n < 64) a->released[a->released_n++] = a->tags[0];
-            memmove(a->tags, a->tags + 1, (a->queued - 1) * 8);
-            memmove(a->sizes, a->sizes + 1, (a->queued - 1) * 8);
-            memmove(a->datas, a->datas + 1, (a->queued - 1) * 8);
+            if (a->released_n < SF2C_AUDIO_N_64_A68B) a->released[a->released_n++] = a->tags[0];
+            memmove(a->tags, a->tags + 1, (a->queued - 1) * SF2C_AUDIO_N_8_2C62);
+            memmove(a->sizes, a->sizes + 1, (a->queued - 1) * SF2C_AUDIO_N_8_2C62);
+            memmove(a->datas, a->datas + 1, (a->queued - 1) * SF2C_AUDIO_N_8_2C62);
             a->queued--;
             a->played += frames;
         }
@@ -1174,105 +1174,105 @@ static void *audout_thread(void *arg) {
 
 static void audio_out(Service *s, IpcReq *req, IpcResp *resp) {
     AudioOut *a = s->state;
-    if (getenv("LARECOMP_AUDIO_LOG") && req->cmd != 3 && req->cmd != 7) {
+    if (getenv(SF2C_AUDIO_S_LARECOMP_AUDIO_LOG_866C) && req->cmd != SF2C_AUDIO_N_3_4E07 && req->cmd != SF2C_AUDIO_N_7_7902) {
         IpcBuf *ob = out_buf(req, 0);
-        LOG("[audout] cmd %u out %llx/%llx\n", req->cmd, ob ? (unsigned long long)ob->addr : 0ull,
-            ob ? (unsigned long long)ob->size : 0ull);
+        LOG(SF2C_AUDIO_S_AUDOUT_CMD_U_OUT_LLX_LLX_N_3FBD, req->cmd, ob ? (unsigned long long)ob->addr : SF2C_AUDIO_N_0ULL_DF1B,
+            ob ? (unsigned long long)ob->size : SF2C_AUDIO_N_0ULL_DF1B);
     }
     switch (req->cmd) {
-    case 0: OUT(uint32_t, 0) = a->state; resp_size(resp, 4); break;   // GetAudioOutState
+    case 0: OUT(uint32_t, 0) = a->state; resp_size(resp, SF2C_AUDIO_N_4_4B22); break;   // GetAudioOutState
     case 1: a->state = 0; break;                                      // Start
-    case 2: a->state = 1; break;                                      // Stop
-    case 3: case 7: {  // AppendAudioOutBuffer(tag) <- AudioOutBuffer {next, samples, capacity, size, offset}
+    case SF2C_AUDIO_N_2_D473: a->state = 1; break;                                      // Stop
+    case SF2C_AUDIO_N_3_4E07: case SF2C_AUDIO_N_7_7902: {  // AppendAudioOutBuffer(tag) <- AudioOutBuffer {next, samples, capacity, size, offset}
         IpcBuf *b = in_buf(req, 0);
         uint64_t tag = IN(uint64_t, 0);
-        uint64_t size = b && b->size >= 0x28 ? ((uint64_t *)(uintptr_t)b->addr)[3] : 0;
-        if (getenv("LARECOMP_AUDIO_LOG") && b)
-            LOG("[audout] append tag %llx buf %llx size %llx: %llx %llx %llx %llx %llx\n", (unsigned long long)tag,
+        uint64_t size = b && b->size >= SF2C_AUDIO_N_0X28_EAB9 ? ((uint64_t *)(uintptr_t)b->addr)[SF2C_AUDIO_N_3_4E07] : 0;
+        if (getenv(SF2C_AUDIO_S_LARECOMP_AUDIO_LOG_866C) && b)
+            LOG(SF2C_AUDIO_S_AUDOUT_APPEND_TAG_LLX_BUF_LL_85F2, (unsigned long long)tag,
                 (unsigned long long)b->addr, (unsigned long long)b->size, ((unsigned long long *)(uintptr_t)b->addr)[0],
-                ((unsigned long long *)(uintptr_t)b->addr)[1], ((unsigned long long *)(uintptr_t)b->addr)[2],
-                ((unsigned long long *)(uintptr_t)b->addr)[3], ((unsigned long long *)(uintptr_t)b->addr)[4]);
+                ((unsigned long long *)(uintptr_t)b->addr)[1], ((unsigned long long *)(uintptr_t)b->addr)[SF2C_AUDIO_N_2_D473],
+                ((unsigned long long *)(uintptr_t)b->addr)[SF2C_AUDIO_N_3_4E07], ((unsigned long long *)(uintptr_t)b->addr)[SF2C_AUDIO_N_4_4B22]);
         pthread_mutex_lock(&a->lock);
         // AudioOutBuffer {next, samples, capacity, size, offset}
-        uint64_t data = b && b->size >= 0x28 ? ((uint64_t *)(uintptr_t)b->addr)[1] + ((uint64_t *)(uintptr_t)b->addr)[4] : 0;
-        if (a->queued < 64) {
+        uint64_t data = b && b->size >= SF2C_AUDIO_N_0X28_EAB9 ? ((uint64_t *)(uintptr_t)b->addr)[1] + ((uint64_t *)(uintptr_t)b->addr)[SF2C_AUDIO_N_4_4B22] : 0;
+        if (a->queued < SF2C_AUDIO_N_64_A68B) {
             a->tags[a->queued] = tag;
-            a->sizes[a->queued] = size ? size : 4096;
+            a->sizes[a->queued] = size ? size : SF2C_AUDIO_N_4096_8B92;
             a->datas[a->queued] = size ? data : 0;
             a->queued++;
         }
         pthread_mutex_unlock(&a->lock);
         break;
     }
-    case 4: resp->copy_handles[resp->ncopy++] = a->ev_r; break;  // RegisterBufferEvent
-    case 5: case 8: {  // GetReleasedAudioOutBuffers -> tags
+    case SF2C_AUDIO_N_4_4B22: resp->copy_handles[resp->ncopy++] = a->ev_r; break;  // RegisterBufferEvent
+    case SF2C_AUDIO_N_5_EF2D: case SF2C_AUDIO_N_8_2C62: {  // GetReleasedAudioOutBuffers -> tags
         IpcBuf *b = out_buf(req, 0);
         pthread_mutex_lock(&a->lock);
         int n = a->released_n;
-        int max = b ? (int)(b->size / 8) : 0;
+        int max = b ? (int)(b->size / SF2C_AUDIO_N_8_2C62) : 0;
         if (n > max) n = max;
         if (b && b->size) memset((void *)(uintptr_t)b->addr, 0, b->size);  // SDK reads entry 0 even when n == 0
         for (int i = 0; i < n; i++) ((uint64_t *)(uintptr_t)b->addr)[i] = a->released[i];
-        if (getenv("LARECOMP_AUDIO_LOG") && n) LOG("[audout] released %d (first %llx)\n", n, (unsigned long long)a->released[0]);
-        memmove(a->released, a->released + n, (a->released_n - n) * 8);
+        if (getenv(SF2C_AUDIO_S_LARECOMP_AUDIO_LOG_866C) && n) LOG(SF2C_AUDIO_S_AUDOUT_RELEASED_D_FIRST_LLX__C47F, n, (unsigned long long)a->released[0]);
+        memmove(a->released, a->released + n, (a->released_n - n) * SF2C_AUDIO_N_8_2C62);
         a->released_n -= n;
         pthread_mutex_unlock(&a->lock);
         OUT(uint32_t, 0) = (uint32_t)n;
-        resp_size(resp, 4);
+        resp_size(resp, SF2C_AUDIO_N_4_4B22);
         break;
     }
-    case 6: OUT(uint8_t, 0) = 0; resp_size(resp, 1); break;
-    case 9: OUT(uint32_t, 0) = (uint32_t)a->queued; resp_size(resp, 4); break;
-    case 10: OUT(uint64_t, 0) = a->played; resp_size(resp, 8); break;
-    case 11: OUT(uint8_t, 0) = 1; resp_size(resp, 1); break;
-    case 12: break;
-    case 13: OUT(float, 0) = 1.0f; resp_size(resp, 4); break;
-    default: LOG("[audout] IAudioOut cmd %u (ok)\n", req->cmd);
+    case SF2C_AUDIO_N_6_E7F6: OUT(uint8_t, 0) = 0; resp_size(resp, 1); break;
+    case SF2C_AUDIO_N_9_1958: OUT(uint32_t, 0) = (uint32_t)a->queued; resp_size(resp, SF2C_AUDIO_N_4_4B22); break;
+    case SF2C_AUDIO_N_10_4A44: OUT(uint64_t, 0) = a->played; resp_size(resp, SF2C_AUDIO_N_8_2C62); break;
+    case SF2C_AUDIO_N_11_4FC8: OUT(uint8_t, 0) = 1; resp_size(resp, 1); break;
+    case SF2C_AUDIO_N_12_6B51: break;
+    case SF2C_AUDIO_N_13_3FDB: OUT(float, 0) = SF2C_AUDIO_N_1_0F_CA71; resp_size(resp, SF2C_AUDIO_N_4_4B22); break;
+    default: LOG(SF2C_AUDIO_S_AUDOUT_IAUDIOOUT_CMD_U_OK_N_BEA4, req->cmd);
     }
 }
 
-SERVICE("audout:u", audout_u) {
+SERVICE(SF2C_AUDIO_S_AUDOUT_U_ED5F, audout_u) {
     (void)s;
     switch (req->cmd) {
-    case 0: case 2: {  // ListAudioOuts
+    case 0: case SF2C_AUDIO_N_2_D473: {  // ListAudioOuts
         IpcBuf *b = out_buf(req, 0);
-        if (b && b->size >= 0x100) strcpy((char *)(uintptr_t)b->addr, "DeviceOut");
+        if (b && b->size >= SF2C_AUDIO_N_0X100_BE6E) strcpy((char *)(uintptr_t)b->addr, SF2C_AUDIO_S_DEVICEOUT_BC5C);
         OUT(uint32_t, 0) = 1;
-        resp_size(resp, 4);
+        resp_size(resp, SF2C_AUDIO_N_4_4B22);
         break;
     }
-    case 1: case 3: {  // OpenAudioOut(rate, channels, aruid, name) -> rate, channels, format, state + IAudioOut
+    case 1: case SF2C_AUDIO_N_3_4E07: {  // OpenAudioOut(rate, channels, aruid, name) -> rate, channels, format, state + IAudioOut
         AudioOut *a = calloc(1, sizeof *a);
-        a->rate = IN(uint32_t, 0) ? IN(uint32_t, 0) : 48000;
-        a->channels = IN(uint16_t, 4) ? IN(uint16_t, 4) : 2;
-        if (a->channels != 1 && a->channels != 2 && a->channels != 6) a->channels = 2;
+        a->rate = IN(uint32_t, 0) ? IN(uint32_t, 0) : SF2C_AUDIO_N_48000_5D1D;
+        a->channels = IN(uint16_t, SF2C_AUDIO_N_4_4B22) ? IN(uint16_t, SF2C_AUDIO_N_4_4B22) : SF2C_AUDIO_N_2_D473;
+        if (a->channels != 1 && a->channels != SF2C_AUDIO_N_2_D473 && a->channels != SF2C_AUDIO_N_6_E7F6) a->channels = SF2C_AUDIO_N_2_D473;
         a->state = 1;
         pthread_mutex_init(&a->lock, NULL);
         a->event = kernel_create_event_pair(&a->ev_w, &a->ev_r);
-        if (getenv("LARECOMP_AUDOUT_WAV")) a->wav = fopen(getenv("LARECOMP_AUDOUT_WAV"), "wb");
-        if (!(getenv("LARECOMP_NO_AUDIO") && strcmp(getenv("LARECOMP_NO_AUDIO"), "0")) && SDL_InitSubSystem(SDL_INIT_AUDIO)) {
+        if (getenv(SF2C_AUDIO_S_LARECOMP_AUDOUT_WAV_7222)) a->wav = fopen(getenv(SF2C_AUDIO_S_LARECOMP_AUDOUT_WAV_7222), SF2C_AUDIO_S_WB_3D6A);
+        if (!(getenv(SF2C_AUDIO_S_LARECOMP_NO_AUDIO_8230) && strcmp(getenv(SF2C_AUDIO_S_LARECOMP_NO_AUDIO_8230), SF2C_AUDIO_S_0_9808)) && SDL_InitSubSystem(SDL_INIT_AUDIO)) {
             SDL_AudioSpec spec = {SDL_AUDIO_S16, (int)a->channels, (int)a->rate};
             a->stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, NULL, NULL);
             if (a->stream) {
-                if (getenv("LARECOMP_AUDIO_GAIN")) SDL_SetAudioStreamGain(a->stream, (float)atof(getenv("LARECOMP_AUDIO_GAIN")));
+                if (getenv(SF2C_AUDIO_S_LARECOMP_AUDIO_GAIN_1F0B)) SDL_SetAudioStreamGain(a->stream, (float)atof(getenv(SF2C_AUDIO_S_LARECOMP_AUDIO_GAIN_1F0B)));
                 SDL_ResumeAudioStreamDevice(a->stream);
             }
         }
         pthread_create(&a->thread, NULL, audout_thread, a);
         audio_track(NULL, a);
         IpcBuf *b = out_buf(req, 0);
-        if (b && b->size) strncpy((char *)(uintptr_t)b->addr, "DeviceOut", b->size);
+        if (b && b->size) strncpy((char *)(uintptr_t)b->addr, SF2C_AUDIO_S_DEVICEOUT_BC5C, b->size);
         OUT(uint32_t, 0) = a->rate;
-        OUT(uint32_t, 4) = a->channels;
-        OUT(uint32_t, 8) = 2;  // PCM16
-        OUT(uint32_t, 12) = 1; // stopped
-        resp_size(resp, 16);
-        Service *svc = service_new("IAudioOut", audio_out, a);
+        OUT(uint32_t, SF2C_AUDIO_N_4_4B22) = a->channels;
+        OUT(uint32_t, SF2C_AUDIO_N_8_2C62) = SF2C_AUDIO_N_2_D473;  // PCM16
+        OUT(uint32_t, SF2C_AUDIO_N_12_6B51) = 1; // stopped
+        resp_size(resp, SF2C_AUDIO_N_16_B17E);
+        Service *svc = service_new(SF2C_AUDIO_S_IAUDIOOUT_AA39, audio_out, a);
         svc->on_close = audout_close;
         ipc_return_object(resp, svc);
-        LOG("[audout] opened %u Hz, %u ch\n", a->rate, a->channels);
+        LOG(SF2C_AUDIO_S_AUDOUT_OPENED_U_HZ_U_CH_N_5A59, a->rate, a->channels);
         break;
     }
-    default: LOG("[audout] cmd %u (ok)\n", req->cmd);
+    default: LOG(SF2C_AUDIO_S_AUDOUT_CMD_U_OK_N_DDE1, req->cmd);
     }
 }

@@ -1,3 +1,4 @@
+#include "../constants/hle.h"
 // nn::vi (display/layer) and nv:: (graphics driver init), implemented on the host.
 #include <stdlib.h>
 #include <time.h>
@@ -15,15 +16,15 @@ uint64_t g_native_window;
 
 static void *vsync_thread(void *arg) {
     (void)arg;
-    const uint32_t hz = g_settings.target_fps >= 30 && g_settings.target_fps <= 360 ?
-                        (uint32_t)g_settings.target_fps : 60;
-    const uint64_t period = 1000000000ull / hz;
-    const uint32_t remainder = (uint32_t)(1000000000ull % hz);
+    const uint32_t hz = g_settings.target_fps >= SF2C_VI_N_30_624B && g_settings.target_fps <= SF2C_VI_N_360_838F ?
+                        (uint32_t)g_settings.target_fps : SF2C_VI_N_60_39FA;
+    const uint64_t period = SF2C_VI_N_1000000000ULL_E860 / hz;
+    const uint32_t remainder = (uint32_t)(SF2C_VI_N_1000000000ULL_E860 % hz);
     plat_thread_realtime(period);
     plat_thread_perf_core(PLAT_PERF_VSYNC);
     uint64_t next = plat_now_ns();
     uint32_t fractional_ns = 0;
-    LOG("[vi] emulated display refresh %u Hz\n", hz);
+    LOG(SF2C_VI_S_VI_EMULATED_DISPLAY_REFRESH__71CD, hz);
     for (;;) {
         next += period;
         fractional_ns += remainder;
@@ -33,14 +34,14 @@ static void *vsync_thread(void *arg) {
         }
         plat_sleep_until_ns(next);
         uint64_t now = plat_now_ns();
-        if (now > next + period * 3) {
+        if (now > next + period * SF2C_VI_N_3_4E07) {
             // (~100 ms late every frame: macOS coalescing the timers of a thread that lost its real-time policy while
             // the app isn't frontmost - checked and set again here; the window's focus says whether it was frontmost)
             static int warned;
             int rt = plat_thread_realtime_check(period);
             extern bool ui_window_focused(void);
-            if (warned++ < 40) LOG("[vi] vsync timer late by %llums (window focused %d, real-time policy %s)\n", (unsigned long long)((now - next) / 1000000),
-                                    ui_window_focused(), rt == 0 ? "holds" : rt == 1 ? "was gone: set again" : "unknown");
+            if (warned++ < SF2C_VI_N_40_D59E) LOG(SF2C_VI_S_VI_VSYNC_TIMER_LATE_BY_LLUMS_5712, (unsigned long long)((now - next) / SF2C_VI_N_1000000_6CCE),
+                                    ui_window_focused(), rt == 0 ? SF2C_VI_S_HOLDS_89F6 : rt == 1 ? SF2C_VI_S_WAS_GONE_SET_AGAIN_7B81 : SF2C_VI_S_UNKNOWN_EB8B);
             next = now;  // don't burst-signal to catch up
             fractional_ns = 0;
         }
@@ -53,37 +54,37 @@ static void *vsync_thread(void *arg) {
     return NULL;
 }
 
-HLE_FUNC("_ZN2nn2vi10InitializeEv", vi_initialize) { (void)c; }
-HLE_FUNC("_ZN2nn2vi8FinalizeEv", vi_finalize) { (void)c; }
+HLE_FUNC(SF2C_VI_S_ZN2NN2VI10INITIALIZEEV_EA98, vi_initialize) { (void)c; }
+HLE_FUNC(SF2C_VI_S_ZN2NN2VI8FINALIZEEV_4CC3, vi_finalize) { (void)c; }
 
-HLE_FUNC("_ZN2nn2vi18OpenDefaultDisplayEPPNS0_7DisplayE", vi_open_default_display) {
-    *(uint64_t *)(uintptr_t)c->x[0] = (uint64_t)hle_alloc(0x100);
+HLE_FUNC(SF2C_VI_S_ZN2NN2VI18OPENDEFAULTDISPLAY_5FDA, vi_open_default_display) {
+    *(uint64_t *)(uintptr_t)c->x[0] = (uint64_t)hle_alloc(SF2C_VI_N_0X100_BE6E);
     c->x[0] = 0;
 }
 
-HLE_FUNC("_ZN2nn2vi12CloseDisplayEPNS0_7DisplayE", vi_close_display) { (void)c; }
+HLE_FUNC(SF2C_VI_S_ZN2NN2VI12CLOSEDISPLAYEPNS0__02C4, vi_close_display) { (void)c; }
 
-HLE_FUNC("_ZN2nn2vi11CreateLayerEPPNS0_5LayerEPNS0_7DisplayE", vi_create_layer) {
-    *(uint64_t *)(uintptr_t)c->x[0] = (uint64_t)hle_alloc(0x100);
+HLE_FUNC(SF2C_VI_S_ZN2NN2VI11CREATELAYEREPPNS0__302C, vi_create_layer) {
+    *(uint64_t *)(uintptr_t)c->x[0] = (uint64_t)hle_alloc(SF2C_VI_N_0X100_BE6E);
     c->x[0] = 0;
 }
 
-HLE_FUNC("_ZN2nn2vi12DestroyLayerEPNS0_5LayerE", vi_destroy_layer) { (void)c; }
-HLE_FUNC("_ZN2nn2vi12SetLayerCropEPNS0_5LayerEiiii", vi_set_layer_crop) { c->x[0] = 0; }
-HLE_FUNC("_ZN2nn2vi19SetLayerScalingModeEPNS0_5LayerENS0_11ScalingModeE", vi_set_layer_scaling_mode) { c->x[0] = 0; }
-HLE_FUNC("_ZN2nn2vi16SetLayerPositionEPNS0_5LayerEff", vi_set_layer_position) { c->x[0] = 0; }
-HLE_FUNC("_ZN2nn2vi12SetLayerSizeEPNS0_5LayerEii", vi_set_layer_size) { c->x[0] = 0; }
-HLE_FUNC("_ZN2nn2vi9SetLayerZEPNS0_5LayerEi", vi_set_layer_z) { c->x[0] = 0; }
-HLE_FUNC("_ZN2nn2vi18SetLayerVisibilityEPNS0_5LayerEb", vi_set_layer_visibility) { c->x[0] = 0; }
-HLE_FUNC("_ZN2nn2vi13SetLayerAlphaEPNS0_5LayerEf", vi_set_layer_alpha) { c->x[0] = 0; }
-HLE_FUNC("_ZN2nn2vi20GetDisplayResolutionEPiS1_PKNS0_7DisplayE", vi_get_display_resolution) {
-    if (c->x[0]) *(int32_t *)(uintptr_t)c->x[0] = 1280;
-    if (c->x[1]) *(int32_t *)(uintptr_t)c->x[1] = 720;
+HLE_FUNC(SF2C_VI_S_ZN2NN2VI12DESTROYLAYEREPNS0__A924, vi_destroy_layer) { (void)c; }
+HLE_FUNC(SF2C_VI_S_ZN2NN2VI12SETLAYERCROPEPNS0__8DE2, vi_set_layer_crop) { c->x[0] = 0; }
+HLE_FUNC(SF2C_VI_S_ZN2NN2VI19SETLAYERSCALINGMOD_1DAA, vi_set_layer_scaling_mode) { c->x[0] = 0; }
+HLE_FUNC(SF2C_VI_S_ZN2NN2VI16SETLAYERPOSITIONEP_63EA, vi_set_layer_position) { c->x[0] = 0; }
+HLE_FUNC(SF2C_VI_S_ZN2NN2VI12SETLAYERSIZEEPNS0__3B86, vi_set_layer_size) { c->x[0] = 0; }
+HLE_FUNC(SF2C_VI_S_ZN2NN2VI9SETLAYERZEPNS0_5LAY_3C97, vi_set_layer_z) { c->x[0] = 0; }
+HLE_FUNC(SF2C_VI_S_ZN2NN2VI18SETLAYERVISIBILITY_13DE, vi_set_layer_visibility) { c->x[0] = 0; }
+HLE_FUNC(SF2C_VI_S_ZN2NN2VI13SETLAYERALPHAEPNS0_36A3, vi_set_layer_alpha) { c->x[0] = 0; }
+HLE_FUNC(SF2C_VI_S_ZN2NN2VI20GETDISPLAYRESOLUTI_600A, vi_get_display_resolution) {
+    if (c->x[0]) *(int32_t *)(uintptr_t)c->x[0] = SF2C_VI_N_1280_6F13;
+    if (c->x[1]) *(int32_t *)(uintptr_t)c->x[1] = SF2C_VI_N_720_D829;
     c->x[0] = 0;
 }
 
-HLE_FUNC("_ZN2nn2vi15GetNativeWindowEPPvPNS0_5LayerE", vi_get_native_window) {
-    if (!g_native_window) g_native_window = (uint64_t)hle_alloc(0x100);
+HLE_FUNC(SF2C_VI_S_ZN2NN2VI15GETNATIVEWINDOWEPP_7850, vi_get_native_window) {
+    if (!g_native_window) g_native_window = (uint64_t)hle_alloc(SF2C_VI_N_0X100_BE6E);
     *(uint64_t *)(uintptr_t)c->x[0] = g_native_window;
     c->x[0] = 0;
 }
@@ -94,7 +95,7 @@ RT_ON_RESET(vi_reset) {
     g_native_window = 0;  // (HLE heap)
 }
 
-HLE_FUNC("_ZN2nn2vi20GetDisplayVsyncEventEPNS_2os15SystemEventTypeEPNS0_7DisplayE", vi_get_vsync_event) {
+HLE_FUNC(SF2C_VI_S_ZN2NN2VI20GETDISPLAYVSYNCEVE_12EC, vi_get_vsync_event) {
     if (!vsync_event) {
         vsync_event = kernel_create_event_pair(&vsync_w, &vsync_r);
         pthread_t t;
@@ -105,13 +106,13 @@ HLE_FUNC("_ZN2nn2vi20GetDisplayVsyncEventEPNS_2os15SystemEventTypeEPNS0_7Display
     }
     // nn::os::AttachReadableHandleToSystemEvent(event, handle, managed=false, clear_mode=AutoClear)
     c->x[1] = vsync_r;
-    c->x[2] = 0;
-    c->x[3] = 1;
-    guest_call(c, guest_sym("_ZN2nn2os33AttachReadableHandleToSystemEventEPNS0_15SystemEventTypeEjbNS0_14EventClearModeE"));
+    c->x[SF2C_VI_N_2_D473] = 0;
+    c->x[SF2C_VI_N_3_4E07] = 1;
+    guest_call(c, guest_sym(SF2C_VI_S_ZN2NN2OS33ATTACHREADABLEHAND_FA24));
     c->x[0] = 0;
 }
 
-HLE_FUNC("_ZN2nv18InitializeGraphicsEPvm", nv_initialize_graphics) { (void)c; }
-HLE_FUNC("_ZN2nv16FinalizeGraphicsEv", nv_finalize_graphics) { (void)c; }
-HLE_FUNC("_ZN2nv20SetGraphicsAllocatorEPFPvmmS0_EPFvS0_S0_EPFS0_S0_mS0_ES0_", nv_set_allocator) { (void)c; }
-HLE_FUNC("_ZN2nv28SetGraphicsDevtoolsAllocatorEPFPvmmS0_EPFvS0_S0_EPFS0_S0_mS0_ES0_", nv_set_dt_allocator) { (void)c; }
+HLE_FUNC(SF2C_VI_S_ZN2NV18INITIALIZEGRAPHICSEPV_BC4E, nv_initialize_graphics) { (void)c; }
+HLE_FUNC(SF2C_VI_S_ZN2NV16FINALIZEGRAPHICSEV_E30E, nv_finalize_graphics) { (void)c; }
+HLE_FUNC(SF2C_VI_S_ZN2NV20SETGRAPHICSALLOCATORE_3746, nv_set_allocator) { (void)c; }
+HLE_FUNC(SF2C_VI_S_ZN2NV28SETGRAPHICSDEVTOOLSAL_3887, nv_set_dt_allocator) { (void)c; }

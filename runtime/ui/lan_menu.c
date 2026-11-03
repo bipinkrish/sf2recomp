@@ -1,3 +1,4 @@
+#include "../constants/ui.h"
 // Native desktop input for the game's LAN dialogs. Managed navigation and
 // callbacks are applied on the guest thread, never from SDL's window thread.
 #include "lan_menu.h"
@@ -19,7 +20,7 @@ int input_menu_back_binding(void) {
 }
 static atomic_uint requests;
 static int axis_direction;
-static bool trigger_held[2];
+static bool trigger_held[SF2C_LAN_MENU_N_2_D473];
 void lan_menu_publish(bool open) {
     if(atomic_exchange(&modal,open)!=open)atomic_store(&requests,0);
 }
@@ -56,12 +57,12 @@ bool lan_menu_handle_event(const SDL_Event *e) {
     }
     if(e->type==SDL_EVENT_GAMEPAD_AXIS_MOTION) {
         if(e->gaxis.axis==SDL_GAMEPAD_AXIS_LEFTY) {
-            int direction=e->gaxis.value < -16000 ? -1:e->gaxis.value >16000 ?1:0;
+            int direction=e->gaxis.value < -SF2C_LAN_MENU_N_16000_2570 ? -1:e->gaxis.value >SF2C_LAN_MENU_N_16000_2570 ?1:0;
             if(direction && direction!=axis_direction)request(direction<0?LAN_MENU_UP:LAN_MENU_DOWN);
             axis_direction=direction;
         } else if(e->gaxis.axis==SDL_GAMEPAD_AXIS_LEFT_TRIGGER || e->gaxis.axis==SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) {
             unsigned which=e->gaxis.axis==SDL_GAMEPAD_AXIS_RIGHT_TRIGGER;
-            bool down=e->gaxis.value>16000;int button=which?PADB_RTRIGGER:PADB_LTRIGGER;
+            bool down=e->gaxis.value>SF2C_LAN_MENU_N_16000_2570;int button=which?PADB_RTRIGGER:PADB_LTRIGGER;
             if(down && !trigger_held[which]) {
                 if(g_bind_pad[BIND_A]==button)request(LAN_MENU_CONFIRM);
                 else if(g_bind_pad[BIND_B]==button)request(LAN_MENU_BACK);

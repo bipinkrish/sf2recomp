@@ -42,6 +42,7 @@ tools/il2cpp/.sf2-build.json
 .venv/
 # Downloaded/built native dependencies (licenses and setup recipes stay tracked)
 /deps/*
+/extensions/
 /third_party/
 /tools/third_party/
 *.so.*

@@ -1,4 +1,5 @@
 """Driver-owned heaps must preserve shader access and never fall back to userptr imports."""
+from source_values import read_source
 import pathlib
 import subprocess
 import tempfile
@@ -9,7 +10,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 class ManagedHeapTests(unittest.TestCase):
     def test_managed_mode_never_requests_userptr_chunks_or_probe(self):
-        source = (ROOT / "runtime/nvn/vulkan/device.c").read_text()
+        source = read_source(ROOT / "runtime/nvn/vulkan/device.c")
         start = source.index("static bool lazy_heap_predicted(")
         function = source[start:source.index("\n}", start) + 2]
         harness = r'''
@@ -50,7 +51,7 @@ int main(void) {
             subprocess.run([str(work / "test")], check=True)
 
     def test_prepare_failure_is_fatal_and_success_keeps_global_memory(self):
-        source = (ROOT / "runtime/nvn/vulkan/exec.c").read_text()
+        source = read_source(ROOT / "runtime/nvn/vulkan/exec.c")
 
         def function(signature):
             start = source.index(signature)

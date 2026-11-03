@@ -1,3 +1,4 @@
+#include "../../constants/nvn_maxwell.h"
 // Maxwell (GM20B) shader translation to Metal Shading Language (macOS) or Vulkan GLSL (Windows; compiled to
 // SPIR-V at runtime with shaderc). ShaderKey.glsl selects the dialect; the MSL output does not depend on it.
 //
@@ -29,15 +30,15 @@
 #include <stddef.h>
 #include <stdint.h>
 
-enum { STAGE_VERTEX = 0, STAGE_FRAGMENT = 1, STAGE_GEOMETRY = 2, STAGE_TESS_CTRL = 3, STAGE_TESS_EVAL = 4,
-       STAGE_COMPUTE = 5 };
+enum { STAGE_VERTEX = 0, STAGE_FRAGMENT = 1, STAGE_GEOMETRY = SF2C_SHADER_N_2_D473, STAGE_TESS_CTRL = SF2C_SHADER_N_3_4E07, STAGE_TESS_EVAL = SF2C_SHADER_N_4_4B22,
+       STAGE_COMPUTE = SF2C_SHADER_N_5_EF2D };
 
 enum { TEXTYPE_1D, TEXTYPE_2D, TEXTYPE_3D, TEXTYPE_CUBE, TEXTYPE_2D_ARRAY, TEXTYPE_CUBE_ARRAY, TEXTYPE_1D_ARRAY,
        TEXTYPE_BUFFER, TEXTYPE_2D_MS };
 
 typedef struct {
-    uint8_t attr_kind[32];  // vertex inputs: 0 float, 1 signed int, 2 unsigned int
-    uint8_t rt_kind[8];     // fragment outputs: 0 float, 1 signed int, 2 unsigned int
+    uint8_t attr_kind[SF2C_SHADER_N_32_E29C];  // vertex inputs: 0 float, 1 signed int, 2 unsigned int
+    uint8_t rt_kind[SF2C_SHADER_N_8_2C62];     // fragment outputs: 0 float, 1 signed int, 2 unsigned int
     bool depth_minus_one;   // NVN depth mode [-1,1]: remap clip z
     bool flip_y;            // lower-left window origin
     uint32_t vs_out_mask;   // fragment: varyings the vertex shader provides
@@ -55,10 +56,10 @@ typedef struct {
     int stage;
     char *msl;              // complete MSL or GLSL source (MSL entry "main0", GLSL "main"); NULL on failure
     uint32_t cbuf_mask;     // hardware constant buffers read
-    uint32_t cbuf_size[18];
+    uint32_t cbuf_size[SF2C_SHADER_N_18_4EC9];
     uint32_t cbuf_dynamic;  // cbufs indexed with a register: bind the whole buffer
     int ntex;
-    ShaderTexture tex[64];
+    ShaderTexture tex[SF2C_SHADER_N_64_A68B];
     uint32_t attr_mask;     // vertex: input attributes; fragment: input varyings
     uint32_t out_mask;      // vertex: output varyings; fragment: render targets written
     bool writes_depth, uses_discard, writes_point_size;
@@ -74,19 +75,19 @@ typedef struct {
                             // target scale, [1 + i] = allocation scale of texture i
     uint32_t local_mem;     // bytes of local memory
     uint32_t num_insts;
-    char error[256];        // set when translation fails
+    char error[SF2C_SHADER_N_256_51E8];        // set when translation fails
 } ShaderInfo;
 
 // Global memory (LDG/STG) is addressed through one buffer that wraps the guest heap.
-#define GMEM_BUFFER_INDEX 17
+#define GMEM_BUFFER_INDEX SF2C_SHADER_GMEM_BUFFER_INDEX
 // (MSL) Metal's sampler slots a stage. A shader with more textures takes its samplers as an array of all the slots
 // and the slot of each texture from a table of uints at SMAP_BUFFER_INDEX (fragment, compute; [i] = texture i's slot).
-#define MSL_MAX_SAMPLERS 16
-#define SMAP_BUFFER_INDEX 22
+#define MSL_MAX_SAMPLERS SF2C_SHADER_MSL_MAX_SAMPLERS
+#define SMAP_BUFFER_INDEX SF2C_SHADER_SMAP_BUFFER_INDEX
 // (GLSL compute, Vulkan) the fast copy of a dispatch's storage buffers: its address table and its data
-#define GMAP_BUFFER_INDEX 20
-#define GFAST_BUFFER_INDEX 21
-#define GMAP_MAX 16  // ranges in the table (GMap { uvec4 gmap[GMAP_MAX + 1]; }: [i] = addr lo, addr hi, size, word offset;
+#define GMAP_BUFFER_INDEX SF2C_SHADER_GMAP_BUFFER_INDEX
+#define GFAST_BUFFER_INDEX SF2C_SHADER_GFAST_BUFFER_INDEX
+#define GMAP_MAX SF2C_SHADER_N_16_B17E  // ranges in the table (GMap { uvec4 gmap[GMAP_MAX + 1]; }: [i] = addr lo, addr hi, size, word offset;
                      // [GMAP_MAX].x = count)
 extern uint64_t maxwell_gmem_base, maxwell_gmem_size;
 // (GLSL / Vulkan) The heap reaches shaders in chunks of 1 << maxwell_gmem_chunk_shift bytes in two cases:
@@ -112,14 +113,14 @@ extern bool maxwell_gmem_fs_miss;
 // as storage buffers GDir<k> at GMEM_DIRECT_BINDING + k of the chunk set: an access in one is a compare and a plain
 // storage buffer load (not a buffer reference: on Intel those miss the bindless surface path and the translator's
 // dispatch loop can't hoist them), no table read and no miss path (exec.c gmem_direct_pick). The table after them.
-#define GMEM_DIRECT_MAX 4
-#define GMEM_DIRECT_BINDING 2  // lazy: GDir<k> at 2 + k (k < GMEM_DIRECT_MAX; unused: a small zero buffer)
-#define GMEM_CHUNKS_MAX 256  // chunks at most (HEAP_MAX in 16 MB chunks is 208)
-#define GMEM_CHUNK_SET(stage) ((stage) == STAGE_COMPUTE ? 1 : 2)
+#define GMEM_DIRECT_MAX SF2C_SHADER_GMEM_DIRECT_MAX
+#define GMEM_DIRECT_BINDING SF2C_SHADER_N_2_D473  // lazy: GDir<k> at 2 + k (k < GMEM_DIRECT_MAX; unused: a small zero buffer)
+#define GMEM_CHUNKS_MAX SF2C_SHADER_N_256_51E8  // chunks at most (HEAP_MAX in 16 MB chunks is 208)
+#define GMEM_CHUNK_SET(stage) ((stage) == STAGE_COMPUTE ? 1 : SF2C_SHADER_N_2_D473)
 #define GMEM_CHUNK_BINDING 0  // windows: GMem<k> at binding k; lazy: the GChunks table
 #define GMEM_MISS_BINDING 1   // lazy: GMiss { uint n[GMEM_CHUNKS_MAX]; uint w[GMEM_CHUNKS_MAX]; } (accesses, lowest word hit)
 static inline int maxwell_gmem_chunks(void) {
-    return maxwell_gmem_chunk_shift ? (int)((maxwell_gmem_size + (1ull << maxwell_gmem_chunk_shift) - 1) >> maxwell_gmem_chunk_shift) : 1;
+    return maxwell_gmem_chunk_shift ? (int)((maxwell_gmem_size + (SF2C_SHADER_N_1ULL_622E << maxwell_gmem_chunk_shift) - 1) >> maxwell_gmem_chunk_shift) : 1;
 }
 // Debug: when translating the shader whose code starts at maxwell_dbg_code, output register
 // maxwell_dbg_reg as captured after the instruction at maxwell_dbg_pc (greyscale, all targets).
@@ -128,8 +129,7 @@ extern uint32_t maxwell_dbg_pc;
 extern int maxwell_dbg_reg;
 // Debug: the vertex shader at maxwell_dbg_vs writes each vertex's position to buffer 18 (slot iid*8+vid).
 extern const uint8_t *maxwell_dbg_vs;
-#define DBG_VS_BUFFER_INDEX 29
-
+#define DBG_VS_BUFFER_INDEX SF2C_SHADER_DBG_VS_BUFFER_INDEX
 // code: shader binary (with the 0x50-byte SPH header for graphics stages)
 ShaderInfo *maxwell_translate(const uint8_t *code, size_t max_size, int stage, const ShaderKey *key);
 void maxwell_free(ShaderInfo *s);

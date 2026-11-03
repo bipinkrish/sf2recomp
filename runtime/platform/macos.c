@@ -1,3 +1,4 @@
+#include "../constants/platform.h"
 // macOS host layer (runtime/platform.h).
 #include <CoreFoundation/CoreFoundation.h>
 #include <crt_externs.h>
@@ -35,15 +36,15 @@ static mach_timebase_info_data_t tb;
 // Started as the app (Finder, Dock: no terminal): stdout / stderr go to sf2recomp.log in the data folder, with five
 // backups (posix_log.h; as on Linux / Windows), and a fatal error is explained in an alert instead of the app
 // vanishing. Runs from a terminal or a test script (not the .app's executable) keep their own output.
-static char g_log_path[1024];
+static char g_log_path[SF2C_MACOS_N_1024_E39E];
 
 static void log_to_file_in_app(void) {
-    char exe[1024];
+    char exe[SF2C_MACOS_N_1024_E39E];
     uint32_t sz = sizeof exe;
-    if (isatty(STDERR_FILENO) || _NSGetExecutablePath(exe, &sz) != 0 || !strstr(exe, ".app/Contents/MacOS/")) return;
-    char dir[900];
+    if (isatty(STDERR_FILENO) || _NSGetExecutablePath(exe, &sz) != 0 || !strstr(exe, SF2C_MACOS_S_APP_CONTENTS_MACOS_D431)) return;
+    char dir[SF2C_MACOS_N_900_BDC5];
     if (!rt_data_root_early(dir, sizeof dir)) return;  // (runtime/paths.h: the data folder, wherever it was moved)
-    mkdir(dir, 0755);
+    mkdir(dir, SF2C_MACOS_N_0755_64A5);
     session_log_open(dir, g_log_path, sizeof g_log_path);
 }
 
@@ -59,24 +60,36 @@ static int64_t sysctl_int(const char *name) {
 }
 
 void plat_system_info(PlatSysInfo *si) {
-    char ver[32], machine[32] = "";
-    sysctl_str("kern.osproductversion", ver, sizeof ver);
+    char ver[SF2C_MACOS_N_32_E29C], machine[SF2C_MACOS_N_32_E29C] = SF2C_MACOS_S_EMPTY_12AE;
+    sysctl_str(SF2C_MACOS_S_KERN_OSPRODUCTVERSION_B89F, ver, sizeof ver);
     struct utsname u;
-    if (uname(&u) == 0) snprintf(machine, sizeof machine, "%s", u.machine);
-    bool rosetta = sysctl_int("sysctl.proc_translated") == 1;
-    snprintf(si->os, sizeof si->os, "macOS %s (%s%s)", ver[0] ? ver : "?", machine, rosetta ? ", Rosetta" : "");
-    sysctl_str("machdep.cpu.brand_string", si->cpu, sizeof si->cpu);
-    si->cores = (int)sysctl_int("hw.physicalcpu");
-    si->threads = (int)sysctl_int("hw.logicalcpu");
-    int64_t p = sysctl_int("hw.perflevel0.physicalcpu"), e = sysctl_int("hw.perflevel1.physicalcpu");
-    if (p && e) snprintf(si->cores_detail, sizeof si->cores_detail, "%dP + %dE", (int)p, (int)e);
-    si->ram = (uint64_t)sysctl_int("hw.memsize");
-    char exe[1024];
+    if (uname(&u) == 0) snprintf(machine, sizeof machine, SF2C_MACOS_S_S_0030, u.machine);
+    bool rosetta = sysctl_int(SF2C_MACOS_S_SYSCTL_PROC_TRANSLATED_F518) == 1;
+    snprintf(si->os, sizeof si->os, SF2C_MACOS_S_MACOS_S_S_S_211F, ver[0] ? ver : SF2C_MACOS_S_EMPTY_15C5, machine, rosetta ? SF2C_MACOS_S_ROSETTA_D126 : SF2C_MACOS_S_EMPTY_12AE);
+    sysctl_str(SF2C_MACOS_S_MACHDEP_CPU_BRAND_STRING_C3D5, si->cpu, sizeof si->cpu);
+    si->cores = (int)sysctl_int(SF2C_MACOS_S_HW_PHYSICALCPU_5E6C);
+    si->threads = (int)sysctl_int(SF2C_MACOS_S_HW_LOGICALCPU_3DBA);
+    int64_t p = sysctl_int(SF2C_MACOS_S_HW_PERFLEVEL0_PHYSICALCPU_6EA3), e = sysctl_int(SF2C_MACOS_S_HW_PERFLEVEL1_PHYSICALCPU_9B55);
+    if (p && e) snprintf(si->cores_detail, sizeof si->cores_detail, SF2C_MACOS_S_DP_DE_6E1A, (int)p, (int)e);
+    si->ram = (uint64_t)sysctl_int(SF2C_MACOS_S_HW_MEMSIZE_7E98);
+    char exe[SF2C_MACOS_N_1024_E39E];
     uint32_t sz = sizeof exe;
-    si->package = _NSGetExecutablePath(exe, &sz) == 0 && strstr(exe, ".app/Contents/MacOS/") ? ".app" : NULL;
+    si->package = _NSGetExecutablePath(exe, &sz) == 0 && strstr(exe, SF2C_MACOS_S_APP_CONTENTS_MACOS_D431) ? SF2C_MACOS_S_APP_BE64 : NULL;
 }
 
 void plat_init(void) {
+    // A converted portable folder carries its own MoltenVK ICD. Preserve an
+    // explicit developer/SDK override, otherwise resolve beside this executable.
+    if (!getenv(SF2C_MACOS_S_VK_DRIVER_FILES_52BA) && !getenv(SF2C_MACOS_S_VK_ICD_FILENAMES_338A)) {
+        char icd[SF2C_MACOS_N_4096_8B92];
+        if (plat_exe_path(icd, sizeof icd)) {
+            char *slash = strrchr(icd, SF2C_MACOS_CH_EMPTY_0825);
+            if (slash && (size_t)(slash - icd) + sizeof SF2C_MACOS_S_MOLTENVK_ICD_JSON_20AD <= sizeof icd) {
+                strcpy(slash, SF2C_MACOS_S_MOLTENVK_ICD_JSON_20AD);
+                if (access(icd, R_OK) == 0) setenv(SF2C_MACOS_S_VK_DRIVER_FILES_52BA, icd, 0);
+            }
+        }
+    }
     mach_timebase_info(&tb);
     log_to_file_in_app();
     raise_open_file_limit();
@@ -114,7 +127,7 @@ uint64_t plat_now_ns(void) {
 
 uint64_t plat_thread_cpu_ns(void) {
     struct timespec ts;
-    return clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts) == 0 ? (uint64_t)ts.tv_sec * 1000000000ull + (uint64_t)ts.tv_nsec : 0;
+    return clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts) == 0 ? (uint64_t)ts.tv_sec * SF2C_MACOS_N_1000000000ULL_E860 + (uint64_t)ts.tv_nsec : 0;
 }
 
 void plat_sleep_until_ns(uint64_t t) {
@@ -130,13 +143,13 @@ void plat_thread_realtime(uint64_t period_ns) {
     uint64_t period = period_ns * tb.denom / tb.numer;
     thread_time_constraint_policy_data_t pol = {
         .period = (uint32_t)period,
-        .computation = (uint32_t)(period / 20),
-        .constraint = (uint32_t)(period / 4),
+        .computation = (uint32_t)(period / SF2C_MACOS_N_20_F5CA),
+        .constraint = (uint32_t)(period / SF2C_MACOS_N_4_4B22),
         .preemptible = 1,
     };
     kern_return_t kr = thread_policy_set(pthread_mach_thread_np(pthread_self()), THREAD_TIME_CONSTRAINT_POLICY, (thread_policy_t)&pol,
                                          THREAD_TIME_CONSTRAINT_POLICY_COUNT);
-    if (kr != KERN_SUCCESS) fprintf(stderr, "[plat] real-time thread policy refused: %d\n", (int)kr);
+    if (kr != KERN_SUCCESS) fprintf(stderr, SF2C_MACOS_S_PLAT_REAL_TIME_THREAD_POLICY_6CB7, (int)kr);
 }
 // After a late wait: is the time-constraint policy still in effect for this thread? The kernel drops it (back to
 // timeshare, timers coalesced to ~100 ms when the app isn't frontmost) for a thread that overruns its computation
@@ -160,20 +173,20 @@ int plat_cpu_count(void) { return 0; }  // (no affinity masks here: the caller u
 
 void plat_thread_guest(int prio) {
     static int on = -1;
-    if (on < 0) on = !getenv("LARECOMP_THREAD_QOS") || atoi(getenv("LARECOMP_THREAD_QOS")) != 0;
-    if (on) pthread_set_qos_class_self_np(prio <= 44 ? QOS_CLASS_USER_INTERACTIVE : QOS_CLASS_USER_INITIATED, 0);
+    if (on < 0) on = !getenv(SF2C_MACOS_S_LARECOMP_THREAD_QOS_8C64) || atoi(getenv(SF2C_MACOS_S_LARECOMP_THREAD_QOS_8C64)) != 0;
+    if (on) pthread_set_qos_class_self_np(prio <= SF2C_MACOS_N_44_71EE ? QOS_CLASS_USER_INTERACTIVE : QOS_CLASS_USER_INITIATED, 0);
 }
 
 bool plat_exe_path(char *buf, size_t size) {
     char executable[PATH_MAX], resolved[PATH_MAX];
     uint32_t len = sizeof executable;
     if (_NSGetExecutablePath(executable, &len) || !realpath(executable, resolved)) return false;
-    return snprintf(buf, size, "%s", resolved) < (int)size;
+    return snprintf(buf, size, SF2C_MACOS_S_S_0030, resolved) < (int)size;
 }
 
 void plat_exec(char *const argv[]) {
     if (argv) { execv(argv[0], argv); return; }
-    char path[4096];
+    char path[SF2C_MACOS_N_4096_8B92];
     if (plat_exe_path(path, sizeof path)) execv(path, *_NSGetArgv());
 }
 
@@ -187,27 +200,27 @@ const char *plat_symbol(uint64_t pc, uint64_t *offset) {
 bool plat_module_name(uint64_t pc, char *out, size_t n) {
     Dl_info di = {0};
     if (!dladdr((void *)(uintptr_t)pc, &di) || !di.dli_fname) return false;
-    snprintf(out, n, "%s", di.dli_fname);
+    snprintf(out, n, SF2C_MACOS_S_S_0030, di.dli_fname);
     return true;
 }
 
 // Fatal error: what happened in plain words (runtime/crash_explain.c) - an alert when running as the app (the
 // terminal shows the log otherwise). CFUserNotification: safe from any thread, no run loop needed.
 void plat_fatal_notice(void) {
-    char text[1600];
+    char text[SF2C_MACOS_N_1600_B458];
     rt_crash_explain(text, sizeof text, g_log_path);
     if (!g_log_path[0]) return;
     fflush(stderr);
     CFStringRef msg = CFStringCreateWithCString(NULL, text, kCFStringEncodingUTF8);
-    CFUserNotificationDisplayAlert(0, kCFUserNotificationStopAlertLevel, NULL, NULL, NULL, CFSTR("Shadow Fight 2 (sf2recomp)"), msg,
-                                   CFSTR("OK"), NULL, NULL, NULL);
+    CFUserNotificationDisplayAlert(0, kCFUserNotificationStopAlertLevel, NULL, NULL, NULL, CFSTR(SF2C_MACOS_S_SHADOW_FIGHT_2_SF2RECOMP_891C), msg,
+                                   CFSTR(SF2C_MACOS_S_OK_98C4), NULL, NULL, NULL);
     if (msg) CFRelease(msg);
 }
 
 static void *notice_thread(void *text) {
     CFStringRef msg = CFStringCreateWithCString(NULL, text, kCFStringEncodingUTF8);
-    CFUserNotificationDisplayAlert(0, kCFUserNotificationCautionAlertLevel, NULL, NULL, NULL, CFSTR("Shadow Fight 2 (sf2recomp)"), msg,
-                                   CFSTR("OK"), NULL, NULL, NULL);
+    CFUserNotificationDisplayAlert(0, kCFUserNotificationCautionAlertLevel, NULL, NULL, NULL, CFSTR(SF2C_MACOS_S_SHADOW_FIGHT_2_SF2RECOMP_891C), msg,
+                                   CFSTR(SF2C_MACOS_S_OK_98C4), NULL, NULL, NULL);
     if (msg) CFRelease(msg);
     free(text);
     return NULL;
@@ -221,11 +234,11 @@ void plat_notice(const char *text) {
 }
 
 void plat_print_backtrace(void) {
-    void *bt[64];
-    int n = backtrace(bt, 64);
+    void *bt[SF2C_MACOS_N_64_A68B];
+    int n = backtrace(bt, SF2C_MACOS_N_64_A68B);
     char **syms = backtrace_symbols(bt, n);
     if (!syms) return;
-    for (int i = 0; i < n; i++) fprintf(stderr, "  %s\n", syms[i]);
+    for (int i = 0; i < n; i++) fprintf(stderr, SF2C_MACOS_S_S_N_56B7, syms[i]);
     free(syms);
 }
 
@@ -242,13 +255,13 @@ static void crash_handler(int sig, siginfo_t *si, void *ctx) {
 #endif
     { extern uint64_t g_fault_lr; g_fault_lr = lr; }
     if (rt_fault_watch(fa, pc)) return;
-    char what[32];
-    snprintf(what, sizeof what, "signal %d", sig);
+    char what[SF2C_MACOS_N_32_E29C];
+    snprintf(what, sizeof what, SF2C_MACOS_S_SIGNAL_D_D3D6, sig);
     rt_fault_report(what, fa, pc, lr);
 }
 
 void plat_crash_handler_install(void) {
-    stack_t ss = {.ss_sp = malloc(1 << 20), .ss_size = 1 << 20};
+    stack_t ss = {.ss_sp = malloc(1 << SF2C_MACOS_N_20_F5CA), .ss_size = 1 << SF2C_MACOS_N_20_F5CA};
     sigaltstack(&ss, NULL);
     struct sigaction sa = {0};
     sa.sa_sigaction = crash_handler;
@@ -269,9 +282,9 @@ extern char **environ;
 PlatProc plat_spawn(const char *const argv[], const char *log_path, bool append_log) {
     posix_spawn_file_actions_t fa;
     posix_spawn_file_actions_init(&fa);
-    posix_spawn_file_actions_addopen(&fa, 1, log_path ? log_path : "/dev/null",
-                                     O_WRONLY | O_CREAT | (append_log ? O_APPEND : O_TRUNC), 0644);
-    posix_spawn_file_actions_adddup2(&fa, 1, 2);
+    posix_spawn_file_actions_addopen(&fa, 1, log_path ? log_path : SF2C_MACOS_S_DEV_NULL_9945,
+                                     O_WRONLY | O_CREAT | (append_log ? O_APPEND : O_TRUNC), SF2C_MACOS_N_0644_3ED6);
+    posix_spawn_file_actions_adddup2(&fa, 1, SF2C_MACOS_N_2_D473);
     posix_spawnattr_t at;  // (its own process group: plat_proc_kill ends what it starts, e.g. a compiler's own child)
     posix_spawnattr_init(&at);
     posix_spawnattr_setflags(&at, POSIX_SPAWN_SETPGROUP);
@@ -292,15 +305,15 @@ int plat_proc_wait(PlatProc p, bool block) {
     int st = 0;
     pid_t r = waitpid((pid_t)p, &st, block ? 0 : WNOHANG);
     if (r == 0) return -1;
-    if (r < 0) return 255;
-    return WIFEXITED(st) ? WEXITSTATUS(st) : WIFSIGNALED(st) ? PLAT_PROC_SIGNALED + WTERMSIG(st) : 255;
+    if (r < 0) return SF2C_MACOS_N_255_9556;
+    return WIFEXITED(st) ? WEXITSTATUS(st) : WIFSIGNALED(st) ? PLAT_PROC_SIGNALED + WTERMSIG(st) : SF2C_MACOS_N_255_9556;
 }
 
 static int rm_entry(const char *path, const struct stat *sb, int flag, struct FTW *ftw) {
     (void)sb, (void)flag, (void)ftw;
     return remove(path) == 0 || errno == ENOENT ? 0 : -1;  // (gone already: e.g. a ._ file macOS removed with its folder on exFAT)
 }
-bool plat_remove_tree(const char *dir) { return nftw(dir, rm_entry, 16, FTW_DEPTH | FTW_PHYS) == 0; }
+bool plat_remove_tree(const char *dir) { return nftw(dir, rm_entry, SF2C_MACOS_N_16_B17E, FTW_DEPTH | FTW_PHYS) == 0; }
 bool plat_onedrive_synced(const char *dir) { (void)dir; return false; }
 
 // Mach reads fail safely for unmapped addresses, including diagnostic probes.

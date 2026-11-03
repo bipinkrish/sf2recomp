@@ -1,4 +1,5 @@
 """Vulkan image allocation, output visibility, and GPU failure handling."""
+from source_values import read_source
 from pathlib import Path
 import subprocess
 import sys
@@ -17,7 +18,7 @@ def function(source, signature):
 
 class VulkanSyncTests(unittest.TestCase):
     def test_compositor_rotation_does_not_recreate_every_present(self):
-        record = (ROOT / "runtime/nvn/vulkan/record.c").read_text()
+        record = read_source(ROOT / "runtime/nvn/vulkan/record.c")
         harness = r'''
 #include <assert.h>
 #include <stdbool.h>
@@ -75,7 +76,7 @@ int main(void) {
             subprocess.run([str(root / "test")], check=True)
 
     def test_resolution_scaling_preserves_cpu_artwork_dimensions(self):
-        textures = (ROOT / "runtime/nvn/vulkan/textures.c").read_text()
+        textures = read_source(ROOT / "runtime/nvn/vulkan/textures.c")
         harness = r'''
 #include <assert.h>
 #include <stdbool.h>
@@ -116,7 +117,7 @@ int main(void) {
             subprocess.run([str(root / "test")], check=True)
 
     def test_gpu_timeout_reports_progress_and_never_returns_completion(self):
-        execute = (ROOT / "runtime/nvn/vulkan/exec.c").read_text()
+        execute = read_source(ROOT / "runtime/nvn/vulkan/exec.c")
         harness = r'''
 #include <assert.h>
 #include <pthread.h>
@@ -173,8 +174,8 @@ int main(void) {
             subprocess.run([str(root / "test")], check=True)
 
     def test_frame_begin_publishes_game_image_writes_before_sampling(self):
-        device = (ROOT / "runtime/nvn/vulkan/device.c").read_text()
-        execute = (ROOT / "runtime/nvn/vulkan/exec.c").read_text()
+        device = read_source(ROOT / "runtime/nvn/vulkan/device.c")
+        execute = read_source(ROOT / "runtime/nvn/vulkan/exec.c")
         harness = r'''
 #include <assert.h>
 #include <stdbool.h>

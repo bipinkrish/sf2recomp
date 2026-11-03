@@ -1,0 +1,4 @@
+# Portable compiler, packaged inside the standalone Python distribution.
+ziglang==0.15.2; sys_platform != 'win32'
+# Portable HTTPS trust for optional downloads, including hosts without a Python CA setup.
+certifi==2026.10.23

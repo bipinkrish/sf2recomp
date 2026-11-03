@@ -1,3 +1,4 @@
+#include "../constants/platform.h"
 // What glibc before 2.38 lacks (included via runtime/platform.h on Linux only): the AppImage is built against
 // Ubuntu 22.04's glibc 2.35 (no strlcpy / strlcat until 2.38, no arc4random until 2.36).
 #pragma once
@@ -5,7 +6,7 @@
 #include <string.h>
 #include <sys/random.h>
 
-#if !__GLIBC_PREREQ(2, 38)
+#if !__GLIBC_PREREQ(SF2C_LINUX_COMPAT_N_2_D473, SF2C_LINUX_COMPAT_N_38_AEA9)
 static inline size_t strlcpy(char *d, const char *s, size_t n) {
     size_t len = strlen(s);
     if (n) {
@@ -22,14 +23,14 @@ static inline size_t strlcat(char *d, const char *s, size_t n) {
 }
 #endif
 
-#if !__GLIBC_PREREQ(2, 36)
+#if !__GLIBC_PREREQ(SF2C_LINUX_COMPAT_N_2_D473, SF2C_LINUX_COMPAT_N_36_76A5)
 static inline uint32_t arc4random(void) {
     uint32_t v = 0;
     while (getrandom(&v, sizeof v, 0) != sizeof v) {}
     return v;
 }
 static inline uint32_t arc4random_uniform(uint32_t n) {
-    if (n < 2) return 0;
+    if (n < SF2C_LINUX_COMPAT_N_2_D473) return 0;
     uint32_t min = -n % n, r;  // reject the low values that would bias the modulo
     do r = arc4random(); while (r < min);
     return r % n;

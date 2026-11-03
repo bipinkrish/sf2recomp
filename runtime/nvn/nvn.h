@@ -1,3 +1,4 @@
+#include "../constants/nvn.h"
 // NVN implemented on the host. Guest NVN objects hold a pointer to a host object at offset 0;
 // builders and small state objects store their fields directly in guest memory.
 #pragma once
@@ -24,7 +25,7 @@ typedef struct NvnPool {
 typedef struct NvnTexture {
     TexLayout layout;
     uint32_t target, format, flags, width, height, depth, levels, samples, ds_mode;
-    uint8_t swizzle[4];
+    uint8_t swizzle[SF2C_NVN_N_4_4B22];
     uint64_t stride;
     uint64_t addr;  // guest address of texel storage
     NvnPool *pool;
@@ -34,7 +35,7 @@ typedef struct NvnTexture {
     uint64_t debug_id;
     uint32_t pool_refs;  // texture pool entries that name it (cleared when it is finalized: runtime/nvn/objects.c)
     bool format_views;   // named through a view in a format the backend can only give with a flag (Metal: PixelFormatView)
-    char label[64];
+    char label[SF2C_NVN_N_64_A68B];
     unsigned refs;  // guest object, recorded command lists, and queued users
 } NvnTexture;
 
@@ -55,9 +56,9 @@ void nvn_commands_release(NvnCommands *commands);
 void nvn_commands_finalize(uint64_t handle);
 
 typedef struct {
-    uint32_t min_filter, mag_filter, wrap[3], compare_mode, compare_func, reduction;
+    uint32_t min_filter, mag_filter, wrap[SF2C_NVN_N_3_4E07], compare_mode, compare_func, reduction;
     float lod_min, lod_max, lod_bias, max_aniso;
-    float border[4];
+    float border[SF2C_NVN_N_4_4B22];
     void *backend;
 } NvnSamplerDesc;
 
@@ -65,14 +66,14 @@ typedef struct {
     uint32_t setmask;  // which fields are overridden
     uint16_t base_level, num_levels, min_layer, num_layers;
     uint32_t format, target, ds_mode;
-    uint8_t swizzle[4];
+    uint8_t swizzle[SF2C_NVN_N_4_4B22];
 } NvnTextureView;  // our layout of the guest NVNtextureView (0x28 bytes)
 
 // A view naming a texture (pool entry, render target, clear, copy): one in another format is told to the backend before
 // the texture is used through it.
 void backend_texture_view_format(NvnTexture *tex, uint32_t format);  // (runtime/nvn/metal.m, vulkan/textures.c)
 static inline void nvn_texture_note_view(NvnTexture *t, const NvnTextureView *v) {
-    if (t && v && (v->setmask & 4) && v->format != t->format) backend_texture_view_format(t, v->format);
+    if (t && v && (v->setmask & SF2C_NVN_N_4_4B22) && v->format != t->format) backend_texture_view_format(t, v->format);
 }
 
 typedef struct {
@@ -100,15 +101,15 @@ typedef struct NvnShaderStage {
 } NvnShaderStage;
 
 typedef struct NvnProgram {
-    NvnShaderStage stages[6];
+    NvnShaderStage stages[SF2C_NVN_N_6_E7F6];
     uint32_t stage_mask;
     void *backend;
 } NvnProgram;
 
 typedef struct NvnWindow {
-    uint64_t textures[8];  // guest NVNtexture*
+    uint64_t textures[SF2C_NVN_N_8_2C62];  // guest NVNtexture*
     int num, active, interval, next;
-    int crop[4];
+    int crop[SF2C_NVN_N_4_4B22];
     uint64_t present_deadline, present_period;
 } NvnWindow;
 
@@ -132,8 +133,8 @@ typedef struct {
 // One recorded command: header, the call's integer and float arguments, then copied data.
 typedef struct {
     uint32_t op, size;  // size includes the header, multiple of 8
-    uint64_t x[7];      // x1..x7 of the call
-    float f[4];         // s0..s3 of the call
+    uint64_t x[SF2C_NVN_N_7_7902];      // x1..x7 of the call
+    float f[SF2C_NVN_N_4_4B22];         // s0..s3 of the call
     uint8_t extra[];
 } CmdRec;
 

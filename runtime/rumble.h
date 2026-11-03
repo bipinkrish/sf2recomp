@@ -1,3 +1,4 @@
+#include "constants/core.h"
 // Approximate Switch HD Rumble with a conventional two-motor gamepad.
 #pragma once
 #include <stdbool.h>
@@ -5,27 +6,27 @@
 #include <math.h>
 
 typedef struct { float low_amp, low_hz, high_amp, high_hz; } RumbleValue;
-_Static_assert(sizeof(RumbleValue) == 16, "HID vibration wire layout");
+_Static_assert(sizeof(RumbleValue) == SF2C_RUMBLE_N_16_B17E, SF2C_RUMBLE_S_HID_VIBRATION_WIRE_LAYOUT_9D06);
 
 static inline uint16_t rumble_amplitude(float a) {
     if (!isfinite(a) || a <= 0) return 0;
-    if (a >= 1) return 65535;
-    return (uint16_t)(a * 65535.0f + 0.5f);
+    if (a >= 1) return SF2C_RUMBLE_N_65535_F2F8;
+    return (uint16_t)(a * SF2C_RUMBLE_N_65535_0F_A14C + SF2C_RUMBLE_N_0_5F_2DB0);
 }
 
-enum { RUMBLE_PLAYER_COUNT = 2, RUMBLE_SIDES_PER_PLAYER = 2, RUMBLE_VALUE_COUNT = 4 };
+enum { RUMBLE_PLAYER_COUNT = SF2C_RUMBLE_N_2_D473, RUMBLE_SIDES_PER_PLAYER = SF2C_RUMBLE_N_2_D473, RUMBLE_VALUE_COUNT = SF2C_RUMBLE_N_4_4B22 };
 
 // Current HLE uses native HID handles: style | player<<8 | side<<16.
 // Accept the older synthetic 0x03000000 | player<<8 | side for compatibility.
 static inline int rumble_index(uint32_t h) {
     uint32_t player, side;
-    if ((h & 0xffff00feu) == 0x03000000u) {  // older handle with style in the high byte
-        player = (h >> 8) & 255;
+    if ((h & SF2C_RUMBLE_N_0XFFFF00FEU_3027) == SF2C_RUMBLE_N_0X03000000U_313C) {  // older handle with style in the high byte
+        player = (h >> SF2C_RUMBLE_N_8_2C62) & SF2C_RUMBLE_N_255_9556;
         side = h & 1;
-    } else if ((h & 0xff000000u) == 0 && (h & 255) >= 3 && (h & 255) <= 5 &&
-               ((h >> 8) & 255) < RUMBLE_PLAYER_COUNT && ((h >> 16) & 255) < RUMBLE_SIDES_PER_PLAYER) {
-        player = (h >> 8) & 255;
-        side = (h >> 16) & 255;
+    } else if ((h & SF2C_RUMBLE_N_0XFF000000U_E7BA) == 0 && (h & SF2C_RUMBLE_N_255_9556) >= SF2C_RUMBLE_N_3_4E07 && (h & SF2C_RUMBLE_N_255_9556) <= SF2C_RUMBLE_N_5_EF2D &&
+               ((h >> SF2C_RUMBLE_N_8_2C62) & SF2C_RUMBLE_N_255_9556) < RUMBLE_PLAYER_COUNT && ((h >> SF2C_RUMBLE_N_16_B17E) & SF2C_RUMBLE_N_255_9556) < RUMBLE_SIDES_PER_PLAYER) {
+        player = (h >> SF2C_RUMBLE_N_8_2C62) & SF2C_RUMBLE_N_255_9556;
+        side = (h >> SF2C_RUMBLE_N_16_B17E) & SF2C_RUMBLE_N_255_9556;
     } else {
         return -1;
     }

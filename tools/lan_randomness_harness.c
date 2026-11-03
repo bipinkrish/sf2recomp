@@ -37,7 +37,7 @@ static void reset(uint32_t value) {
     controlled=selected=true;simulation_depth=1;random_scope=wrapped=0;
     ST32((uintptr_t)generator+0x10,value);ST64((uintptr_t)object+0x10,(uintptr_t)generator);
     rt_hook_features=0;cpu.x[0]=value;f_70018d6fe0(&cpu);
-    menu_state=(uint64_t)value^UINT64_C(0x53463253454c4543);
+    menu_state=(uint64_t)value^SF2RECOMP_LAN_SELECTION_SALT;
 }
 static uint32_t seeds[]={0,1,12345,54321,0x7fffffff,0x80000000,0xdeadbeef,0xffffffff};
 // 0/1 native/LAN Nekki floats; 2/3 native/LAN Unity floats;

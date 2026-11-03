@@ -1,3 +1,4 @@
+#include "../constants/ui.h"
 #include "mouse.h"
 #include "../hle.h"
 #include "../settings.h"
@@ -24,8 +25,8 @@ RT_ON_RESET(reset_menu_mouse) { menu_mouse_reset(); }
 static uint8_t mouse_bit(uint8_t button) {
     switch (button) {
     case SDL_BUTTON_LEFT: return 1;
-    case SDL_BUTTON_RIGHT: return 2;
-    case SDL_BUTTON_MIDDLE: return 4;
+    case SDL_BUTTON_RIGHT: return SF2C_MOUSE_N_2_D473;
+    case SDL_BUTTON_MIDDLE: return SF2C_MOUSE_N_4_4B22;
     default: return 0;
     }
 }
@@ -41,7 +42,7 @@ void menu_mouse_event(const SDL_Event *e) {
         menu_mouse_reset();
         return;
     case SDL_EVENT_GAMEPAD_AXIS_MOTION:
-        if (abs(e->gaxis.value) <= 12000) return;
+        if (abs(e->gaxis.value) <= SF2C_MOUSE_N_12000_C5D1) return;
         // fall through
     case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
         menu_mouse_reset();
@@ -53,8 +54,8 @@ void menu_mouse_event(const SDL_Event *e) {
     }
     SDL_Window *window = SDL_GetWindowFromEvent(e);
     if (!window) window = SDL_GetKeyboardFocus();  // scripted events have no window ID
-    bool scripted_mouse = (e->type == SDL_EVENT_MOUSE_MOTION && e->motion.which == 0x7E57u) ||
-        ((e->type == SDL_EVENT_MOUSE_BUTTON_DOWN || e->type == SDL_EVENT_MOUSE_BUTTON_UP) && e->button.which == 0x7E57u);
+    bool scripted_mouse = (e->type == SDL_EVENT_MOUSE_MOTION && e->motion.which == SF2C_MOUSE_N_0X7E57U_3EAD) ||
+        ((e->type == SDL_EVENT_MOUSE_BUTTON_DOWN || e->type == SDL_EVENT_MOUSE_BUTTON_UP) && e->button.which == SF2C_MOUSE_N_0X7E57U_3EAD);
     // Hidden diagnostic windows have no focus. Resolve only our synthetic
     // mouse to the sole game window, on SDL's event/window thread.
     if (!window && scripted_mouse) {
@@ -73,8 +74,8 @@ void menu_mouse_event(const SDL_Event *e) {
     SDL_LockSpinlock(&mouse_lock);
     pending.x = x; pending.y = y;
     pending.width = width; pending.height = height;
-    if (ENV("LARECOMP_MOUSE_TRACE") && e->type != SDL_EVENT_WINDOW_RESIZED)
-        LOG("[mouse] SDL event %x position %.1f/%.1f window %dx%d\n", e->type, x, y, width, height);
+    if (ENV(SF2C_MOUSE_S_LARECOMP_MOUSE_TRACE_86DC) && e->type != SDL_EVENT_WINDOW_RESIZED)
+        LOG(SF2C_MOUSE_S_MOUSE_SDL_EVENT_X_POSITION_1_B53F, e->type, x, y, width, height);
     if (e->type != SDL_EVENT_WINDOW_RESIZED) pending.active = true;
     if (e->type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
         uint8_t bit = mouse_bit(e->button.button);
@@ -93,7 +94,7 @@ void menu_mouse_event(const SDL_Event *e) {
 }
 
 MenuMouse menu_mouse_frame(unsigned width, unsigned height, bool captured) {
-    MenuMouse result = {.x = -10000, .y = -10000};
+    MenuMouse result = {.x = -SF2C_MOUSE_N_10000_39E5, .y = -SF2C_MOUSE_N_10000_39E5};
     SDL_LockSpinlock(&mouse_lock);
     if (captured) {
         pending.active = false;
@@ -110,12 +111,12 @@ MenuMouse menu_mouse_frame(unsigned width, unsigned height, bool captured) {
     pending.scroll_x = pending.scroll_y = 0;
     // Presentation fits the configured aspect to the window. SDL reports window
     // points, so this also works on HiDPI screens regardless of render scale.
-    float base_width = settings_screen_width(1080);
-    float scale = fminf(pending.width / base_width, pending.height / 1080.f);
+    float base_width = settings_screen_width(SF2C_MOUSE_N_1080_32EB);
+    float scale = fminf(pending.width / base_width, pending.height / SF2C_MOUSE_N_1080_F_E3B8);
     if (pending.active && scale > 0 && width && height) {
-        float view_w = base_width * scale, view_h = 1080 * scale;
-        float x = (pending.x - (pending.width - view_w) / 2) / view_w;
-        float y = (pending.y - (pending.height - view_h) / 2) / view_h;
+        float view_w = base_width * scale, view_h = SF2C_MOUSE_N_1080_32EB * scale;
+        float x = (pending.x - (pending.width - view_w) / SF2C_MOUSE_N_2_D473) / view_w;
+        float y = (pending.y - (pending.height - view_h) / SF2C_MOUSE_N_2_D473) / view_h;
         // Keep positions outside the viewport outside: clamping would make black
         // bars clickable. Unity uses a bottom-left origin.
         result.x = x * width;

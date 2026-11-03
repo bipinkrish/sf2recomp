@@ -1,3 +1,5 @@
 plugins {
     id 'com.android.application' version '8.9.2' apply false
 }
+ext.sf2Toolchain = new Properties()
+file('toolchain.properties').withInputStream { ext.sf2Toolchain.load(it) }

@@ -1,3 +1,4 @@
+#include "../constants/nvn.h"
 // Host resources captured by a command list belong to that list, not its submission.
 // A loader can record an upload, finalize its texture, then submit the upload later.
 // Queue ordering alone does not keep that texture alive until the upload is translated.
@@ -16,12 +17,12 @@ struct NvnCommands {
     size_t ncalls, cap_calls;
 };
 
-enum { COMMAND_BUCKETS = 1024 };
+enum { COMMAND_BUCKETS = SF2C_COMMAND_LIFETIME_N_1024_E39E };
 static NvnCommands *handles[COMMAND_BUCKETS];
 static pthread_mutex_t handles_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static NvnCommands **handle_slot(uint64_t handle) {
-    NvnCommands **slot = &handles[(handle >> 3) % COMMAND_BUCKETS];
+    NvnCommands **slot = &handles[(handle >> SF2C_COMMAND_LIFETIME_N_3_4E07) % COMMAND_BUCKETS];
     while (*slot && (*slot)->handle != handle) slot = &(*slot)->next;
     return slot;
 }
@@ -38,7 +39,7 @@ void nvn_commands_texture(NvnCommands *commands, NvnTexture *texture) {
     for (size_t i = 0; i < commands->ntextures; ++i)
         if (commands->textures[i] == texture) return;
     if (commands->ntextures == commands->cap_textures) {
-        commands->cap_textures = commands->cap_textures ? commands->cap_textures * 2 : 8;
+        commands->cap_textures = commands->cap_textures ? commands->cap_textures * SF2C_COMMAND_LIFETIME_N_2_D473 : SF2C_COMMAND_LIFETIME_N_8_2C62;
         commands->textures = realloc(commands->textures, commands->cap_textures * sizeof *commands->textures);
     }
     nvn_texture_retain(texture);
@@ -59,7 +60,7 @@ void nvn_commands_call(NvnCommands *commands, uint64_t handle) {
     for (size_t i = 0; i < commands->ncalls; ++i)
         if (commands->calls[i] == child) { nvn_commands_release(child); return; }
     if (commands->ncalls == commands->cap_calls) {
-        commands->cap_calls = commands->cap_calls ? commands->cap_calls * 2 : 4;
+        commands->cap_calls = commands->cap_calls ? commands->cap_calls * SF2C_COMMAND_LIFETIME_N_2_D473 : SF2C_COMMAND_LIFETIME_N_4_4B22;
         commands->calls = realloc(commands->calls, commands->cap_calls * sizeof *commands->calls);
     }
     commands->calls[commands->ncalls++] = child;

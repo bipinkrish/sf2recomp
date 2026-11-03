@@ -1,3 +1,4 @@
+#include "constants/core.h"
 // Kernel object types shared by kernel.c and the IPC/service layer.
 #pragma once
 #include <setjmp.h>
@@ -5,9 +6,8 @@
 
 #include "rt.h"
 
-#define STACK_BASE 0x7200000000ull
-#define STACK_SIZE 0x0040000000ull
-
+#define STACK_BASE SF2C_KERNEL_STACK_BASE
+#define STACK_SIZE SF2C_KERNEL_STACK_SIZE
 typedef enum { KOBJ_THREAD = 1, KOBJ_EVENT, KOBJ_SESSION, KOBJ_SHMEM, KOBJ_TMEM } KType;
 typedef enum { WAIT_NONE = 0, WAIT_MUTEX, WAIT_CONDVAR, WAIT_ARBITER } WaitKind;
 

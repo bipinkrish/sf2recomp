@@ -1,3 +1,4 @@
+#include "../constants/nvn.h"
 // The player's own diagnostic shader variants, kept in cache/shader_seen.txt.
 // A writer thread deduplicates and appends hash/pipeline-state records in batches;
 // the render thread only enqueues them. These are not shader code or an offline
@@ -12,13 +13,13 @@
 #include "nvn.h"
 #include "shader_prep.h"
 
-#define SEEN_FILE "cache/shader_seen.txt"
-#define SEEN_MAX 20000  // records kept at most
+#define SEEN_FILE SF2C_SHADER_SEEN_SEEN_FILE
+#define SEEN_MAX SF2C_SHADER_SEEN_N_20000_876C  // records kept at most
 
 bool shader_seen_on(void) {
     static int v = -1;
     if (v < 0) {
-        const char *e = getenv("LARECOMP_SHADER_SEEN");
+        const char *e = getenv(SF2C_SHADER_SEEN_S_LARECOMP_SHADER_SEEN_DA2E);
         v = !(e && *e && !atoi(e));
     }
     return v;
@@ -33,8 +34,8 @@ static uint64_t line_hash(const char *l, size_t n) {
 }
 
 static bool hs_add(HSet *s, uint64_t h) {  // false: already there
-    if (s->n * 2 >= s->cap) {
-        size_t cap = s->cap ? s->cap * 2 : 4096;
+    if (s->n * SF2C_SHADER_SEEN_N_2_D473 >= s->cap) {
+        size_t cap = s->cap ? s->cap * SF2C_SHADER_SEEN_N_2_D473 : SF2C_SHADER_SEEN_N_4096_8B92;
         uint64_t *t = calloc(cap, sizeof *t);
         for (size_t i = 0; i < s->cap; i++)
             if (s->t[i]) {
@@ -65,11 +66,11 @@ static bool hs_has(const HSet *s, uint64_t h) {
 // Each G / C line of text (trimmed of \r) -> fn
 static void each_record(const char *text, void (*fn)(const char *line, size_t n, void *ctx), void *ctx) {
     for (const char *p = text; p && *p;) {
-        const char *e = strchr(p, '\n');
+        const char *e = strchr(p, SF2C_SHADER_SEEN_CH_N_AD65);
         size_t n = e ? (size_t)(e - p) : strlen(p);
         size_t m = n;
-        while (m && (p[m - 1] == '\r' || p[m - 1] == ' ')) m--;
-        if (m && (p[0] == 'G' || p[0] == 'C')) fn(p, m, ctx);
+        while (m && (p[m - 1] == SF2C_SHADER_SEEN_CH_R_4859 || p[m - 1] == SF2C_SHADER_SEEN_CH_EMPTY_730D)) m--;
+        if (m && (p[0] == SF2C_SHADER_SEEN_CH_G_C429 || p[0] == SF2C_SHADER_SEEN_CH_C_809F)) fn(p, m, ctx);
         p += n + (e != NULL);
     }
 }
@@ -77,7 +78,7 @@ static void each_record(const char *text, void (*fn)(const char *line, size_t n,
 static void add_line(const char *l, size_t n, void *s) { hs_add(s, line_hash(l, n)); }
 
 static char *read_all(const char *path) {
-    FILE *f = fopen(path, "rb");
+    FILE *f = fopen(path, SF2C_SHADER_SEEN_S_RB_46CA);
     if (!f) return NULL;
     fseek(f, 0, SEEK_END);
     long n = ftell(f);
@@ -123,11 +124,11 @@ static void write_batch(void) {  // (f_lock held) everything queued -> the file
         uint64_t h = line_hash(tab[i], strlen(tab[i]));
         if (file_n < SEEN_MAX && !hs_has(&known, h)) {
             if (!f) {
-                mkdir("cache", 0755);
-                f = fopen(SEEN_FILE, "ab");
+                mkdir(SF2C_SHADER_SEEN_S_CACHE_C87A, SF2C_SHADER_SEEN_N_0755_64A5);
+                f = fopen(SEEN_FILE, SF2C_SHADER_SEEN_S_AB_782B);
             }
-            if (f && fprintf(f, "%s\n", tab[i]) > 0) { hs_add(&known, h); file_n++; }
-            if (file_n == SEEN_MAX) LOG("[shader] seen list full (%d records)\n", SEEN_MAX);
+            if (f && fprintf(f, SF2C_SHADER_SEEN_S_S_N_1F0E, tab[i]) > 0) { hs_add(&known, h); file_n++; }
+            if (file_n == SEEN_MAX) LOG(SF2C_SHADER_SEEN_S_SHADER_SEEN_LIST_FULL_D_RECO_E8EC, SEEN_MAX);
         }
         free(tab[i]);
     }
@@ -157,12 +158,12 @@ static void at_exit(void) {
 }
 
 void shader_seen_note(const ShaderRec *r) {
-    if (!shader_seen_on() || !r->vs || (r->kind == 'G' && !r->fs)) return;
-    char line[2048];
+    if (!shader_seen_on() || !r->vs || (r->kind == SF2C_SHADER_SEEN_CH_G_C429 && !r->fs)) return;
+    char line[SF2C_SHADER_SEEN_N_2048_BFA0];
     shader_rec_format(r, line, sizeof line);
     pthread_mutex_lock(&q_lock);
     if (hs_add(&q_seen, line_hash(line, strlen(line)))) {
-        if (q_n == q_cap) q_tab = realloc(q_tab, sizeof *q_tab * (q_cap = q_cap ? q_cap * 2 : 256));
+        if (q_n == q_cap) q_tab = realloc(q_tab, sizeof *q_tab * (q_cap = q_cap ? q_cap * SF2C_SHADER_SEEN_N_2_D473 : SF2C_SHADER_SEEN_N_256_51E8));
         q_tab[q_n++] = strdup(line);
         if (!writer_started) {
             writer_started = true;

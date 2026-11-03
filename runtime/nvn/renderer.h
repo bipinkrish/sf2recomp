@@ -1,3 +1,4 @@
+#include "../constants/nvn.h"
 // Interface between the NVN executor (renderer.m) and the Metal plumbing (metal.m).
 #pragma once
 #include "nvn.h"
@@ -13,7 +14,7 @@ extern uint64_t g_guest_buffer_base;
 #endif
 #include <SDL3/SDL_events.h>
 
-enum { RENDERER_MOVIE_WIDTH = 720, RENDERER_MOVIE_HEIGHT = 400 };
+enum { RENDERER_MOVIE_WIDTH = SF2C_RENDERER_N_720_D829, RENDERER_MOVIE_HEIGHT = SF2C_RENDERER_N_400_26D2 };
 
 // Host-decoded cinematics use a reusable RGBA target with NV12 frame uploads.
 // Decoder workers may submit frames; the Vulkan presenter consumes the newest one.

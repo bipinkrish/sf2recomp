@@ -1,3 +1,4 @@
+#include "../constants/services.h"
 // nfp:user - amiibo. Behaves like a console with NFC available but no amiibo ever touched: the game's own
 // "no amiibo" path runs (issue #282: a null IUser used to crash Dampe's amiibo option).
 // Command ids follow the public IUser interface layout.
@@ -10,8 +11,8 @@ enum { NFP_STATE_NONE = 0, NFP_STATE_INITIALIZED = 1 };
 enum { DEV_INITIALIZED = 0, DEV_SEARCHING = 1 };
 
 // Result (module 115): no tag in range.
-#define NFP_RESULT(desc) (0x73u | ((uint32_t)(desc) << 9))
-#define RESULT_DEVICE_NOT_FOUND NFP_RESULT(64)
+#define NFP_RESULT(desc) (SF2C_NFP_N_0X73U_A45A | ((uint32_t)(desc) << SF2C_NFP_N_9_1958))
+#define RESULT_DEVICE_NOT_FOUND NFP_RESULT(SF2C_NFP_N_64_A68B)
 
 typedef struct {
     int state, dev_state;
@@ -37,58 +38,58 @@ static void nfp_iuser(Service *s, IpcReq *req, IpcResp *resp) {
         u->state = NFP_STATE_NONE;
         u->dev_state = DEV_INITIALIZED;
         break;
-    case 2: {  // ListDevices -> one NFC reader (the controller), so the game can search and time out / cancel
+    case SF2C_NFP_N_2_D473: {  // ListDevices -> one NFC reader (the controller), so the game can search and time out / cancel
         IpcBuf *b = out_buf(req, 0);
         int n = 0;
-        if (b && b->addr && b->size >= 8) {
-            memset((void *)(uintptr_t)b->addr, 0, 8);  // device handle 0 (player 1 controller)
+        if (b && b->addr && b->size >= SF2C_NFP_N_8_2C62) {
+            memset((void *)(uintptr_t)b->addr, 0, SF2C_NFP_N_8_2C62);  // device handle 0 (player 1 controller)
             n = 1;
         }
         OUT(uint32_t, 0) = (uint32_t)n;
-        resp_size(resp, 4);
+        resp_size(resp, SF2C_NFP_N_4_4B22);
         break;
     }
-    case 3:  // StartDetection
+    case SF2C_NFP_N_3_4E07:  // StartDetection
         u->dev_state = DEV_SEARCHING;
         break;
-    case 4:  // StopDetection
+    case SF2C_NFP_N_4_4B22:  // StopDetection
         u->dev_state = DEV_INITIALIZED;
         break;
-    case 5: case 6: case 7: case 8: case 9: case 10: case 11: case 12:  // Mount .. CreateApplicationArea
-    case 13: case 14: case 15: case 16: case 24:  // Get*Info, RecreateApplicationArea
+    case SF2C_NFP_N_5_EF2D: case SF2C_NFP_N_6_E7F6: case SF2C_NFP_N_7_7902: case SF2C_NFP_N_8_2C62: case SF2C_NFP_N_9_1958: case SF2C_NFP_N_10_4A44: case SF2C_NFP_N_11_4FC8: case SF2C_NFP_N_12_6B51:  // Mount .. CreateApplicationArea
+    case SF2C_NFP_N_13_3FDB: case SF2C_NFP_N_14_8527: case SF2C_NFP_N_15_E629: case SF2C_NFP_N_16_B17E: case SF2C_NFP_N_24_C235:  // Get*Info, RecreateApplicationArea
         resp->result = RESULT_DEVICE_NOT_FOUND;  // no tag present
         break;
-    case 17: case 18: case 23:  // Attach{Activate,Deactivate,AvailabilityChange}Event (never signalled)
+    case SF2C_NFP_N_17_4523: case SF2C_NFP_N_18_4EC9: case SF2C_NFP_N_23_535F:  // Attach{Activate,Deactivate,AvailabilityChange}Event (never signalled)
         resp->copy_handles[resp->ncopy++] = new_event_handle();
         break;
-    case 19:  // GetState
+    case SF2C_NFP_N_19_9400:  // GetState
         OUT(uint32_t, 0) = (uint32_t)u->state;
-        resp_size(resp, 4);
+        resp_size(resp, SF2C_NFP_N_4_4B22);
         break;
-    case 20:  // GetDeviceState
+    case SF2C_NFP_N_20_F5CA:  // GetDeviceState
         OUT(uint32_t, 0) = (uint32_t)u->dev_state;
-        resp_size(resp, 4);
+        resp_size(resp, SF2C_NFP_N_4_4B22);
         break;
-    case 21:  // GetNpadId
+    case SF2C_NFP_N_21_6F4B:  // GetNpadId
         OUT(uint32_t, 0) = 0;  // player 1
-        resp_size(resp, 4);
+        resp_size(resp, SF2C_NFP_N_4_4B22);
         break;
-    case 22:  // GetApplicationAreaSize
-        OUT(uint32_t, 0) = 0xD8;
-        resp_size(resp, 4);
+    case SF2C_NFP_N_22_785F:  // GetApplicationAreaSize
+        OUT(uint32_t, 0) = SF2C_NFP_N_0XD8_93CA;
+        resp_size(resp, SF2C_NFP_N_4_4B22);
         break;
     default:
-        LOG("[nfp] IUser cmd %u (ok)\n", req->cmd);
-        resp_size(resp, 0x10);
+        LOG(SF2C_NFP_S_NFP_IUSER_CMD_U_OK_N_2B46, req->cmd);
+        resp_size(resp, SF2C_NFP_N_0X10_BF9C);
     }
-    if (req->cmd != 19 && req->cmd != 20) LOG("[nfp] IUser cmd %u -> %x\n", req->cmd, resp->result);
+    if (req->cmd != SF2C_NFP_N_19_9400 && req->cmd != SF2C_NFP_N_20_F5CA) LOG(SF2C_NFP_S_NFP_IUSER_CMD_U_X_N_9A3D, req->cmd, resp->result);
 }
 
-SERVICE("nfp:user", nfp_user) {
+SERVICE(SF2C_NFP_S_NFP_USER_A145, nfp_user) {
     (void)s;
     if (req->cmd == 0) {  // CreateUserInterface
-        ipc_return_object(resp, service_new("nfp:IUser", nfp_iuser, NULL));
+        ipc_return_object(resp, service_new(SF2C_NFP_S_NFP_IUSER_3FB7, nfp_iuser, NULL));
         return;
     }
-    LOG("[nfp] IUserManager cmd %u (ok)\n", req->cmd);
+    LOG(SF2C_NFP_S_NFP_IUSERMANAGER_CMD_U_OK_N_DEE6, req->cmd);
 }

@@ -48,12 +48,28 @@ Local extraction and analysis (not linked into the game)
   nstool-libpietendo.txt and nstool-libtoolchain.txt in the same folder.
   Official source revisions and archive checksums: tools/extraction-dependencies.json.
   tools/setup_extraction.py fetches these into ignored tools/third_party/.
-- LibHac 0.19.0: local NuGet dependency of tools/bktr/Sf2Bktr.csproj. Preserve
-  the license supplied by the restored package if redistributing the tool binary.
+- LibHac 0.19.0: MIT, licenses/LibHac.txt, with copyright/source identity
+  declared by the restored NuGet package. Used by tools/bktr/Sf2Bktr.csproj.
 - Il2CppDumper and Mono.Cecil: licenses/Il2CppDumper.txt and licenses/Mono.Cecil.txt;
   source-build instructions in tools/il2cpp/. Assemblies are local build outputs.
 - Python analysis dependencies are declared in tools/requirements.txt; their
   package licenses accompany their installed distributions.
+
+Portable release tools
+- CPython / python-build-standalone: the distribution retains its PSF and bundled
+  dependency licenses inside python/. https://github.com/astral-sh/python-build-standalone
+- Zig 0.15.2 via ziglang: MIT, with LLVM/Clang and bundled runtime notices retained
+  in the installed Python package. https://ziglang.org/ and https://pypi.org/project/ziglang/
+- Certifi: Mozilla Public License 2.0, with license and CA bundle retained in its
+  installed Python distribution. https://github.com/certifi/python-certifi
+- Self-contained .NET helpers retain Microsoft's LICENSE.txt/ThirdPartyNotices.txt
+  alongside the runtime files. https://github.com/dotnet/runtime
+- Native shared-library notices are collected in native/licenses at release
+  assembly, including GNU runtime exceptions and package copyright records.
+  Windows UCRT64 packages retain their share/licenses records; macOS also records
+  the installed Homebrew formulas and source URLs.
+- Optional Android toolchains are downloaded from Google and Eclipse Adoptium
+  into extensions/android. Their upstream notices remain in those distributions.
 
 The public source package excludes game/, generated C, game-derived executables,
 assets, tickets and user keys. The conversion output is generated locally and

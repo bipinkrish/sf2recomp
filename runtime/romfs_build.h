@@ -1,3 +1,4 @@
+#include "constants/core.h"
 // The game's RomFS image, laid out from a folder of game files (runtime/romfs_build.c). The game reads its data through
 // one raw RomFS image; runtime/services/fs.c serves that image from this layout - the header and tables in memory, each
 // file's data straight from its file in the player's romfs/ folder - so no second copy of the game data is kept.
@@ -7,10 +8,10 @@
 #include <stdint.h>
 
 #ifdef __cplusplus
-extern "C" {
+extern SF2C_ROMFS_BUILD_S_C_C2E8 {
 #endif
 
-#define ROMFS_DATA_START 0x200u
+#define ROMFS_DATA_START SF2C_ROMFS_BUILD_ROMFS_DATA_START
 typedef struct { uint64_t start, size; char *path; } RomfsLayoutFile;  // start: offset in the image
 typedef struct {
     uint8_t header[ROMFS_DATA_START];  // the image's first bytes (the 0x50-byte header, then zeros)

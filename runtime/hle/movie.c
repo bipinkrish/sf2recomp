@@ -1,6 +1,7 @@
+#include "../constants/hle.h"
 // nn::movie HLE implementation for video playback / cinematics
-#define _POSIX_C_SOURCE 200809L
-#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE SF2C_MOVIE__POSIX_C_SOURCE
+#define _XOPEN_SOURCE SF2C_MOVIE__XOPEN_SOURCE
 #include <SDL3/SDL.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -47,13 +48,13 @@ typedef int MoviePipe;
 #endif
 extern void audio_movie_set_active(bool active);
 
-#define MOVIE_FPS 25
-#define MOVIE_AUDIO_RATE 48000
-#define MOVIE_AUDIO_CHANNELS 2
-#define MOVIE_AUDIO_BYTES_PER_SAMPLE 2
-#define MOVIE_AUDIO_QUEUE_LIMIT (MOVIE_AUDIO_RATE * MOVIE_AUDIO_CHANNELS * MOVIE_AUDIO_BYTES_PER_SAMPLE / 4)
-#define MOVIE_FRAME_BYTES ((size_t)RENDERER_MOVIE_WIDTH * RENDERER_MOVIE_HEIGHT * 3 / 2)
-#define MOVIE_FRAME_COUNT 16
+#define MOVIE_FPS SF2C_MOVIE_MOVIE_FPS
+#define MOVIE_AUDIO_RATE SF2C_MOVIE_MOVIE_AUDIO_RATE
+#define MOVIE_AUDIO_CHANNELS SF2C_MOVIE_MOVIE_AUDIO_CHANNELS
+#define MOVIE_AUDIO_BYTES_PER_SAMPLE SF2C_MOVIE_MOVIE_AUDIO_BYTES_PER_SAMPLE
+#define MOVIE_AUDIO_QUEUE_LIMIT (MOVIE_AUDIO_RATE * MOVIE_AUDIO_CHANNELS * MOVIE_AUDIO_BYTES_PER_SAMPLE / SF2C_MOVIE_N_4_4B22)
+#define MOVIE_FRAME_BYTES ((size_t)RENDERER_MOVIE_WIDTH * RENDERER_MOVIE_HEIGHT * SF2C_MOVIE_N_3_4E07 / SF2C_MOVIE_N_2_D473)
+#define MOVIE_FRAME_COUNT SF2C_MOVIE_MOVIE_FRAME_COUNT
 typedef struct {
     uint64_t index;
     uint8_t *pixels;
@@ -87,21 +88,21 @@ static atomic_uint_fast64_t g_movie_displayed_frame = UINT64_MAX;
 static uint64_t movie_now_ns(void) {
     struct timespec t;
     clock_gettime(CLOCK_MONOTONIC, &t);
-    return (uint64_t)t.tv_sec * 1000000000ull + t.tv_nsec;
+    return (uint64_t)t.tv_sec * SF2C_MOVIE_N_1000000000ULL_E860 + t.tv_nsec;
 }
 
 static void movie_sleep_ns(uint64_t ns) {
-    struct timespec t = {(time_t)(ns / 1000000000ull), (long)(ns % 1000000000ull)};
+    struct timespec t = {(time_t)(ns / SF2C_MOVIE_N_1000000000ULL_E860), (long)(ns % SF2C_MOVIE_N_1000000000ULL_E860)};
     while (nanosleep(&t, &t) && errno == EINTR) {}
 }
 
 static bool movie_path_safe(const char *path) {
     for (const char *p = path; *p;) {
-        while (*p == '/') p++;
+        while (*p == SF2C_MOVIE_CH_EMPTY_0825) p++;
         const char *start = p;
-        while (*p && *p != '/') p++;
+        while (*p && *p != SF2C_MOVIE_CH_EMPTY_0825) p++;
         size_t n = (size_t)(p - start);
-        if ((n == 1 && start[0] == '.') || (n == 2 && start[0] == '.' && start[1] == '.')) return false;
+        if ((n == 1 && start[0] == SF2C_MOVIE_CH_EMPTY_277A) || (n == SF2C_MOVIE_N_2_D473 && start[0] == SF2C_MOVIE_CH_EMPTY_277A && start[1] == SF2C_MOVIE_CH_EMPTY_277A)) return false;
     }
     return true;
 }
@@ -109,29 +110,29 @@ static bool movie_path_safe(const char *path) {
 static bool movie_resolve_path(const char *guest_path, char *out, size_t out_size) {
     if (!guest_path || !*guest_path || !g_romfs_dir) return false;
     const char *p = guest_path;
-    if (!strncmp(p, "rom:", 4)) p += 4;
-    while (*p == '/') p++;
-    const char *streaming = strstr(p, "Data/StreamingAssets/");
+    if (!strncmp(p, SF2C_MOVIE_S_ROM_7221, SF2C_MOVIE_N_4_4B22)) p += SF2C_MOVIE_N_4_4B22;
+    while (*p == SF2C_MOVIE_CH_EMPTY_0825) p++;
+    const char *streaming = strstr(p, SF2C_MOVIE_S_DATA_STREAMINGASSETS_304E);
     if (streaming) p = streaming;
     char rel[PATH_MAX];
-    if (!strncmp(p, "Data/StreamingAssets/", 21)) {
-        if (snprintf(rel, sizeof rel, "%s", p) >= (int)sizeof rel) return false;
-    } else if (!strncmp(p, "database/", 9)) {
-        if (snprintf(rel, sizeof rel, "Data/StreamingAssets/%s", p) >= (int)sizeof rel) return false;
+    if (!strncmp(p, SF2C_MOVIE_S_DATA_STREAMINGASSETS_304E, SF2C_MOVIE_N_21_6F4B)) {
+        if (snprintf(rel, sizeof rel, SF2C_MOVIE_S_S_0030, p) >= (int)sizeof rel) return false;
+    } else if (!strncmp(p, SF2C_MOVIE_S_DATABASE_EAF1, SF2C_MOVIE_N_9_1958)) {
+        if (snprintf(rel, sizeof rel, SF2C_MOVIE_S_DATA_STREAMINGASSETS_S_11B3, p) >= (int)sizeof rel) return false;
     } else {
-        if (snprintf(rel, sizeof rel, "Data/StreamingAssets/database/%s", p) >= (int)sizeof rel) return false;
+        if (snprintf(rel, sizeof rel, SF2C_MOVIE_S_DATA_STREAMINGASSETS_DATABAS_26BD, p) >= (int)sizeof rel) return false;
     }
     if (!movie_path_safe(rel)) return false;
     char candidate[PATH_MAX], root[PATH_MAX], resolved[PATH_MAX];
-    if (snprintf(candidate, sizeof candidate, "%s/%s", g_romfs_dir, rel) >= (int)sizeof candidate) return false;
+    if (snprintf(candidate, sizeof candidate, SF2C_MOVIE_S_S_S_22D8, g_romfs_dir, rel) >= (int)sizeof candidate) return false;
     if (!realpath(g_romfs_dir, root) || !realpath(candidate, resolved)) return false;
     size_t root_len = strlen(root);
 #ifdef _WIN32
-    if (_strnicmp(root, resolved, root_len) || resolved[root_len] != '/') return false;
+    if (_strnicmp(root, resolved, root_len) || resolved[root_len] != SF2C_MOVIE_CH_EMPTY_0825) return false;
 #else
-    if (strncmp(root, resolved, root_len) || resolved[root_len] != '/') return false;
+    if (strncmp(root, resolved, root_len) || resolved[root_len] != SF2C_MOVIE_CH_EMPTY_0825) return false;
 #endif
-    if (snprintf(out, out_size, "%s", resolved) >= (int)out_size) return false;
+    if (snprintf(out, out_size, SF2C_MOVIE_S_S_0030, resolved) >= (int)out_size) return false;
     return true;
 }
 
@@ -139,9 +140,9 @@ static bool movie_resolve_path(const char *guest_path, char *out, size_t out_siz
 static int movie_move_fd(int fd) {
     int n;
 #ifdef F_DUPFD_CLOEXEC
-    n = fcntl(fd, F_DUPFD_CLOEXEC, 10);
+    n = fcntl(fd, F_DUPFD_CLOEXEC, SF2C_MOVIE_N_10_4A44);
 #else
-    n = fcntl(fd, F_DUPFD, 10);
+    n = fcntl(fd, F_DUPFD, SF2C_MOVIE_N_10_4A44);
     if (n >= 0 && fcntl(n, F_SETFD, FD_CLOEXEC) < 0) { close(n); n = -1; }
 #endif
     if (n < 0) return -1;
@@ -149,7 +150,7 @@ static int movie_move_fd(int fd) {
     return n;
 }
 
-static void movie_close_pair(int p[2]) {
+static void movie_close_pair(int p[SF2C_MOVIE_N_2_D473]) {
     if (p[0] >= 0) close(p[0]);
     if (p[1] >= 0) close(p[1]);
     p[0] = p[1] = -1;
@@ -165,28 +166,28 @@ typedef struct {
 #ifndef __ANDROID__
 static bool movie_select_decoder(MovieDecoder *decoder) {
     memset(decoder, 0, sizeof *decoder);
-    const char *override = getenv("LARECOMP_FFMPEG");
+    const char *override = getenv(SF2C_MOVIE_S_LARECOMP_FFMPEG_0C2D);
     if (override && *override) {
-        return snprintf(decoder->executable, sizeof decoder->executable, "%s", override) < (int)sizeof decoder->executable;
+        return snprintf(decoder->executable, sizeof decoder->executable, SF2C_MOVIE_S_S_0030, override) < (int)sizeof decoder->executable;
     }
 
     char executable[PATH_MAX];
     if (plat_exe_path(executable, sizeof executable)) {
-        char *slash = strrchr(executable, '/');
+        char *slash = strrchr(executable, SF2C_MOVIE_CH_EMPTY_0825);
         if (slash) {
             *slash = 0;
             if (snprintf(decoder->executable, sizeof decoder->executable,
-                         "%s/lib/ffmpeg/bin/ffmpeg" PLAT_EXE_SUFFIX, executable) < (int)sizeof decoder->executable &&
+                         SF2C_MOVIE_S_S_LIB_FFMPEG_BIN_FFMPEG_EBA8 PLAT_EXE_SUFFIX, executable) < (int)sizeof decoder->executable &&
                 snprintf(decoder->library_dir, sizeof decoder->library_dir,
-                         "%s/lib/ffmpeg/lib", executable) < (int)sizeof decoder->library_dir &&
+                         SF2C_MOVIE_S_S_LIB_FFMPEG_LIB_06EE, executable) < (int)sizeof decoder->library_dir &&
                 access(decoder->executable, X_OK) == 0)
                 return true;
         }
     }
 
     // A raw build/smoke run can use the developer's PATH. Converted game folders always bundle FFmpeg here.
-    strcpy(decoder->executable, "ffmpeg" PLAT_EXE_SUFFIX);
-    LOG("[movie] bundled decoder not found beside the executable; trying PATH (developer fallback)\n");
+    strcpy(decoder->executable, SF2C_MOVIE_S_FFMPEG_B521 PLAT_EXE_SUFFIX);
+    LOG(SF2C_MOVIE_S_MOVIE_BUNDLED_DECODER_NOT_FO_E486);
     return true;
 }
 #endif
@@ -204,21 +205,21 @@ static char **movie_spawn_environment(const char *library_dir, char *ld_library_
     *owned_env = NULL;
     if (!library_dir || !*library_dir) return environ;
 #ifdef __APPLE__
-    const char *variable = "DYLD_LIBRARY_PATH";
+    const char *variable = SF2C_MOVIE_S_DYLD_LIBRARY_PATH_A363;
 #else
-    const char *variable = "LD_LIBRARY_PATH";
+    const char *variable = SF2C_MOVIE_S_LD_LIBRARY_PATH_6EAC;
 #endif
     const char *old_path = getenv(variable);
-    int n = snprintf(ld_library_path, path_size, "%s=%s%s%s", variable, library_dir,
-                     old_path && *old_path ? ":" : "", old_path && *old_path ? old_path : "");
+    int n = snprintf(ld_library_path, path_size, SF2C_MOVIE_S_S_S_S_S_C1C4, variable, library_dir,
+                     old_path && *old_path ? SF2C_MOVIE_S_EMPTY_194A : SF2C_MOVIE_S_EMPTY_12AE, old_path && *old_path ? old_path : SF2C_MOVIE_S_EMPTY_12AE);
     if (n < 0 || (size_t)n >= path_size) return NULL;
     size_t count = 0;
     while (environ[count]) count++;
-    char **env = calloc(count + 2, sizeof *env);
+    char **env = calloc(count + SF2C_MOVIE_N_2_D473, sizeof *env);
     if (!env) return NULL;
     size_t used = 0;
     for (size_t i = 0; i < count; i++)
-        if (strncmp(environ[i], variable, strlen(variable)) || environ[i][strlen(variable)] != '=')
+        if (strncmp(environ[i], variable, strlen(variable)) || environ[i][strlen(variable)] != SF2C_MOVIE_CH_EMPTY_C874)
             env[used++] = environ[i];
     env[used++] = ld_library_path;
     env[used] = NULL;
@@ -228,9 +229,9 @@ static char **movie_spawn_environment(const char *library_dir, char *ld_library_
 
 static bool movie_spawn_decoder(const char *path, const MovieDecoder *decoder,
                                 pid_t *pid, int *video_fd, int *audio_fd) {
-    int video[2] = {-1, -1}, audio[2] = {-1, -1};
+    int video[SF2C_MOVIE_N_2_D473] = {-1, -1}, audio[SF2C_MOVIE_N_2_D473] = {-1, -1};
     if (pipe(video) || pipe(audio)) goto fail;
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < SF2C_MOVIE_N_2_D473; i++) {
         int n = movie_move_fd(video[i]);
         if (n < 0) goto fail;
         video[i] = n;
@@ -242,10 +243,10 @@ static bool movie_spawn_decoder(const char *path, const MovieDecoder *decoder,
     posix_spawn_file_actions_t actions;
     if (posix_spawn_file_actions_init(&actions)) goto fail;
     int action_error = 0;
-    action_error |= posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0);
+    action_error |= posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, SF2C_MOVIE_S_DEV_NULL_9945, O_RDONLY, 0);
     action_error |= posix_spawn_file_actions_adddup2(&actions, video[1], STDOUT_FILENO);
-    action_error |= posix_spawn_file_actions_adddup2(&actions, audio[1], 3);
-    for (int i = 0; i < 2; i++) {
+    action_error |= posix_spawn_file_actions_adddup2(&actions, audio[1], SF2C_MOVIE_N_3_4E07);
+    for (int i = 0; i < SF2C_MOVIE_N_2_D473; i++) {
         action_error |= posix_spawn_file_actions_addclose(&actions, video[i]);
         action_error |= posix_spawn_file_actions_addclose(&actions, audio[i]);
     }
@@ -254,32 +255,32 @@ static bool movie_spawn_decoder(const char *path, const MovieDecoder *decoder,
         goto fail;
     }
 
-    char scale_filter[128];
-    snprintf(scale_filter, sizeof scale_filter, "scale=%d:%d:flags=fast_bilinear,fps=%d",
+    char scale_filter[SF2C_MOVIE_N_128_2747];
+    snprintf(scale_filter, sizeof scale_filter, SF2C_MOVIE_S_SCALE_D_D_FLAGS_FAST_BILINEA_8CC9,
              RENDERER_MOVIE_WIDTH, RENDERER_MOVIE_HEIGHT, MOVIE_FPS);
     char *argv[] = {
         (char *)decoder->executable,
-        "-nostdin", "-hide_banner", "-loglevel", "error", "-re", "-i", (char *)path,
-        "-map", "0:v:0", "-vf", scale_filter, "-pix_fmt", "nv12", "-f", "rawvideo", "pipe:1",
-        "-map", "0:a:0?", "-vn", "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "2", "-f", "s16le", "pipe:3",
+        SF2C_MOVIE_S_NOSTDIN_EFF2, SF2C_MOVIE_S_HIDE_BANNER_990C, SF2C_MOVIE_S_LOGLEVEL_5625, SF2C_MOVIE_S_ERROR_4D01, SF2C_MOVIE_S_RE_F3EE, SF2C_MOVIE_S_I_7B25, (char *)path,
+        SF2C_MOVIE_S_MAP_1FEC, SF2C_MOVIE_S_0_V_0_9868, SF2C_MOVIE_S_VF_EBB8, scale_filter, SF2C_MOVIE_S_PIX_FMT_3C34, SF2C_MOVIE_S_NV12_383B, SF2C_MOVIE_S_F_28E1, SF2C_MOVIE_S_RAWVIDEO_2BE0, SF2C_MOVIE_S_PIPE_1_97EC,
+        SF2C_MOVIE_S_MAP_1FEC, SF2C_MOVIE_S_0_A_0_AEE2, SF2C_MOVIE_S_VN_71D0, SF2C_MOVIE_S_C_A_44B3, SF2C_MOVIE_S_PCM_S16LE_A70E, SF2C_MOVIE_S_AR_71F2, SF2C_MOVIE_S_48000_F9E7, SF2C_MOVIE_S_AC_F05F, SF2C_MOVIE_S_2_CC11, SF2C_MOVIE_S_F_28E1, SF2C_MOVIE_S_S16LE_1ADE, SF2C_MOVIE_S_PIPE_3_B2C3,
         NULL
     };
     pid_t child = 0;
-    char child_ld_library_path[PATH_MAX * 2];
+    char child_ld_library_path[PATH_MAX * SF2C_MOVIE_N_2_D473];
     char **owned_env = NULL;
     char **child_env = movie_spawn_environment(decoder->library_dir, child_ld_library_path,
                                                 sizeof child_ld_library_path, &owned_env);
     if (!child_env) {
         posix_spawn_file_actions_destroy(&actions);
-        LOG("[movie] cannot prepare the bundled decoder library path\n");
+        LOG(SF2C_MOVIE_S_MOVIE_CANNOT_PREPARE_THE_BUN_7568);
         goto fail;
     }
-    int e = strchr(argv[0], '/') ? posix_spawn(&child, argv[0], &actions, NULL, argv, child_env)
+    int e = strchr(argv[0], SF2C_MOVIE_CH_EMPTY_0825) ? posix_spawn(&child, argv[0], &actions, NULL, argv, child_env)
                                 : posix_spawnp(&child, argv[0], &actions, NULL, argv, child_env);
     free(owned_env);
     posix_spawn_file_actions_destroy(&actions);
     if (e) {
-        LOG("[movie] cannot start %s: %s\n", argv[0], strerror(e));
+        LOG(SF2C_MOVIE_S_MOVIE_CANNOT_START_S_S_N_54BE, argv[0], strerror(e));
         goto fail;
     }
     close(video[1]); video[1] = -1;
@@ -302,13 +303,13 @@ fail:
 // SF2_MOVIE_SDL_PROCESS exercises this same branch on Linux without a Windows SDK.
 static bool movie_spawn_decoder(const char *path, const MovieDecoder *decoder,
                                 MovieChild *child, MoviePipe *video_fd, MoviePipe *audio_fd) {
-    char filter[128];
-    snprintf(filter, sizeof filter, "scale=%d:%d:flags=fast_bilinear,fps=%d",
+    char filter[SF2C_MOVIE_N_128_2747];
+    snprintf(filter, sizeof filter, SF2C_MOVIE_S_SCALE_D_D_FLAGS_FAST_BILINEA_8CC9,
              RENDERER_MOVIE_WIDTH, RENDERER_MOVIE_HEIGHT, MOVIE_FPS);
     const char *argv[] = {
-        decoder->executable, "-nostdin", "-hide_banner", "-loglevel", "quiet", "-re", "-i", path,
-        "-map", "0:v:0", "-vf", filter, "-pix_fmt", "nv12", "-f", "rawvideo", "pipe:1",
-        "-map", "0:a:0?", "-vn", "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "2", "-f", "s16le", "pipe:2", NULL
+        decoder->executable, SF2C_MOVIE_S_NOSTDIN_EFF2, SF2C_MOVIE_S_HIDE_BANNER_990C, SF2C_MOVIE_S_LOGLEVEL_5625, SF2C_MOVIE_S_QUIET_7024, SF2C_MOVIE_S_RE_F3EE, SF2C_MOVIE_S_I_7B25, path,
+        SF2C_MOVIE_S_MAP_1FEC, SF2C_MOVIE_S_0_V_0_9868, SF2C_MOVIE_S_VF_EBB8, filter, SF2C_MOVIE_S_PIX_FMT_3C34, SF2C_MOVIE_S_NV12_383B, SF2C_MOVIE_S_F_28E1, SF2C_MOVIE_S_RAWVIDEO_2BE0, SF2C_MOVIE_S_PIPE_1_97EC,
+        SF2C_MOVIE_S_MAP_1FEC, SF2C_MOVIE_S_0_A_0_AEE2, SF2C_MOVIE_S_VN_71D0, SF2C_MOVIE_S_C_A_44B3, SF2C_MOVIE_S_PCM_S16LE_A70E, SF2C_MOVIE_S_AR_71F2, SF2C_MOVIE_S_48000_F9E7, SF2C_MOVIE_S_AC_F05F, SF2C_MOVIE_S_2_CC11, SF2C_MOVIE_S_F_28E1, SF2C_MOVIE_S_S16LE_1ADE, SF2C_MOVIE_S_PIPE_2_DBA9, NULL
     };
     SDL_PropertiesID props = SDL_CreateProperties();
     if (!props) return false;
@@ -318,7 +319,7 @@ static bool movie_spawn_decoder(const char *path, const MovieDecoder *decoder,
         SDL_SetNumberProperty(props, SDL_PROP_PROCESS_CREATE_STDERR_NUMBER, SDL_PROCESS_STDIO_APP);
     SDL_Process *process = ok ? SDL_CreateProcessWithProperties(props) : NULL;
     SDL_DestroyProperties(props);
-    if (!process) { LOG("[movie] cannot start decoder: %s\n", SDL_GetError()); return false; }
+    if (!process) { LOG(SF2C_MOVIE_S_MOVIE_CANNOT_START_DECODER_S_9488, SDL_GetError()); return false; }
     SDL_PropertiesID output = SDL_GetProcessProperties(process);
     MoviePipe video = SDL_GetProcessOutput(process);
     MoviePipe audio = SDL_GetPointerProperty(output, SDL_PROP_PROCESS_STDERR_POINTER, NULL);
@@ -378,13 +379,13 @@ static int movie_child_wait(MovieChild child) {
 #ifdef __ANDROID__
     return android_movie_failed(child) ? 1 : 0;
 #elif defined(MOVIE_SDL_PROCESS)
-    int status = 255;
-    return SDL_WaitProcess(child, true, &status) ? status : 255;
+    int status = SF2C_MOVIE_N_255_9556;
+    return SDL_WaitProcess(child, true, &status) ? status : SF2C_MOVIE_N_255_9556;
 #else
     int status = 0;
     pid_t waited;
     do { waited = waitpid(child, &status, 0); } while (waited < 0 && errno == EINTR);
-    return waited < 0 ? 255 : WIFEXITED(status) ? WEXITSTATUS(status) : 255;
+    return waited < 0 ? SF2C_MOVIE_N_255_9556 : WIFEXITED(status) ? WEXITSTATUS(status) : SF2C_MOVIE_N_255_9556;
 #endif
 }
 
@@ -450,7 +451,7 @@ static void *movie_video_reader(void *arg) {
             atomic_store(&p->first_frame_ready, true);
 
             // Keep frame zero intact until the presenter has shown it and released playback.
-            while (!atomic_load(&p->playback_started) && !atomic_load(&p->stop)) movie_sleep_ns(1000000ull);
+            while (!atomic_load(&p->playback_started) && !atomic_load(&p->stop)) movie_sleep_ns(SF2C_MOVIE_N_1000000ULL_6C52);
         }
         uint64_t index = 1;
         for (; n == MOVIE_FRAME_BYTES && !atomic_load(&p->stop);) {
@@ -462,7 +463,7 @@ static void *movie_video_reader(void *arg) {
             while (!atomic_load(&p->stop)) {
                 uint64_t displayed = atomic_load(&g_movie_displayed_frame);
                 if (displayed == UINT64_MAX || index - displayed < MOVIE_FRAME_COUNT) break;
-                movie_sleep_ns(1000000ull);
+                movie_sleep_ns(SF2C_MOVIE_N_1000000ULL_6C52);
             }
             if (atomic_load(&p->stop)) break;
             pthread_mutex_lock(&g_movie_frames_lock);
@@ -477,13 +478,13 @@ static void *movie_video_reader(void *arg) {
         // being presented. Keep the overlay through the last complete frame.
         if (atomic_load(&p->first_frame_ready)) {
             while (!atomic_load(&p->stop) && atomic_load(&g_movie_displayed_frame)!=index-1)
-                movie_sleep_ns(1000000ull);
-            if (!atomic_load(&p->stop)) movie_sleep_ns(1000000000ull/MOVIE_FPS);
+                movie_sleep_ns(SF2C_MOVIE_N_1000000ULL_6C52);
+            if (!atomic_load(&p->stop)) movie_sleep_ns(SF2C_MOVIE_N_1000000000ULL_E860/MOVIE_FPS);
         }
 #endif
         free(scratch);
     } else {
-        LOG("[movie] cannot allocate video frame buffer\n");
+        LOG(SF2C_MOVIE_S_MOVIE_CANNOT_ALLOCATE_VIDEO__DD47);
         atomic_store(&p->stop, true);
         movie_child_kill(p->child);
     }
@@ -495,7 +496,7 @@ static void *movie_video_reader(void *arg) {
 
 static void *movie_audio_reader(void *arg) {
     MoviePlayer *p = arg;
-    uint8_t buffer[8192];
+    uint8_t buffer[SF2C_MOVIE_N_8192_864A];
     // Drain FFmpeg immediately: it can fill the audio pipe before writing video frame zero.
     // Queue samples on the paused SDL stream, then resume only after that frame reaches the window.
     bool playback_started = false;
@@ -512,7 +513,7 @@ static void *movie_audio_reader(void *arg) {
                     playback_started=true;
                     SDL_ResumeAudioStreamDevice(p->audio_stream);
                 }
-                movie_sleep_ns(5000000ull);
+                movie_sleep_ns(SF2C_MOVIE_N_5000000ULL_50A2);
             }
         }
         ssize_t n = movie_pipe_read(p->audio_fd, buffer, sizeof buffer, p);
@@ -522,7 +523,7 @@ static void *movie_audio_reader(void *arg) {
                     atomic_fetch_add(&p->audio_bytes_submitted, (uint64_t)n);
                     atomic_store(&p->audio_clock_active, true);
                 } else {
-                    LOG("[movie] audio output failed: %s\n", SDL_GetError());
+                    LOG(SF2C_MOVIE_S_MOVIE_AUDIO_OUTPUT_FAILED_S__7A68, SDL_GetError());
                 }
             }
         } else if (n < 0 && errno == EINTR) continue;
@@ -535,7 +536,7 @@ static void *movie_audio_reader(void *arg) {
     // samples still need to start once the presenter releases playback.
     while (p->audio_stream && !atomic_load(&p->stop) &&
            !atomic_load(&p->playback_started) && !atomic_load(&p->video_done))
-        movie_sleep_ns(1000000ull);
+        movie_sleep_ns(SF2C_MOVIE_N_1000000ULL_6C52);
     if (!playback_started && atomic_load(&p->playback_started)) {
         playback_started = true;
         if (p->audio_stream) SDL_ResumeAudioStreamDevice(p->audio_stream);
@@ -543,7 +544,7 @@ static void *movie_audio_reader(void *arg) {
     if (p->audio_stream && playback_started && !atomic_load(&p->stop)) {
         SDL_FlushAudioStream(p->audio_stream);
         while (!atomic_load(&p->stop) && SDL_GetAudioStreamQueued(p->audio_stream) > 0)
-            movie_sleep_ns(5000000ull);
+            movie_sleep_ns(SF2C_MOVIE_N_5000000ULL_50A2);
     }
     atomic_store(&p->audio_done, true);
     return NULL;
@@ -555,12 +556,12 @@ static void *movie_monitor(void *arg) {
     pthread_join(p->audio_thread, NULL);
     int status = movie_child_wait(p->child);
     if (!atomic_load(&p->stop) && status != 0)
-        LOG("[movie] decoder exited with status %#x\n", status);
+        LOG(SF2C_MOVIE_S_MOVIE_DECODER_EXITED_WITH_ST_7D7C, status);
     audio_movie_set_active(false);
     atomic_store(&g_movie_watched_end,!atomic_load(&p->stop) && status==0 && atomic_load(&p->first_frame_submitted));
     atomic_store(&g_movie_completed,true);
     atomic_store(&g_movie_visible, false);
-    LOG("[movie] host playback finished%s\n", atomic_load(&p->stop) ? " (stopped)" : "");
+    LOG(SF2C_MOVIE_S_MOVIE_HOST_PLAYBACK_FINISHED_7F5A, atomic_load(&p->stop) ? SF2C_MOVIE_S_STOPPED_90E7 : SF2C_MOVIE_S_EMPTY_12AE);
     atomic_store(&p->monitor_done, true);
     return NULL;
 }
@@ -579,7 +580,7 @@ static void movie_cancel_locked(void) {
     // the chance that a reused PID is signalled when a later movie/reset cleans up an already-finished clip.
     if (was_visible && g_movie.child) movie_child_kill(g_movie.child);
     if (g_movie.audio_stream) {
-        SDL_SetAudioStreamGain(g_movie.audio_stream, 0.0f);
+        SDL_SetAudioStreamGain(g_movie.audio_stream, SF2C_MOVIE_N_0_0F_6895);
         SDL_PauseAudioStreamDevice(g_movie.audio_stream);
         SDL_ClearAudioStream(g_movie.audio_stream);
     }
@@ -636,7 +637,7 @@ static bool movie_start(const char *guest_path) {
             // here would replay the movie and lose the player's early skip.
             atomic_store(&g_movie.source_ready, true);
             atomic_store(&g_movie_guest_ready, true);
-            LOG("[movie] guest adopted the intro prepared during boot%s\n", movie_overlay_active() ? "" : " (already finished/skipped)");
+            LOG(SF2C_MOVIE_S_MOVIE_GUEST_ADOPTED_THE_INTR_FA6B, movie_overlay_active() ? SF2C_MOVIE_S_EMPTY_12AE : SF2C_MOVIE_S_ALREADY_FINISHED_SKIPPED_1266);
             pthread_mutex_unlock(&g_movie_lock);
             return true;
         }
@@ -648,12 +649,12 @@ static bool movie_start(const char *guest_path) {
     atomic_store(&g_movie_watched_end,false);
     MovieDecoder decoder={0};
     if (!movie_resolve_path(guest_path, path, sizeof path)) {
-        LOG("[movie] cannot resolve game movie path: %s\n", guest_path ? guest_path : "(null)");
+        LOG(SF2C_MOVIE_S_MOVIE_CANNOT_RESOLVE_GAME_MO_C907, guest_path ? guest_path : SF2C_MOVIE_S_NULL_929F);
         pthread_mutex_unlock(&g_movie_lock);
         return false;
     }
     if (!movie_frames_init()) {
-        LOG("[movie] cannot allocate frame queue\n");
+        LOG(SF2C_MOVIE_S_MOVIE_CANNOT_ALLOCATE_FRAME__8895);
         pthread_mutex_unlock(&g_movie_lock);
         return false;
     }
@@ -662,27 +663,27 @@ static bool movie_start(const char *guest_path) {
         !movie_select_decoder(&decoder) ||
 #endif
         !movie_spawn_decoder(path, &decoder, &g_movie.child, &g_movie.video_fd, &g_movie.audio_fd)) {
-        LOG("[movie] decoder startup failed for %s (rebuild the app package or set LARECOMP_FFMPEG)\n", path);
+        LOG(SF2C_MOVIE_S_MOVIE_DECODER_STARTUP_FAILED_FDD3, path);
         movie_frames_clear();
         pthread_mutex_unlock(&g_movie_lock);
         return false;
     }
 
-    if (!(getenv("LARECOMP_NO_AUDIO") && strcmp(getenv("LARECOMP_NO_AUDIO"), "0"))) {
+    if (!(getenv(SF2C_MOVIE_S_LARECOMP_NO_AUDIO_8230) && strcmp(getenv(SF2C_MOVIE_S_LARECOMP_NO_AUDIO_8230), SF2C_MOVIE_S_0_9808))) {
         g_movie.audio_subsystem = SDL_InitSubSystem(SDL_INIT_AUDIO);
         if (g_movie.audio_subsystem) {
             SDL_AudioSpec spec = {SDL_AUDIO_S16LE, MOVIE_AUDIO_CHANNELS, MOVIE_AUDIO_RATE};
             g_movie.audio_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, NULL, NULL);
             if (g_movie.audio_stream) {
                 double gain = g_settings.volume;
-                const char *env_gain = getenv("LARECOMP_AUDIO_GAIN");
+                const char *env_gain = getenv(SF2C_MOVIE_S_LARECOMP_AUDIO_GAIN_1F0B);
                 if (env_gain) gain *= atof(env_gain);
                 SDL_SetAudioStreamGain(g_movie.audio_stream, (float)gain);
             } else {
-                LOG("[movie] audio device unavailable: %s (video will use the system clock)\n", SDL_GetError());
+                LOG(SF2C_MOVIE_S_MOVIE_AUDIO_DEVICE_UNAVAILAB_895B, SDL_GetError());
             }
         } else {
-            LOG("[movie] SDL audio init failed: %s (video will use the system clock)\n", SDL_GetError());
+            LOG(SF2C_MOVIE_S_MOVIE_SDL_AUDIO_INIT_FAILED__CE4C, SDL_GetError());
         }
     }
 
@@ -698,7 +699,7 @@ static bool movie_start(const char *guest_path) {
     atomic_store(&g_movie_visible, true);
     int e = pthread_create(&g_movie.audio_thread, NULL, movie_audio_reader, &g_movie);
     if (e) {
-        LOG("[movie] cannot start audio reader: %s\n", strerror(e));
+        LOG(SF2C_MOVIE_S_MOVIE_CANNOT_START_AUDIO_REA_295B, strerror(e));
         movie_stop_locked();
         pthread_mutex_unlock(&g_movie_lock);
         return false;
@@ -706,7 +707,7 @@ static bool movie_start(const char *guest_path) {
     g_movie.audio_started = true;
     e = pthread_create(&g_movie.video_thread, NULL, movie_video_reader, &g_movie);
     if (e) {
-        LOG("[movie] cannot start video reader: %s\n", strerror(e));
+        LOG(SF2C_MOVIE_S_MOVIE_CANNOT_START_VIDEO_REA_CC30, strerror(e));
         movie_stop_locked();
         pthread_mutex_unlock(&g_movie_lock);
         return false;
@@ -714,7 +715,7 @@ static bool movie_start(const char *guest_path) {
     g_movie.video_started = true;
     e = pthread_create(&g_movie.monitor_thread, NULL, movie_monitor, &g_movie);
     if (e) {
-        LOG("[movie] cannot start decoder monitor: %s\n", strerror(e));
+        LOG(SF2C_MOVIE_S_MOVIE_CANNOT_START_DECODER_M_BA77, strerror(e));
         movie_stop_locked();
         pthread_mutex_unlock(&g_movie_lock);
         return false;
@@ -722,7 +723,7 @@ static bool movie_start(const char *guest_path) {
     g_movie.monitor_started = true;
     atomic_store(&g_movie.source_ready, true);
     atomic_store(&g_movie_guest_ready, true);
-    LOG("[movie] ready %s (%dx%d at %d fps); audio waits for frame zero to reach the window\n", path,
+    LOG(SF2C_MOVIE_S_MOVIE_READY_S_DX_D_AT_D_FPS__2479, path,
         RENDERER_MOVIE_WIDTH, RENDERER_MOVIE_HEIGHT, MOVIE_FPS);
     pthread_mutex_unlock(&g_movie_lock);
     return true;
@@ -731,13 +732,13 @@ static bool movie_start(const char *guest_path) {
 void movie_preload_intro(void) {
     if (!g_settings.show_intro || atomic_load(&g_intro_prestarted)) return;
     char path[PATH_MAX];
-    if (!movie_resolve_path("intro.mp4", path, sizeof path) || !movie_start("intro.mp4")) return;
+    if (!movie_resolve_path(SF2C_MOVIE_S_INTRO_MP4_5BC1, path, sizeof path) || !movie_start(SF2C_MOVIE_S_INTRO_MP4_5BC1)) return;
     pthread_mutex_lock(&g_movie_lock);
-    snprintf(g_intro_path, sizeof g_intro_path, "%s", path);
+    snprintf(g_intro_path, sizeof g_intro_path, SF2C_MOVIE_S_S_0030, path);
     atomic_store(&g_intro_prestarted, true);
     atomic_store(&g_movie_guest_ready, false);
     pthread_mutex_unlock(&g_movie_lock);
-    LOG("[movie] intro decoding overlaps graphics and engine startup\n");
+    LOG(SF2C_MOVIE_S_MOVIE_INTRO_DECODING_OVERLAP_10B1);
 }
 
 bool movie_guest_ready(void) {
@@ -763,7 +764,7 @@ bool movie_poll(void) {
     if (pthread_mutex_trylock(&g_movie_lock)) return false;
     bool dismissed = false;
     if (atomic_exchange(&g_movie_skip_requested, false) && movie_overlay_active()) {
-        LOG("[movie] skipped by confirm/back or mouse input\n");
+        LOG(SF2C_MOVIE_S_MOVIE_SKIPPED_BY_CONFIRM_BAC_1204);
         movie_cancel_locked();
         dismissed = true;
     }
@@ -794,7 +795,7 @@ bool movie_render_tick(void) {
         target_frame = 0;
     } else {
         uint64_t elapsed = movie_now_ns() - p->start_ns;
-        target_frame = elapsed * MOVIE_FPS / 1000000000ull;
+        target_frame = elapsed * MOVIE_FPS / SF2C_MOVIE_N_1000000000ULL_E860;
     }
     pthread_mutex_unlock(&g_movie_lock);
 
@@ -826,7 +827,7 @@ void movie_presented(void) {
         atomic_load(&p->first_frame_submitted)) {
         p->start_ns = movie_now_ns();
         atomic_store(&p->playback_started, true);
-        LOG("[movie] frame zero presented; playback started\n");
+        LOG(SF2C_MOVIE_S_MOVIE_FRAME_ZERO_PRESENTED_P_8B4A);
     }
     pthread_mutex_unlock(&g_movie_lock);
 }
@@ -837,7 +838,7 @@ static void movie_stop_from_guest(void) {
         (!atomic_load(&p->playback_started) && !atomic_load(&p->first_frame_submitted))) return;
     pthread_mutex_lock(&g_movie_lock);
     if (movie_overlay_active()) {
-        LOG("[movie] guest stopped playback\n");
+        LOG(SF2C_MOVIE_S_MOVIE_GUEST_STOPPED_PLAYBACK_7CD2);
         movie_cancel_locked();
     }
     pthread_mutex_unlock(&g_movie_lock);
@@ -854,25 +855,25 @@ RT_ON_RESET(movie_reset) {
     pthread_mutex_unlock(&g_movie_lock);
 }
 
-static uint64_t g_extractor_vtable[16];
-static uint64_t g_decoder_vtable[16];
+static uint64_t g_extractor_vtable[SF2C_MOVIE_N_16_B17E];
+static uint64_t g_decoder_vtable[SF2C_MOVIE_N_16_B17E];
 static int g_movie_inited = 0;
 
 static void movie_dtor(Cpu *c) { (void)c; }
 static void movie_set_data_source(Cpu *c) {
     const char *path = (const char *)(uintptr_t)c->x[1];
     bool started = movie_start(path);
-    LOG("[movie] SetDataSource: %s (%s; host decoder owns playback)\n",
-        path ? path : "(null)", started ? "host playback started" : "host playback unavailable");
-    c->x[0] = started ? 0 : 0x2;
+    LOG(SF2C_MOVIE_S_MOVIE_SETDATASOURCE_S_S_HOST_DB53,
+        path ? path : SF2C_MOVIE_S_NULL_929F, started ? SF2C_MOVIE_S_HOST_PLAYBACK_STARTED_20AB : SF2C_MOVIE_S_HOST_PLAYBACK_UNAVAILABLE_7062);
+    c->x[0] = started ? 0 : SF2C_MOVIE_N_0X2_5F6F;
 }
 static void movie_get_track_count(Cpu *c) {
     // The host owns decode/presentation; expose a successful empty guest track list so the SDK
     // does not create its own decoder or fail the game's managed movie lifecycle.
     if (c->x[1]) *(int32_t *)(uintptr_t)c->x[1] = 0;
     bool source_ready = atomic_load(&g_movie.source_ready);
-    LOG("[movie] GetTrackCount -> %d (%s)\n", 0, source_ready ? "host-only playback" : "no active movie");
-    c->x[0] = source_ready ? 0 : 0x2;
+    LOG(SF2C_MOVIE_S_MOVIE_GETTRACKCOUNT_D_S_N_080D, 0, source_ready ? SF2C_MOVIE_S_HOST_ONLY_PLAYBACK_DA6D : SF2C_MOVIE_S_NO_ACTIVE_MOVIE_4845);
+    c->x[0] = source_ready ? 0 : SF2C_MOVIE_N_0X2_5F6F;
 }
 static void movie_get_track_config(Cpu *c) {
     c->x[0] = 0;
@@ -881,83 +882,83 @@ static void movie_get_track_config(Cpu *c) {
 static void init_movie_vtables(void) {
     if (g_movie_inited) return;
     g_movie_inited = 1;
-    uint64_t dtor = hle_register("<movie_dtor>", movie_dtor);
-    uint64_t set_ds = hle_register("<movie_set_ds>", movie_set_data_source);
-    uint64_t get_tc = hle_register("<movie_get_tc>", movie_get_track_count);
-    uint64_t get_cfg = hle_register("<movie_get_cfg>", movie_get_track_config);
+    uint64_t dtor = hle_register(SF2C_MOVIE_S_MOVIE_DTOR_3F94, movie_dtor);
+    uint64_t set_ds = hle_register(SF2C_MOVIE_S_MOVIE_SET_DS_C4CC, movie_set_data_source);
+    uint64_t get_tc = hle_register(SF2C_MOVIE_S_MOVIE_GET_TC_C3B8, movie_get_track_count);
+    uint64_t get_cfg = hle_register(SF2C_MOVIE_S_MOVIE_GET_CFG_3BBC, movie_get_track_config);
 
     g_extractor_vtable[0] = dtor;
     g_extractor_vtable[1] = dtor;
-    g_extractor_vtable[2] = set_ds;
-    g_extractor_vtable[3] = set_ds;
-    g_extractor_vtable[4] = get_tc;
-    g_extractor_vtable[5] = get_cfg;
+    g_extractor_vtable[SF2C_MOVIE_N_2_D473] = set_ds;
+    g_extractor_vtable[SF2C_MOVIE_N_3_4E07] = set_ds;
+    g_extractor_vtable[SF2C_MOVIE_N_4_4B22] = get_tc;
+    g_extractor_vtable[SF2C_MOVIE_N_5_EF2D] = get_cfg;
 
     g_decoder_vtable[0] = dtor;
     g_decoder_vtable[1] = dtor;
 }
 
-HLE_FUNC("_ZN5movie12SetAllocatorEPFPvmmS0_EPFvS0_S0_EPFS0_S0_mS0_ES0_", movie_set_allocator) {
+HLE_FUNC(SF2C_MOVIE_S_ZN5MOVIE12SETALLOCATOREPFPVM_892C, movie_set_allocator) {
     init_movie_vtables();
     c->x[0] = 0;
 }
 
-HLE_FUNC("_ZN5movie11SetCoreMaskEm", movie_set_core_mask) {
+HLE_FUNC(SF2C_MOVIE_S_ZN5MOVIE11SETCOREMASKEM_7FBA, movie_set_core_mask) {
     init_movie_vtables();
     c->x[0] = 0;
 }
 
-HLE_FUNC("_ZN5movie17GetThreadPriorityEv", movie_get_thread_prio) {
-    c->x[0] = 44;
+HLE_FUNC(SF2C_MOVIE_S_ZN5MOVIE17GETTHREADPRIORITYE_E25D, movie_get_thread_prio) {
+    c->x[0] = SF2C_MOVIE_N_44_71EE;
 }
 
-HLE_FUNC("_ZN5movie9ExtractorC1ENS_13ContainerTypeE", movie_extractor_c1) {
-    init_movie_vtables();
-    *(uint64_t *)(uintptr_t)c->x[0] = (uint64_t)(uintptr_t)g_extractor_vtable;
-    c->x[0] = 0;
-}
-
-HLE_FUNC("_ZN5movie9ExtractorC2ENS_13ContainerTypeE", movie_extractor_c2) {
+HLE_FUNC(SF2C_MOVIE_S_ZN5MOVIE9EXTRACTORC1ENS_13CO_6853, movie_extractor_c1) {
     init_movie_vtables();
     *(uint64_t *)(uintptr_t)c->x[0] = (uint64_t)(uintptr_t)g_extractor_vtable;
     c->x[0] = 0;
 }
 
-HLE_FUNC("_ZN5movie9ExtractorD1Ev", movie_extractor_d1) { (void)c; movie_stop_from_guest(); }
-HLE_FUNC("_ZN5movie9ExtractorD2Ev", movie_extractor_d2) { (void)c; movie_stop_from_guest(); }
+HLE_FUNC(SF2C_MOVIE_S_ZN5MOVIE9EXTRACTORC2ENS_13CO_6CEB, movie_extractor_c2) {
+    init_movie_vtables();
+    *(uint64_t *)(uintptr_t)c->x[0] = (uint64_t)(uintptr_t)g_extractor_vtable;
+    c->x[0] = 0;
+}
 
-HLE_FUNC("_ZN5movie9Extractor13SetDataSourceEPKc", movie_extractor_set_ds) {
+HLE_FUNC(SF2C_MOVIE_S_ZN5MOVIE9EXTRACTORD1EV_9FA9, movie_extractor_d1) { (void)c; movie_stop_from_guest(); }
+HLE_FUNC(SF2C_MOVIE_S_ZN5MOVIE9EXTRACTORD2EV_6EDF, movie_extractor_d2) { (void)c; movie_stop_from_guest(); }
+
+HLE_FUNC(SF2C_MOVIE_S_ZN5MOVIE9EXTRACTOR13SETDATAS_7FED, movie_extractor_set_ds) {
     movie_set_data_source(c);
 }
 
-HLE_FUNC("_ZN5movie9Extractor13GetTrackCountEPi", movie_extractor_get_tc) {
+HLE_FUNC(SF2C_MOVIE_S_ZN5MOVIE9EXTRACTOR13GETTRACK_6178, movie_extractor_get_tc) {
     movie_get_track_count(c);
 }
 
-HLE_FUNC("_ZN5movie9Extractor21GetTrackConfigurationEiPNS_9MediaDataE", movie_extractor_get_cfg) {
+HLE_FUNC(SF2C_MOVIE_S_ZN5MOVIE9EXTRACTOR21GETTRACK_0920, movie_extractor_get_cfg) {
     movie_get_track_config(c);
 }
 
-HLE_FUNC("_ZN5movie7DecoderC1ENS_11DecoderTypeENS_19DecoderOutputFormatENS_11DecoderModeEi", movie_decoder_c1) {
+HLE_FUNC(SF2C_MOVIE_S_ZN5MOVIE7DECODERC1ENS_11DECO_07D9, movie_decoder_c1) {
     init_movie_vtables();
     *(uint64_t *)(uintptr_t)c->x[0] = (uint64_t)(uintptr_t)g_decoder_vtable;
     c->x[0] = 0;
 }
-HLE_FUNC("_ZN5movie7DecoderD1Ev", movie_decoder_d1) { (void)c; movie_stop_from_guest(); }
-HLE_FUNC("_ZN5movie7DecoderD2Ev", movie_decoder_d2) { (void)c; movie_stop_from_guest(); }
+HLE_FUNC(SF2C_MOVIE_S_ZN5MOVIE7DECODERD1EV_D69D, movie_decoder_d1) { (void)c; movie_stop_from_guest(); }
+HLE_FUNC(SF2C_MOVIE_S_ZN5MOVIE7DECODERD2EV_F589, movie_decoder_d2) { (void)c; movie_stop_from_guest(); }
 
-HLE_FUNC("_ZN5movie9MediaDataC1Ev", movie_media_data_c1) { (void)c; }
-HLE_FUNC("_ZN5movie9MediaDataD1Ev", movie_media_data_d1) { (void)c; }
-HLE_FUNC("_ZN5movie9MediaData5ClearEv", movie_media_data_clear) { (void)c; }
-HLE_FUNC("_ZNK5movie9MediaData9FindInt32EPKcPi", movie_media_data_find_i32) { c->x[0] = 0; }
-HLE_FUNC("_ZNK5movie9MediaData9FindInt64EPKcPl", movie_media_data_find_i64) { c->x[0] = 0; }
-HLE_FUNC("_ZNK5movie9MediaData10FindStringEPKcPS2_", movie_media_data_find_str) { c->x[0] = 0; }
-HLE_FUNC("_ZNK5movie9MediaData8FindRectEPKcPiS3_S3_S3_", movie_media_data_find_rect) { c->x[0] = 0; }
+HLE_FUNC(SF2C_MOVIE_S_ZN5MOVIE9MEDIADATAC1EV_0375, movie_media_data_c1) { (void)c; }
+HLE_FUNC(SF2C_MOVIE_S_ZN5MOVIE9MEDIADATAD1EV_56B7, movie_media_data_d1) { (void)c; }
+HLE_FUNC(SF2C_MOVIE_S_ZN5MOVIE9MEDIADATA5CLEAREV_7DDF, movie_media_data_clear) { (void)c; }
+HLE_FUNC(SF2C_MOVIE_S_ZNK5MOVIE9MEDIADATA9FINDINT3_D93F, movie_media_data_find_i32) { c->x[0] = 0; }
+HLE_FUNC(SF2C_MOVIE_S_ZNK5MOVIE9MEDIADATA9FINDINT6_4065, movie_media_data_find_i64) { c->x[0] = 0; }
+HLE_FUNC(SF2C_MOVIE_S_ZNK5MOVIE9MEDIADATA10FINDSTR_655E, movie_media_data_find_str) { c->x[0] = 0; }
+HLE_FUNC(SF2C_MOVIE_S_ZNK5MOVIE9MEDIADATA8FINDRECT_AB06, movie_media_data_find_rect) { c->x[0] = 0; }
 
-HLE_FUNC("_ZN5movie6BufferC1Ev", movie_buffer_c1) { (void)c; }
-HLE_FUNC("_ZN5movie6BufferD1Ev", movie_buffer_d1) { (void)c; }
-HLE_FUNC("_ZNK5movie6Buffer4SizeEv", movie_buffer_size) { c->x[0] = 0; }
-HLE_FUNC("_ZNK5movie6Buffer6OffsetEv", movie_buffer_offset) { c->x[0] = 0; }
-HLE_FUNC("_ZNK5movie6Buffer4DataEv", movie_buffer_data) { c->x[0] = 0; }
-HLE_FUNC("_ZN5movie6Buffer18SetDataAndCapacityEPvm", movie_buffer_set_cap) { (void)c; }
-HLE_FUNC("_ZN5movie6Buffer8SetRangeEii", movie_buffer_set_range) { (void)c; }
+HLE_FUNC(SF2C_MOVIE_S_ZN5MOVIE6BUFFERC1EV_CCF4, movie_buffer_c1) { (void)c; }
+HLE_FUNC(SF2C_MOVIE_S_ZN5MOVIE6BUFFERD1EV_A978, movie_buffer_d1) { (void)c; }
+HLE_FUNC(SF2C_MOVIE_S_ZNK5MOVIE6BUFFER4SIZEEV_9EC0, movie_buffer_size) { c->x[0] = 0; }
+HLE_FUNC(SF2C_MOVIE_S_ZNK5MOVIE6BUFFER6OFFSETEV_D9B6, movie_buffer_offset) { c->x[0] = 0; }
+HLE_FUNC(SF2C_MOVIE_S_ZNK5MOVIE6BUFFER4DATAEV_EA41, movie_buffer_data) { c->x[0] = 0; }
+HLE_FUNC(SF2C_MOVIE_S_ZN5MOVIE6BUFFER18SETDATAANDC_F846, movie_buffer_set_cap) { (void)c; }
+HLE_FUNC(SF2C_MOVIE_S_ZN5MOVIE6BUFFER8SETRANGEEII_693C, movie_buffer_set_range) { (void)c; }

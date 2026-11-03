@@ -1,3 +1,4 @@
+#include "../constants/platform.h"
 // Windows host layer, adapted from LAS Recomp (MIT; licenses/LASRecomp.txt).
 // Upstream blobs and local adaptations are recorded in docs/windows.md.
 #include <windows.h>
@@ -21,8 +22,7 @@ const char *rt_host_fn_name(uint64_t pc, uint64_t *offset);
 // below, so the window behaves like macOS's all-RW reservation. The OS itself (ReadFile into a guest buffer)
 // does not fault: such buffers must be inside committed regions.
 static uint64_t g_lo, g_hi;
-#define COMMIT_CHUNK 0x10000ull
-
+#define COMMIT_CHUNK SF2C_WINDOWS_COMMIT_CHUNK
 static bool lazy_commit(uint64_t a) {
     if (a < g_lo || a >= g_hi) return false;
     MEMORY_BASIC_INFORMATION mi;
@@ -30,7 +30,7 @@ static bool lazy_commit(uint64_t a) {
     // Two threads touching the same uncommitted chunk: the second faulted before the first committed it and now finds
     // it committed - retry the access. (A page protected on purpose, plat_protect / LARECOMP_WATCH, isn't plain
     // read-write and still goes on to the fault watch.) Fix from letsgo-recomp.
-    if (mi.State == MEM_COMMIT) return (mi.Protect & 0xFF) == PAGE_READWRITE && !(mi.Protect & PAGE_GUARD);
+    if (mi.State == MEM_COMMIT) return (mi.Protect & SF2C_WINDOWS_N_0XFF_7312) == PAGE_READWRITE && !(mi.Protect & PAGE_GUARD);
     if (mi.State != MEM_RESERVE) return false;
     uint64_t base = a & ~(COMMIT_CHUNK - 1);
     return VirtualAlloc((void *)(uintptr_t)base, COMMIT_CHUNK, MEM_COMMIT, PAGE_READWRITE) != NULL;
@@ -40,7 +40,7 @@ static bool g_report_crashes;
 
 static LONG CALLBACK vectored_handler(EXCEPTION_POINTERS *ep) {
     EXCEPTION_RECORD *er = ep->ExceptionRecord;
-    if (er->ExceptionCode != EXCEPTION_ACCESS_VIOLATION || er->NumberParameters < 2) return EXCEPTION_CONTINUE_SEARCH;
+    if (er->ExceptionCode != EXCEPTION_ACCESS_VIOLATION || er->NumberParameters < SF2C_WINDOWS_N_2_D473) return EXCEPTION_CONTINUE_SEARCH;
     uint64_t fa = er->ExceptionInformation[1];
     // (not for an execute fault: on a read-write page, retrying it would fault again forever)
     if (er->ExceptionInformation[0] != EXCEPTION_EXECUTE_FAULT && lazy_commit(fa)) return EXCEPTION_CONTINUE_EXECUTION;
@@ -56,32 +56,32 @@ static bool g_write_watch;
 // (main.c, LARECOMP_REEXEC_WHY: this one can't log yet). Windows places heaps, stacks and DLLs' allocations at random
 // addresses in the lower terabyte (high-entropy ASLR), so now and then one lands in the guest's 12.5 GB.
 static void note_guest_conflict(uint64_t lo, uint64_t hi) {
-    char why[200];
-    snprintf(why, sizeof why, "VirtualAlloc error %lu, nothing found in the range", GetLastError());
+    char why[SF2C_WINDOWS_N_200_27BA];
+    snprintf(why, sizeof why, SF2C_WINDOWS_S_VIRTUALALLOC_ERROR_LU_NOTHIN_69C7, GetLastError());
     MEMORY_BASIC_INFORMATION mi;
     for (uint64_t a = lo; a < hi && VirtualQuery((void *)(uintptr_t)a, &mi, sizeof mi); ) {
         uint64_t base = (uint64_t)(uintptr_t)mi.BaseAddress, end = base + mi.RegionSize;
         if (mi.State != MEM_FREE) {
-            char mod[MAX_PATH] = "";
+            char mod[MAX_PATH] = SF2C_WINDOWS_S_EMPTY_12AE;
             if (mi.Type == MEM_IMAGE && !GetModuleFileNameA((HMODULE)mi.AllocationBase, mod, sizeof mod)) mod[0] = 0;
-            const char *name = strrchr(mod, '\\');
-            snprintf(why, sizeof why, "%s %s at %llx-%llx%s%s",
-                     mi.State == MEM_COMMIT ? "committed" : "reserved",
-                     mi.Type == MEM_IMAGE ? "module" : mi.Type == MEM_MAPPED ? "mapped file" : "private memory",
-                     (unsigned long long)base, (unsigned long long)end, mod[0] ? " " : "", name ? name + 1 : mod);
+            const char *name = strrchr(mod, SF2C_WINDOWS_CH_EMPTY_6672);
+            snprintf(why, sizeof why, SF2C_WINDOWS_S_S_S_AT_LLX_LLX_S_S_25E0,
+                     mi.State == MEM_COMMIT ? SF2C_WINDOWS_S_COMMITTED_A749 : SF2C_WINDOWS_S_RESERVED_D651,
+                     mi.Type == MEM_IMAGE ? SF2C_WINDOWS_S_MODULE_51B0 : mi.Type == MEM_MAPPED ? SF2C_WINDOWS_S_MAPPED_FILE_FAD8 : SF2C_WINDOWS_S_PRIVATE_MEMORY_68EB,
+                     (unsigned long long)base, (unsigned long long)end, mod[0] ? SF2C_WINDOWS_S_EMPTY_5210 : SF2C_WINDOWS_S_EMPTY_12AE, name ? name + 1 : mod);
             break;
         }
         if (end <= a) break;
         a = end;
     }
-    _putenv_s("LARECOMP_REEXEC_WHY", why);
+    _putenv_s(SF2C_WINDOWS_S_LARECOMP_REEXEC_WHY_6D9D, why);
 }
 
 bool plat_reserve_guest(uint64_t lo, uint64_t hi) {
     SYSTEM_INFO sys;
     GetSystemInfo(&sys);
     if (hi <= lo || lo % sys.dwAllocationGranularity || hi % sys.dwPageSize) return false;
-    const char *watch = getenv("LARECOMP_WRITE_TRACKING");
+    const char *watch = getenv(SF2C_WINDOWS_S_LARECOMP_WRITE_TRACKING_EF34);
     bool tracking = !watch || atoi(watch) != 0;
     void *p = tracking ? VirtualAlloc((void *)(uintptr_t)lo, hi - lo, MEM_RESERVE | MEM_WRITE_WATCH, PAGE_READWRITE) : NULL;
     if (p == (void *)(uintptr_t)lo) g_write_watch = true;
@@ -103,7 +103,7 @@ bool plat_reserve_guest(uint64_t lo, uint64_t hi) {
 int plat_written_pages(uint64_t addr, uint64_t size, uint64_t *pages, int max, uint64_t *page) {
     if (!g_write_watch || addr < g_lo || addr >= g_hi || size > g_hi - addr || max <= 0) return -1;
     ULONG_PTR n = (ULONG_PTR)max;
-    DWORD gran = 4096;
+    DWORD gran = SF2C_WINDOWS_N_4096_8B92;
     if (GetWriteWatch(WRITE_WATCH_FLAG_RESET, (void *)(uintptr_t)addr, (SIZE_T)size, (PVOID *)pages, &n, &gran) != 0) return -1;
     *page = gran;
     // At capacity the caller conservatively treats the whole range as dirty.
@@ -119,12 +119,12 @@ bool plat_reset_guest(uint64_t lo, uint64_t hi) {
 void plat_commit(uint64_t addr, uint64_t size) {
     if (!size) return;
     if (addr < g_lo || addr >= g_hi || size > g_hi - addr) {
-        fprintf(stderr, "[plat] invalid guest commit range\n");
+        fprintf(stderr, SF2C_WINDOWS_S_PLAT_INVALID_GUEST_COMMIT_RA_1C49);
         ExitProcess(1);
     }
-    uint64_t a = addr & ~0xFFFull, e = (addr + size + 0xFFF) & ~0xFFFull;
+    uint64_t a = addr & ~SF2C_WINDOWS_N_0XFFFULL_6F3A, e = (addr + size + SF2C_WINDOWS_N_0XFFF_1DF4) & ~SF2C_WINDOWS_N_0XFFFULL_6F3A;
     if (!VirtualAlloc((void *)(uintptr_t)a, e - a, MEM_COMMIT, PAGE_READWRITE)) {
-        fprintf(stderr, "[plat] commit %llx+%llx failed (%lu)\n", (unsigned long long)addr,
+        fprintf(stderr, SF2C_WINDOWS_S_PLAT_COMMIT_LLX_LLX_FAILED_L_01CA, (unsigned long long)addr,
                 (unsigned long long)size, GetLastError());
         ExitProcess(1);
     }
@@ -143,7 +143,7 @@ uint64_t plat_now_ns(void) {
     if (!qpf.QuadPart) QueryPerformanceFrequency(&qpf);
     LARGE_INTEGER t;
     QueryPerformanceCounter(&t);
-    return (uint64_t)((unsigned __int128)t.QuadPart * 1000000000u / (uint64_t)qpf.QuadPart);
+    return (uint64_t)((unsigned __int128)t.QuadPart * SF2C_WINDOWS_N_1000000000U_112A / (uint64_t)qpf.QuadPart);
 }
 
 // The calling thread's CPU time. GetThreadTimes only advances in whole scheduler ticks (15.6 ms): per frame that reads
@@ -157,7 +157,7 @@ static INIT_ONCE tsc_once = INIT_ONCE_STATIC_INIT;
 static BOOL CALLBACK tsc_calibrate(PINIT_ONCE o, PVOID p, PVOID *c) {
     (void)o, (void)p, (void)c;
     uint64_t q0 = plat_now_ns(), t0 = __rdtsc();
-    Sleep(20);
+    Sleep(SF2C_WINDOWS_N_20_F5CA);
     uint64_t q1 = plat_now_ns(), t1 = __rdtsc();
     if (q1 > q0 && t1 > t0) tsc_per_ns = (double)(t1 - t0) / (double)(q1 - q0);
     return TRUE;
@@ -171,12 +171,12 @@ uint64_t plat_thread_cpu_ns(void) {
 #endif
     FILETIME c, e, k, u;
     if (!GetThreadTimes(GetCurrentThread(), &c, &e, &k, &u)) return 0;
-    uint64_t kt = ((uint64_t)k.dwHighDateTime << 32) | k.dwLowDateTime, ut = ((uint64_t)u.dwHighDateTime << 32) | u.dwLowDateTime;
-    return (kt + ut) * 100;  // (100 ns units)
+    uint64_t kt = ((uint64_t)k.dwHighDateTime << SF2C_WINDOWS_N_32_E29C) | k.dwLowDateTime, ut = ((uint64_t)u.dwHighDateTime << SF2C_WINDOWS_N_32_E29C) | u.dwLowDateTime;
+    return (kt + ut) * SF2C_WINDOWS_N_100_AD57;  // (100 ns units)
 }
 
 #ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
-#define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x2
+#define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION SF2C_WINDOWS_CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
 #endif
 
 void plat_sleep_until_ns(uint64_t t) {
@@ -189,8 +189,8 @@ void plat_sleep_until_ns(uint64_t t) {
         uint64_t now = plat_now_ns();
         if (now >= t) return;
         uint64_t left = t - now;
-        if (left < 200000) { YieldProcessor(); continue; }  // last 0.2 ms: spin (timer slack)
-        LARGE_INTEGER due = {.QuadPart = -(LONGLONG)((left - 100000) / 100)};  // relative, 100 ns units
+        if (left < SF2C_WINDOWS_N_200000_B552) { YieldProcessor(); continue; }  // last 0.2 ms: spin (timer slack)
+        LARGE_INTEGER due = {.QuadPart = -(LONGLONG)((left - SF2C_WINDOWS_N_100000_3BB7) / SF2C_WINDOWS_N_100_AD57)};  // relative, 100 ns units
         if (!timer || !SetWaitableTimer(timer, &due, 0, NULL, NULL, FALSE)) { Sleep(1); continue; }
         WaitForSingleObject(timer, INFINITE);
     }
@@ -214,14 +214,14 @@ static INIT_ONCE pcore_once = INIT_ONCE_STATIC_INIT;
 static bool pcore_off;
 static ULONG *pcore_ids;  // the selected CPU set ids (NULL: no selection)
 static ULONG pcore_n;
-static const char *pcore_how = "";
+static const char *pcore_how = SF2C_WINDOWS_S_EMPTY_12AE;
 
 static BOOL CALLBACK pcore_init(PINIT_ONCE o, PVOID p, PVOID *c) {
     (void)o, (void)p, (void)c;
-    const char *e = getenv("LARECOMP_PCORE");
+    const char *e = getenv(SF2C_WINDOWS_S_LARECOMP_PCORE_44E2);
     if (e && *e && atoi(e) == 0) {
         pcore_off = true;
-        fprintf(stderr, "[pcore] off (LARECOMP_PCORE=0): default scheduling, thread power throttling unchanged\n");
+        fprintf(stderr, SF2C_WINDOWS_S_PCORE_OFF_LARECOMP_PCORE_0_D_E35F);
         return TRUE;
     }
     ULONG len = 0;
@@ -229,14 +229,14 @@ static BOOL CALLBACK pcore_init(PINIT_ONCE o, PVOID p, PVOID *c) {
     uint8_t *buf = len ? malloc(len) : NULL;
     if (!buf || !GetSystemCpuSetInformation((PSYSTEM_CPU_SET_INFORMATION)buf, len, &len, GetCurrentProcess(), 0)) {
         free(buf);
-        pcore_how = " (CPU sets unavailable)";
-        fprintf(stderr, "[pcore] CPU set information unavailable (error %lu): power throttling off only\n", GetLastError());
+        pcore_how = SF2C_WINDOWS_S_CPU_SETS_UNAVAILABLE_B9DE;
+        fprintf(stderr, SF2C_WINDOWS_S_PCORE_CPU_SET_INFORMATION_UN_4F1B, GetLastError());
         return TRUE;
     }
     // The process affinity mask covers its primary group only: filter by it when the system has a single group.
     DWORD_PTR proc = 0, sys = 0;
     bool filter = GetActiveProcessorGroupCount() == 1 && GetProcessAffinityMask(GetCurrentProcess(), &proc, &sys) && proc;
-    int lo = 255, hi = -1, all_p = 0, all_e = 0, ok_p = 0, ok_e = 0, n = 0;
+    int lo = SF2C_WINDOWS_N_255_9556, hi = -1, all_p = 0, all_e = 0, ok_p = 0, ok_e = 0, n = 0;
     for (ULONG off = 0; off < len;) {  // pass 1: the efficiency classes
         SYSTEM_CPU_SET_INFORMATION *i = (SYSTEM_CPU_SET_INFORMATION *)(buf + off);
         if (!i->Size) break;
@@ -255,7 +255,7 @@ static BOOL CALLBACK pcore_init(PINIT_ONCE o, PVOID p, PVOID *c) {
         if (!i->Size) break;
         if (i->Type == CpuSetInformation) {
             bool perf = i->CpuSet.EfficiencyClass > lo;
-            bool allowed = !filter || (i->CpuSet.Group == 0 && i->CpuSet.LogicalProcessorIndex < 64 &&
+            bool allowed = !filter || (i->CpuSet.Group == 0 && i->CpuSet.LogicalProcessorIndex < SF2C_WINDOWS_N_64_A68B &&
                                        (proc >> i->CpuSet.LogicalProcessorIndex) & 1);
             perf ? all_p++ : all_e++;
             if (allowed) perf ? ok_p++ : ok_e++;
@@ -265,19 +265,19 @@ static BOOL CALLBACK pcore_init(PINIT_ONCE o, PVOID p, PVOID *c) {
     }
     free(buf);
     if (!hybrid) {
-        pcore_how = " (not hybrid: no CPU sets)";
-        fprintf(stderr, "[pcore] CPU not hybrid (%d logical processors, one efficiency class): power throttling off, "
-                        "no CPU sets\n", n);
+        pcore_how = SF2C_WINDOWS_S_NOT_HYBRID_NO_CPU_SETS_0D22;
+        fprintf(stderr, SF2C_WINDOWS_S_PCORE_CPU_NOT_HYBRID_D_LOGIC_0E39
+                        SF2C_WINDOWS_S_NO_CPU_SETS_N_84D2, n);
     } else if (!ok_p || !ok_e) {
         free(pcore_ids), pcore_ids = NULL, pcore_n = 0;
-        pcore_how = " (affinity decides: no CPU sets)";
-        fprintf(stderr, "[pcore] hybrid CPU: %d performance + %d efficiency logical processors; the process affinity "
-                        "allows %d + %d: no CPU sets (the affinity decides), power throttling off\n", all_p, all_e, ok_p, ok_e);
+        pcore_how = SF2C_WINDOWS_S_AFFINITY_DECIDES_NO_CPU_SETS_78B9;
+        fprintf(stderr, SF2C_WINDOWS_S_PCORE_HYBRID_CPU_D_PERFORMAN_42D0
+                        SF2C_WINDOWS_S_ALLOWS_D_D_NO_CPU_SETS_THE_A_6B2E, all_p, all_e, ok_p, ok_e);
     } else {
-        pcore_how = " (performance-core CPU sets)";
-        fprintf(stderr, "[pcore] hybrid CPU: %d performance + %d efficiency logical processors%s; game/render/vsync "
-                        "threads prefer the %d performance ones, power throttling off\n", all_p, all_e,
-                filter && (ok_p != all_p || ok_e != all_e) ? " (affinity-limited)" : "", ok_p);
+        pcore_how = SF2C_WINDOWS_S_PERFORMANCE_CORE_CPU_SETS_70B5;
+        fprintf(stderr, SF2C_WINDOWS_S_PCORE_HYBRID_CPU_D_PERFORMAN_B5DF
+                        SF2C_WINDOWS_S_THREADS_PREFER_THE_D_PERFORM_CB50, all_p, all_e,
+                filter && (ok_p != all_p || ok_e != all_e) ? SF2C_WINDOWS_S_AFFINITY_LIMITED_593E : SF2C_WINDOWS_S_EMPTY_12AE, ok_p);
     }
     return TRUE;
 }
@@ -293,10 +293,10 @@ void plat_thread_perf_core(int role) {
     bool thr = SetThreadInformation(GetCurrentThread(), ThreadPowerThrottling, &tp, sizeof tp) != 0;
     bool sets = !pcore_ids || SetThreadSelectedCpuSets(GetCurrentThread(), pcore_ids, pcore_n) != 0;
     static volatile LONG logged;  // (once per role: a reboot's new game thread applies the same, quietly)
-    static const char *const names[] = {"game", "render", "vsync"};
-    if (role < 0 || role > 2 || (InterlockedOr(&logged, 1 << role) & (1 << role))) return;
-    fprintf(stderr, "[pcore] %s thread: power throttling %s%s%s\n", names[role], thr ? "off" : "unchanged (refused)",
-            pcore_how, sets ? "" : " (CPU sets refused)");
+    static const char *const names[] = {SF2C_WINDOWS_S_GAME_12B5, SF2C_WINDOWS_S_RENDER_CCC9, SF2C_WINDOWS_S_VSYNC_4729};
+    if (role < 0 || role > SF2C_WINDOWS_N_2_D473 || (InterlockedOr(&logged, 1 << role) & (1 << role))) return;
+    fprintf(stderr, SF2C_WINDOWS_S_PCORE_S_THREAD_POWER_THROTTL_B141, names[role], thr ? SF2C_WINDOWS_S_OFF_9F3B : SF2C_WINDOWS_S_UNCHANGED_REFUSED_FD0C,
+            pcore_how, sets ? SF2C_WINDOWS_S_EMPTY_12AE : SF2C_WINDOWS_S_CPU_SETS_REFUSED_9D87);
 }
 
 void plat_thread_realtime(uint64_t period_ns) {
@@ -309,18 +309,18 @@ int plat_thread_realtime_check(uint64_t period_ns) { (void)period_ns; return -1;
 // GUI launches keep their own append-only log; lasrecomp.log names the latest run, with five recent backups.
 // A launcher and the game it starts share one session, so another launch cannot truncate either writer.
 static char g_log_path[MAX_PATH], g_log_latest[MAX_PATH];
-static char g_log_tag[MAX_PATH + 16];
+static char g_log_tag[MAX_PATH + SF2C_WINDOWS_N_16_B17E];
 static HANDLE g_log_mutex;
 
 static bool lock_logs(void) {
-    DWORD r = g_log_mutex ? WaitForSingleObject(g_log_mutex, 5000) : WAIT_FAILED;
+    DWORD r = g_log_mutex ? WaitForSingleObject(g_log_mutex, SF2C_WINDOWS_N_5000_0F8E) : WAIT_FAILED;
     return r == WAIT_OBJECT_0 || r == WAIT_ABANDONED;
 }
 
 // A shared lock outside the log's data marks it as live, including across the launcher's child processes.
 // Pruning takes the exclusive form, so an older session still running keeps its path until the next cleanup.
 static bool log_live_lock(HANDLE file, bool exclusive) {
-    OVERLAPPED at = {.Offset = 0xffffffffu, .OffsetHigh = 0x7fffffffu};
+    OVERLAPPED at = {.Offset = SF2C_WINDOWS_N_0XFFFFFFFFU_7BAF, .OffsetHigh = SF2C_WINDOWS_N_0X7FFFFFFFU_7A69};
     return LockFileEx(file, LOCKFILE_FAIL_IMMEDIATELY | (exclusive ? LOCKFILE_EXCLUSIVE_LOCK : 0), 0, 1, 0, &at);
 }
 
@@ -331,17 +331,17 @@ static int newest_log(const void *a, const void *b) {
     return time ? time : strcmp(y->name, x->name);
 }
 static bool session_log_name(const char *name) {  // lasrecomp-backup-<filetime hex>-<pid>.log
-    if (strncmp(name, "lasrecomp-backup-", 17)) return false;
-    const char *p = name + 17;
-    while ((*p >= '0' && *p <= '9') || (*p >= 'a' && *p <= 'f') || *p == '-') p++;
-    return p > name + 17 && !strcmp(p, ".log");
+    if (strncmp(name, SF2C_WINDOWS_S_LASRECOMP_BACKUP_9CFD, SF2C_WINDOWS_N_17_4523)) return false;
+    const char *p = name + SF2C_WINDOWS_N_17_4523;
+    while ((*p >= SF2C_WINDOWS_CH_0_59A9 && *p <= SF2C_WINDOWS_CH_9_E453) || (*p >= SF2C_WINDOWS_CH_A_D749 && *p <= SF2C_WINDOWS_CH_F_CE92) || *p == SF2C_WINDOWS_CH_EMPTY_01F8) p++;
+    return p > name + SF2C_WINDOWS_N_17_4523 && !strcmp(p, SF2C_WINDOWS_S_LOG_0386);
 }
 static void keep_legacy_log(const char *dir) {
     WIN32_FILE_ATTRIBUTE_DATA old;
     if (!GetFileAttributesExA(g_log_latest, GetFileExInfoStandard, &old) ||
         old.dwFileAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT)) return;
     // The fallback copy has its own creation time, but still names the original session in its first line.
-    char old_tag[MAX_PATH + 16] = {0};
+    char old_tag[MAX_PATH + SF2C_WINDOWS_N_16_B17E] = {0};
     HANDLE old_file = CreateFileA(g_log_latest, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                                   NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (old_file != INVALID_HANDLE_VALUE) {
@@ -349,13 +349,13 @@ static void keep_legacy_log(const char *dir) {
         ReadFile(old_file, old_tag, sizeof old_tag - 1, &got, NULL); CloseHandle(old_file);
     }
     char path[MAX_PATH];
-    snprintf(path, sizeof path, "%slasrecomp-backup-*.log", dir);
+    snprintf(path, sizeof path, SF2C_WINDOWS_S_SLASRECOMP_BACKUP_LOG_F9E4, dir);
     WIN32_FIND_DATAA data;
     HANDLE find = FindFirstFileA(path, &data);
     bool kept = false;
     if (find != INVALID_HANDLE_VALUE) {
         do {
-            char tag[MAX_PATH + 16]; snprintf(tag, sizeof tag, "[session] %s\n", data.cFileName);
+            char tag[MAX_PATH + SF2C_WINDOWS_N_16_B17E]; snprintf(tag, sizeof tag, SF2C_WINDOWS_S_SESSION_S_N_980F, data.cFileName);
             kept |= !strncmp(old_tag, tag, strlen(tag)) || !CompareFileTime(&data.ftCreationTime, &old.ftCreationTime);
         }
         while (!kept && FindNextFileA(find, &data));
@@ -363,14 +363,14 @@ static void keep_legacy_log(const char *dir) {
     }
     // The first launch after upgrading may only have the old lasrecomp.log; retain that report too.
     if (!kept) {
-        unsigned long long stamp = ((unsigned long long)old.ftCreationTime.dwHighDateTime << 32) | old.ftCreationTime.dwLowDateTime;
-        if (snprintf(path, sizeof path, "%slasrecomp-backup-%016llx-0.log", dir, stamp) < (int)sizeof path)
+        unsigned long long stamp = ((unsigned long long)old.ftCreationTime.dwHighDateTime << SF2C_WINDOWS_N_32_E29C) | old.ftCreationTime.dwLowDateTime;
+        if (snprintf(path, sizeof path, SF2C_WINDOWS_S_SLASRECOMP_BACKUP_016LLX_0_L_A116, dir, stamp) < (int)sizeof path)
             CopyFileA(g_log_latest, path, TRUE);
     }
 }
 static void prune_logs(const char *dir) {
     char path[MAX_PATH];
-    if (snprintf(path, sizeof path, "%slasrecomp-backup-*.log", dir) >= (int)sizeof path) return;
+    if (snprintf(path, sizeof path, SF2C_WINDOWS_S_SLASRECOMP_BACKUP_LOG_F9E4, dir) >= (int)sizeof path) return;
     WIN32_FIND_DATAA data;
     HANDLE find = FindFirstFileA(path, &data);
     if (find == INVALID_HANDLE_VALUE) return;
@@ -381,13 +381,13 @@ static void prune_logs(const char *dir) {
         SessionLog *next = realloc(logs, (n + 1) * sizeof *logs);
         if (!next) { free(logs); FindClose(find); return; }
         logs = next;
-        snprintf(logs[n].name, sizeof logs[n].name, "%s", data.cFileName);
+        snprintf(logs[n].name, sizeof logs[n].name, SF2C_WINDOWS_S_S_0030, data.cFileName);
         logs[n++].created = data.ftCreationTime;
     } while (FindNextFileA(find, &data));
     FindClose(find);
     if (n > 1) qsort(logs, n, sizeof *logs, newest_log);
-    for (size_t i = 5; i < n; i++) {
-        if (snprintf(path, sizeof path, "%s%s", dir, logs[i].name) >= (int)sizeof path) continue;
+    for (size_t i = SF2C_WINDOWS_N_5_EF2D; i < n; i++) {
+        if (snprintf(path, sizeof path, SF2C_WINDOWS_S_S_S_72BD, dir, logs[i].name) >= (int)sizeof path) continue;
         HANDLE f = CreateFileA(path, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                                NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
         if (f == INVALID_HANDLE_VALUE) continue;
@@ -421,27 +421,27 @@ static void publish_log(void) {
 static void log_to_file_without_console(void) {
     // An inherited pipe/file (tools, terminal) is already somewhere useful. Only the GUI launch needs redirecting.
     // A relaunched game must still join its GUI session and publish its fallback copy on exit.
-    const char *inherited = getenv("LASRECOMP_LOG_FILE");
+    const char *inherited = getenv(SF2C_WINDOWS_S_LASRECOMP_LOG_FILE_AAE4);
     bool fresh = !inherited || !*inherited;
     HANDLE err = GetStdHandle(STD_ERROR_HANDLE);
     if (fresh && err && err != INVALID_HANDLE_VALUE && GetFileType(err) != FILE_TYPE_UNKNOWN) return;
     char dir[MAX_PATH];
     DWORD n = GetModuleFileNameA(NULL, dir, sizeof dir);
     if (!n || n >= sizeof dir) return;
-    char *slash = strrchr(dir, '\\');
+    char *slash = strrchr(dir, SF2C_WINDOWS_CH_EMPTY_6672);
     if (!slash) return;
     slash[1] = 0;
-    if (snprintf(g_log_latest, sizeof g_log_latest, "%slasrecomp.log", dir) >= (int)sizeof g_log_latest) return;
-    unsigned long long hash = 14695981039346656037ull;
-    for (const unsigned char *p = (const unsigned char *)g_log_latest; *p; p++) hash = (hash ^ *p) * 1099511628211ull;
-    char mutex[64]; snprintf(mutex, sizeof mutex, "Local\\LASRecomp.logs.%016llx", hash);
+    if (snprintf(g_log_latest, sizeof g_log_latest, SF2C_WINDOWS_S_SLASRECOMP_LOG_DB16, dir) >= (int)sizeof g_log_latest) return;
+    unsigned long long hash = SF2C_WINDOWS_N_14695981039346656037ULL_11FE;
+    for (const unsigned char *p = (const unsigned char *)g_log_latest; *p; p++) hash = (hash ^ *p) * SF2C_WINDOWS_N_1099511628211ULL_D3BD;
+    char mutex[SF2C_WINDOWS_N_64_A68B]; snprintf(mutex, sizeof mutex, SF2C_WINDOWS_S_LOCAL_LASRECOMP_LOGS_016LLX_47FF, hash);
     g_log_mutex = CreateMutexA(NULL, FALSE, mutex);
     if (!lock_logs()) return;
     FILETIME now; GetSystemTimeAsFileTime(&now);
-    unsigned long long stamp = ((unsigned long long)now.dwHighDateTime << 32) | now.dwLowDateTime;
-    int used = fresh ? snprintf(g_log_path, sizeof g_log_path, "%slasrecomp-backup-%016llx-%lu.log", dir, stamp,
+    unsigned long long stamp = ((unsigned long long)now.dwHighDateTime << SF2C_WINDOWS_N_32_E29C) | now.dwLowDateTime;
+    int used = fresh ? snprintf(g_log_path, sizeof g_log_path, SF2C_WINDOWS_S_SLASRECOMP_BACKUP_016LLX_LU__4157, dir, stamp,
                                (unsigned long)GetCurrentProcessId())
-                     : snprintf(g_log_path, sizeof g_log_path, "%s", inherited);
+                     : snprintf(g_log_path, sizeof g_log_path, SF2C_WINDOWS_S_S_0030, inherited);
     HANDLE file = INVALID_HANDLE_VALUE;
     if (used >= 0 && (size_t)used < sizeof g_log_path)
         file = CreateFileA(g_log_path, GENERIC_READ | FILE_APPEND_DATA | FILE_READ_ATTRIBUTES,
@@ -451,11 +451,11 @@ static void log_to_file_without_console(void) {
         if (file != INVALID_HANDLE_VALUE) CloseHandle(file);
         g_log_path[0] = 0; ReleaseMutex(g_log_mutex); return;
     }
-    const char *name = strrchr(g_log_path, '\\');
-    snprintf(g_log_tag, sizeof g_log_tag, "[session] %s\n", name ? name + 1 : g_log_path);
+    const char *name = strrchr(g_log_path, SF2C_WINDOWS_CH_EMPTY_6672);
+    snprintf(g_log_tag, sizeof g_log_tag, SF2C_WINDOWS_S_SESSION_S_N_980F, name ? name + 1 : g_log_path);
     // A GUI-subsystem process with no inherited handles starts with invalid CRT stream descriptors.
     // Give both streams real descriptors before duplicating the shared-delete log handle into them.
-    if (!freopen("NUL", "ab", stderr) || !freopen("NUL", "ab", stdout)) {
+    if (!freopen(SF2C_WINDOWS_S_NUL_DB9B, SF2C_WINDOWS_S_AB_782B, stderr) || !freopen(SF2C_WINDOWS_S_NUL_DB9B, SF2C_WINDOWS_S_AB_782B, stdout)) {
         CloseHandle(file); g_log_path[0] = 0; ReleaseMutex(g_log_mutex); return;
     }
     int fd = _open_osfhandle((intptr_t)file, _O_WRONLY | _O_APPEND | _O_BINARY);
@@ -466,13 +466,13 @@ static void log_to_file_without_console(void) {
     _close(fd);
     setvbuf(stderr, NULL, _IONBF, 0);
     _dup2(_fileno(stderr), _fileno(stdout));
-    _putenv_s("LASRECOMP_LOG_FILE", g_log_path);
+    _putenv_s(SF2C_WINDOWS_S_LASRECOMP_LOG_FILE_AAE4, g_log_path);
     if (fresh) {
         fputs(g_log_tag, stderr);
         keep_legacy_log(dir);
         char next[MAX_PATH];
         // A shorter name than the session path, which was already checked above.
-        snprintf(next, sizeof next, "%slasrecomp-current-%016llx-%lu.tmp", dir, stamp, (unsigned long)GetCurrentProcessId());
+        snprintf(next, sizeof next, SF2C_WINDOWS_S_SLASRECOMP_CURRENT_016LLX_LU_C19D, dir, stamp, (unsigned long)GetCurrentProcessId());
         bool staged = CreateHardLinkA(next, g_log_path, NULL) != 0;
         if (!staged) {
             // Keep the session header in the placeholder too; the full copy at exit preserves it.
@@ -497,10 +497,10 @@ static void log_to_file_without_console(void) {
 // Generated atomics use CMPXCHG16B (-mcx16); AVX2 is not required by this build.
 static void require_cpu(void) {
     unsigned a, b, c, d;
-    __asm__ volatile("cpuid" : "=a"(a), "=b"(b), "=c"(c), "=d"(d) : "a"(1), "c"(0));
-    if (c & (1u << 13)) return;
-    MessageBoxA(NULL, "Shadow Fight 2 Recomp requires an x64 CPU with CMPXCHG16B.",
-                "Shadow Fight 2 Recomp", MB_ICONERROR | MB_OK);
+    __asm__ volatile(SF2C_WINDOWS_S_CPUID_A8C5 : SF2C_WINDOWS_S_A_5E34(a), SF2C_WINDOWS_S_B_6A25(b), SF2C_WINDOWS_S_C_0E76(c), SF2C_WINDOWS_S_D_81BF(d) : SF2C_WINDOWS_S_A_AC8D(1), SF2C_WINDOWS_S_C_8799(0));
+    if (c & (SF2C_WINDOWS_N_1U_B8E6 << SF2C_WINDOWS_N_13_3FDB)) return;
+    MessageBoxA(NULL, SF2C_WINDOWS_S_SHADOW_FIGHT_2_RECOMP_REQUIR_9D48,
+                SF2C_WINDOWS_S_SHADOW_FIGHT_2_RECOMP_3AC8, MB_ICONERROR | MB_OK);
     ExitProcess(1);
 }
 
@@ -508,15 +508,15 @@ static void require_cpu(void) {
 // no console; the technical lines stay in the log.
 void plat_fatal_notice(void) {
     publish_log();
-    char text[1600];
-    snprintf(text, sizeof text, "Shadow Fight 2 stopped because of an error.\n\nSee the log for details:\n%s", g_log_path);
+    char text[SF2C_WINDOWS_N_1600_B458];
+    snprintf(text, sizeof text, SF2C_WINDOWS_S_SHADOW_FIGHT_2_STOPPED_BECAU_22CC, g_log_path);
     if (!g_log_path[0]) return;
     fflush(stderr);
-    MessageBoxA(NULL, text, "Shadow Fight 2 Recomp", MB_ICONERROR | MB_OK);
+    MessageBoxA(NULL, text, SF2C_WINDOWS_S_SHADOW_FIGHT_2_RECOMP_3AC8, MB_ICONERROR | MB_OK);
 }
 
 static DWORD WINAPI notice_thread(LPVOID text) {
-    MessageBoxA(NULL, text, "Shadow Fight 2 Recomp", MB_ICONWARNING | MB_OK);
+    MessageBoxA(NULL, text, SF2C_WINDOWS_S_SHADOW_FIGHT_2_RECOMP_3AC8, MB_ICONWARNING | MB_OK);
     free(text);
     return 0;
 }
@@ -540,35 +540,35 @@ bool plat_module_name(uint64_t pc, char *out, size_t n) {
 typedef LONG(WINAPI *RtlGetVersionFn)(OSVERSIONINFOW *);
 void plat_system_info(PlatSysInfo *si) {
     OSVERSIONINFOW v = {.dwOSVersionInfoSize = sizeof v};
-    HMODULE ntdll = GetModuleHandleA("ntdll.dll");
-    RtlGetVersionFn rtl = ntdll ? (RtlGetVersionFn)(void *)GetProcAddress(ntdll, "RtlGetVersion") : NULL;
+    HMODULE ntdll = GetModuleHandleA(SF2C_WINDOWS_S_NTDLL_DLL_20E2);
+    RtlGetVersionFn rtl = ntdll ? (RtlGetVersionFn)(void *)GetProcAddress(ntdll, SF2C_WINDOWS_S_RTLGETVERSION_DFBA) : NULL;
     if (!rtl || rtl(&v) != 0) v.dwMajorVersion = 0;
     SYSTEM_INFO sys;
     GetNativeSystemInfo(&sys);
-    const char *arch = sys.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 ? "x64"
-                     : sys.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_ARM64 ? "arm64" : "?";
-    const char *name = v.dwMajorVersion != 10 ? "Windows" : v.dwBuildNumber >= 22000 ? "Windows 11" : "Windows 10";
+    const char *arch = sys.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 ? SF2C_WINDOWS_S_X64_DD35
+                     : sys.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_ARM64 ? SF2C_WINDOWS_S_ARM64_20EF : SF2C_WINDOWS_S_EMPTY_15C5;
+    const char *name = v.dwMajorVersion != SF2C_WINDOWS_N_10_4A44 ? SF2C_WINDOWS_S_WINDOWS_0B1D : v.dwBuildNumber >= SF2C_WINDOWS_N_22000_7D9A ? SF2C_WINDOWS_S_WINDOWS_11_4438 : SF2C_WINDOWS_S_WINDOWS_10_19C2;
     if (v.dwMajorVersion)  // (Windows 11 still says 10.0: build 22000 and later)
-        snprintf(si->os, sizeof si->os, "%s (%lu.%lu.%lu, %s)", name, v.dwMajorVersion, v.dwMinorVersion,
+        snprintf(si->os, sizeof si->os, SF2C_WINDOWS_S_S_LU_LU_LU_S_56C6, name, v.dwMajorVersion, v.dwMinorVersion,
                  v.dwBuildNumber, arch);
-    else snprintf(si->os, sizeof si->os, "Windows (%s)", arch);
+    else snprintf(si->os, sizeof si->os, SF2C_WINDOWS_S_WINDOWS_S_0043, arch);
     // the CPU's name: the registry's (what Task Manager shows), else the CPUID brand string
     DWORD len = sizeof si->cpu;
-    if (RegGetValueA(HKEY_LOCAL_MACHINE, "HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0", "ProcessorNameString",
+    if (RegGetValueA(HKEY_LOCAL_MACHINE, SF2C_WINDOWS_S_HARDWARE_DESCRIPTION_SYSTEM__DEFC, SF2C_WINDOWS_S_PROCESSORNAMESTRING_AE33,
                      RRF_RT_REG_SZ, NULL, si->cpu, &len) != ERROR_SUCCESS) {
         si->cpu[0] = 0;
 #if defined(__x86_64__) || defined(__i386__)
-        unsigned r[12];
-        for (unsigned i = 0; i < 3; i++)
-            __asm__ volatile("cpuid" : "=a"(r[i * 4]), "=b"(r[i * 4 + 1]), "=c"(r[i * 4 + 2]), "=d"(r[i * 4 + 3]) : "a"(0x80000002u + i), "c"(0));
+        unsigned r[SF2C_WINDOWS_N_12_6B51];
+        for (unsigned i = 0; i < SF2C_WINDOWS_N_3_4E07; i++)
+            __asm__ volatile(SF2C_WINDOWS_S_CPUID_A8C5 : SF2C_WINDOWS_S_A_5E34(r[i * SF2C_WINDOWS_N_4_4B22]), SF2C_WINDOWS_S_B_6A25(r[i * SF2C_WINDOWS_N_4_4B22 + 1]), SF2C_WINDOWS_S_C_0E76(r[i * SF2C_WINDOWS_N_4_4B22 + SF2C_WINDOWS_N_2_D473]), SF2C_WINDOWS_S_D_81BF(r[i * SF2C_WINDOWS_N_4_4B22 + SF2C_WINDOWS_N_3_4E07]) : SF2C_WINDOWS_S_A_AC8D(SF2C_WINDOWS_N_0X80000002U_5A8A + i), SF2C_WINDOWS_S_C_8799(0));
         memcpy(si->cpu, r, sizeof r);
         si->cpu[sizeof r] = 0;
 #endif
     }
     char *c = si->cpu;  // (both pad the name with spaces)
-    while (*c == ' ') c++;
+    while (*c == SF2C_WINDOWS_CH_EMPTY_730D) c++;
     memmove(si->cpu, c, strlen(c) + 1);
-    for (size_t l = strlen(si->cpu); l && si->cpu[l - 1] == ' '; l--) si->cpu[l - 1] = 0;
+    for (size_t l = strlen(si->cpu); l && si->cpu[l - 1] == SF2C_WINDOWS_CH_EMPTY_730D; l--) si->cpu[l - 1] = 0;
     // cores: one RelationProcessorCore record each; threads: every processor group's
     DWORD bytes = 0;
     GetLogicalProcessorInformationEx(RelationProcessorCore, NULL, &bytes);
@@ -581,7 +581,7 @@ void plat_system_info(PlatSysInfo *si) {
     MEMORYSTATUSEX m = {.dwLength = sizeof m};
     if (GlobalMemoryStatusEx(&m)) si->ram = m.ullTotalPhys;
 #ifdef LARECOMP_ZIP_BUILD
-    si->package = "zip";  // (make dist: the release zip)
+    si->package = SF2C_WINDOWS_S_ZIP_732D;  // (make dist: the release zip)
 #endif
 }
 
@@ -608,32 +608,32 @@ void plat_init(void) {
 }
 
 bool plat_exe_path(char *buf, size_t size) {
-    wchar_t path[32768];
-    DWORD n = GetModuleFileNameW(NULL, path, 32768);
-    if (!n || n >= 32768 || size > INT_MAX ||
+    wchar_t path[SF2C_WINDOWS_N_32768_D196];
+    DWORD n = GetModuleFileNameW(NULL, path, SF2C_WINDOWS_N_32768_D196);
+    if (!n || n >= SF2C_WINDOWS_N_32768_D196 || size > INT_MAX ||
         !WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, path, -1, buf, (int)size, NULL, NULL)) return false;
-    for (char *p = buf; *p; p++) if (*p == '\\') *p = '/';
+    for (char *p = buf; *p; p++) if (*p == SF2C_WINDOWS_CH_EMPTY_6672) *p = SF2C_WINDOWS_CH_EMPTY_0825;
     return true;
 }
 
 char *realpath(const char *path, char *out) {
-    wchar_t input[32768], final[32768];
-    if (!out || !MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, input, 32768)) {
+    wchar_t input[SF2C_WINDOWS_N_32768_D196], final[SF2C_WINDOWS_N_32768_D196];
+    if (!out || !MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, input, SF2C_WINDOWS_N_32768_D196)) {
         errno = EINVAL; return NULL;
     }
     HANDLE h = CreateFileW(input, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                            NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
     if (h == INVALID_HANDLE_VALUE) { errno = ENOENT; return NULL; }
-    DWORD n = GetFinalPathNameByHandleW(h, final, 32768, FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
+    DWORD n = GetFinalPathNameByHandleW(h, final, SF2C_WINDOWS_N_32768_D196, FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
     CloseHandle(h);
-    if (!n || n >= 32768) { errno = ENAMETOOLONG; return NULL; }
+    if (!n || n >= SF2C_WINDOWS_N_32768_D196) { errno = ENAMETOOLONG; return NULL; }
     wchar_t *p = final;
-    if (!wcsncmp(p, L"\\\\?\\UNC\\", 8)) { p += 6; p[0] = L'\\'; }
-    else if (!wcsncmp(p, L"\\\\?\\", 4)) p += 4;
+    if (!wcsncmp(p, SF2C_WINDOWS_S_L_UNC_2256, SF2C_WINDOWS_N_8_2C62)) { p += SF2C_WINDOWS_N_6_E7F6; p[0] = SF2C_WINDOWS_CH_L_ACE1; }
+    else if (!wcsncmp(p, SF2C_WINDOWS_S_L_99A3, SF2C_WINDOWS_N_4_4B22)) p += SF2C_WINDOWS_N_4_4B22;
     if (!WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, p, -1, out, PATH_MAX, NULL, NULL)) {
         errno = ENAMETOOLONG; return NULL;
     }
-    for (char *c = out; *c; c++) if (*c == '\\') *c = '/';
+    for (char *c = out; *c; c++) if (*c == SF2C_WINDOWS_CH_EMPTY_6672) *c = SF2C_WINDOWS_CH_EMPTY_0825;
     return out;
 }
 
@@ -664,16 +664,16 @@ bool plat_bt_other_thread_tid(int tid, const char *prefix) {
     }
     CloseHandle(thread);
     if (!got) return false;
-    fprintf(stderr, "%s host tid %d: rip=%llx rsp=%llx rbp=%llx\n", prefix, tid,
+    fprintf(stderr, SF2C_WINDOWS_S_S_HOST_TID_D_RIP_LLX_RSP_LLX_6F0E, prefix, tid,
             (unsigned long long)ctx.Rip, (unsigned long long)ctx.Rsp, (unsigned long long)ctx.Rbp);
     uint64_t frame = ctx.Rbp;
-    for (int i = 0; i < 24 && frame >= ctx.Rsp && frame - ctx.Rsp < (256ull << 20) && !(frame & 7); i++) {
-        uint64_t pair[2], off = 0;
+    for (int i = 0; i < SF2C_WINDOWS_N_24_C235 && frame >= ctx.Rsp && frame - ctx.Rsp < (SF2C_WINDOWS_N_256ULL_3175 << SF2C_WINDOWS_N_20_F5CA) && !(frame & SF2C_WINDOWS_N_7_7902); i++) {
+        uint64_t pair[SF2C_WINDOWS_N_2_D473], off = 0;
         if (!plat_probe_read(frame, pair, sizeof pair)) break;
         const char *symbol = rt_host_fn_name(pair[1], &off);
         if (!symbol) symbol = plat_symbol(pair[1], &off);
-        fprintf(stderr, "%s  #%d %llx %s+%llx\n", prefix, i, (unsigned long long)pair[1],
-                symbol ? symbol : "?", (unsigned long long)off);
+        fprintf(stderr, SF2C_WINDOWS_S_S_D_LLX_S_LLX_N_08FF, prefix, i, (unsigned long long)pair[1],
+                symbol ? symbol : SF2C_WINDOWS_S_EMPTY_15C5, (unsigned long long)off);
         if (pair[0] <= frame) break;
         frame = pair[0];
     }
@@ -695,12 +695,12 @@ void plat_exec(char *const argv[]) {
         ok = CreateProcessW(NULL, command, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi);
         free(command);
     } else {
-        static char cmd[32768];
+        static char cmd[SF2C_WINDOWS_N_32768_D196];
         cmd[0] = 0;
         for (int i = 0; argv[i]; i++)
             if (!win_append_arg(cmd, sizeof cmd, argv[i])) { errno = E2BIG; return; }
-        static wchar_t wcmd[32768];
-        if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, cmd, -1, wcmd, 32768)) {
+        static wchar_t wcmd[SF2C_WINDOWS_N_32768_D196];
+        if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, cmd, -1, wcmd, SF2C_WINDOWS_N_32768_D196)) {
             errno = EINVAL; return;
         }
         ok = CreateProcessW(NULL, wcmd, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi);
@@ -726,8 +726,8 @@ const char *plat_symbol(uint64_t pc, uint64_t *offset) {
     if (m == GetModuleHandleA(NULL)) return NULL;
     char path[MAX_PATH];
     if (!GetModuleFileNameA(m, path, sizeof path)) return NULL;
-    const char *b = strrchr(path, '\\');
-    snprintf(name, sizeof name, "%s", b ? b + 1 : path);
+    const char *b = strrchr(path, SF2C_WINDOWS_CH_EMPTY_6672);
+    snprintf(name, sizeof name, SF2C_WINDOWS_S_S_0030, b ? b + 1 : path);
     if (offset) *offset = pc - (uint64_t)(uintptr_t)m;
     return name;
 }
@@ -735,24 +735,24 @@ const char *plat_symbol(uint64_t pc, uint64_t *offset) {
 const char *rt_host_fn_name(uint64_t pc, uint64_t *offset);  // runtime/dispatch.c
 
 void plat_print_backtrace(void) {
-    void *bt[64];
-    USHORT n = RtlCaptureStackBackTrace(0, 64, bt, NULL);
+    void *bt[SF2C_WINDOWS_N_64_A68B];
+    USHORT n = RtlCaptureStackBackTrace(0, SF2C_WINDOWS_N_64_A68B, bt, NULL);
     uint64_t exe = (uint64_t)(uintptr_t)GetModuleHandleA(NULL);
     for (int i = 0; i < n; i++) {
         uint64_t pc = (uint64_t)(uintptr_t)bt[i], off = 0;
         const char *s = plat_symbol(pc, &off);
         if (!s) s = rt_host_fn_name(pc, &off);
-        if (s) fprintf(stderr, "  #%-2d %016llx %s+%llx\n", i, (unsigned long long)pc, s, (unsigned long long)off);
-        else fprintf(stderr, "  #%-2d %016llx lasrecomp+%llx\n", i, (unsigned long long)pc,
+        if (s) fprintf(stderr, SF2C_WINDOWS_S_2D_016LLX_S_LLX_N_454B, i, (unsigned long long)pc, s, (unsigned long long)off);
+        else fprintf(stderr, SF2C_WINDOWS_S_2D_016LLX_LASRECOMP_LLX_N_84FF, i, (unsigned long long)pc,
                      (unsigned long long)(pc - exe));
     }
 }
 
 static LONG WINAPI unhandled_filter(EXCEPTION_POINTERS *ep) {
     EXCEPTION_RECORD *er = ep->ExceptionRecord;
-    uint64_t fa = er->NumberParameters >= 2 ? er->ExceptionInformation[1] : 0;
-    char what[48];
-    snprintf(what, sizeof what, "exception %08lx", er->ExceptionCode);
+    uint64_t fa = er->NumberParameters >= SF2C_WINDOWS_N_2_D473 ? er->ExceptionInformation[1] : 0;
+    char what[SF2C_WINDOWS_N_48_9801];
+    snprintf(what, sizeof what, SF2C_WINDOWS_S_EXCEPTION_08LX_1CEE, er->ExceptionCode);
     // x64 has no link register: report the return address on top of the stack (valid at function entry).
     uint64_t lr = 0;
     plat_probe_read(ep->ContextRecord->Rsp, &lr, sizeof lr);
@@ -760,7 +760,7 @@ static LONG WINAPI unhandled_filter(EXCEPTION_POINTERS *ep) {
 }
 
 void plat_crash_handler_install(void) {
-    ULONG guarantee = 64 << 10;  // room for the report after a stack overflow
+    ULONG guarantee = SF2C_WINDOWS_N_64_A68B << SF2C_WINDOWS_N_10_4A44;  // room for the report after a stack overflow
     SetThreadStackGuarantee(&guarantee);
     if (g_report_crashes) return;
     g_report_crashes = true;
@@ -789,8 +789,8 @@ static ssize_t prw(int fd, void *buf, size_t n, off_t off, bool write) {
         OVERLAPPED ov = {0};
         uint64_t o = (uint64_t)off + done;
         ov.Offset = (DWORD)o;
-        ov.OffsetHigh = (DWORD)(o >> 32);
-        DWORD chunk = n - done > 0x40000000 ? 0x40000000 : (DWORD)(n - done), got = 0;
+        ov.OffsetHigh = (DWORD)(o >> SF2C_WINDOWS_N_32_E29C);
+        DWORD chunk = n - done > SF2C_WINDOWS_N_0X40000000_A930 ? SF2C_WINDOWS_N_0X40000000_A930 : (DWORD)(n - done), got = 0;
         BOOL ok = write ? WriteFile(h, (const char *)buf + done, chunk, &got, &ov)
                         : ReadFile(h, (char *)buf + done, chunk, &got, &ov);
         if (!ok && GetLastError() == ERROR_IO_PENDING)
@@ -817,19 +817,19 @@ typedef struct { HANDLE process, job; } WinProcess;
 
 PlatProc plat_spawn(const char *const argv[], const char *log_path, bool append_log) {
     if (!argv || !argv[0] || !*argv[0]) { errno = EINVAL; return 0; }
-    static __thread char cmd[32768];
+    static __thread char cmd[SF2C_WINDOWS_N_32768_D196];
     cmd[0] = 0;
     for (int i = 0; argv[i]; i++)
         if (!win_append_arg(cmd, sizeof cmd, argv[i])) { errno = E2BIG; return 0; }
-    static __thread wchar_t wcmd[32768], wlog[32768], wprog[32768], wfull[32768];
-    if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, cmd, -1, wcmd, 32768) ||
-        !MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, log_path ? log_path : "NUL", -1, wlog, 32768) ||
-        !MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, argv[0], -1, wprog, 32768)) {
+    static __thread wchar_t wcmd[SF2C_WINDOWS_N_32768_D196], wlog[SF2C_WINDOWS_N_32768_D196], wprog[SF2C_WINDOWS_N_32768_D196], wfull[SF2C_WINDOWS_N_32768_D196];
+    if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, cmd, -1, wcmd, SF2C_WINDOWS_N_32768_D196) ||
+        !MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, log_path ? log_path : SF2C_WINDOWS_S_NUL_DB9B, -1, wlog, SF2C_WINDOWS_N_32768_D196) ||
+        !MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, argv[0], -1, wprog, SF2C_WINDOWS_N_32768_D196)) {
         errno = EINVAL; return 0;
     }
-    for (wchar_t *p = wprog; *p; p++) if (*p == L'/') *p = L'\\';
-    DWORD length = GetFullPathNameW(wprog, 32768, wfull, NULL);
-    if (!length || length >= 32768) { errno = ENAMETOOLONG; return 0; }
+    for (wchar_t *p = wprog; *p; p++) if (*p == SF2C_WINDOWS_CH_L_A8E7) *p = SF2C_WINDOWS_CH_L_ACE1;
+    DWORD length = GetFullPathNameW(wprog, SF2C_WINDOWS_N_32768_D196, wfull, NULL);
+    if (!length || length >= SF2C_WINDOWS_N_32768_D196) { errno = ENAMETOOLONG; return 0; }
     SECURITY_ATTRIBUTES sa = {.nLength = sizeof sa, .bInheritHandle = TRUE};
     HANDLE log = CreateFileW(wlog, append_log ? FILE_APPEND_DATA : GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
                              &sa, append_log ? OPEN_ALWAYS : CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -841,14 +841,14 @@ PlatProc plat_spawn(const char *const argv[], const char *log_path, bool append_
     // as a full path, like posix_spawn takes it as given
     BOOL ok = CreateProcessW(wfull, wcmd, NULL, NULL, TRUE, CREATE_NO_WINDOW | CREATE_SUSPENDED,
                              NULL, NULL, &si, &pi);
-    if (!ok) fprintf(stderr, "[plat] could not start %s (error %lu)\n", argv[0], GetLastError());
+    if (!ok) fprintf(stderr, SF2C_WINDOWS_S_PLAT_COULD_NOT_START_S_ERROR_F8C8, argv[0], GetLastError());
     CloseHandle(log);
     if (!ok) return 0;
     // A separate job per helper: cancelling one compiler also stops its children immediately,
     // without killing the other compilation jobs. Handles close on app exit as well.
     WinProcess *child = calloc(1, sizeof *child);
     if (!child) {
-        TerminateProcess(pi.hProcess, 255);
+        TerminateProcess(pi.hProcess, SF2C_WINDOWS_N_255_9556);
         CloseHandle(pi.hThread); CloseHandle(pi.hProcess);
         return 0;
     }
@@ -859,13 +859,13 @@ PlatProc plat_spawn(const char *const argv[], const char *log_path, bool append_
         !AssignProcessToJobObject(job, pi.hProcess)) {
         // A restricted parent job can prevent assignment. Still run the helper, as before jobs were added;
         // cancellation can stop this process only in that case, not its descendants.
-        fprintf(stderr, "[plat] could not supervise %s (error %lu); starting without a job\n", argv[0], GetLastError());
+        fprintf(stderr, SF2C_WINDOWS_S_PLAT_COULD_NOT_SUPERVISE_S_E_15E3, argv[0], GetLastError());
         if (job) CloseHandle(job);
         job = NULL;
     }
     child->process = pi.hProcess, child->job = job;
     if (ResumeThread(pi.hThread) == (DWORD)-1) {
-        TerminateProcess(pi.hProcess, 255);
+        TerminateProcess(pi.hProcess, SF2C_WINDOWS_N_255_9556);
         CloseHandle(pi.hThread);
         CloseHandle(pi.hProcess);
         if (job) CloseHandle(job);
@@ -878,8 +878,8 @@ PlatProc plat_spawn(const char *const argv[], const char *log_path, bool append_
 
 void plat_proc_kill(PlatProc p) {
     WinProcess *child = (WinProcess *)p;
-    if (child->job) TerminateJobObject(child->job, 255);
-    else TerminateProcess(child->process, 255);
+    if (child->job) TerminateJobObject(child->job, SF2C_WINDOWS_N_255_9556);
+    else TerminateProcess(child->process, SF2C_WINDOWS_N_255_9556);
     WaitForSingleObject(child->process, INFINITE);
     CloseHandle(child->process);
     if (child->job) CloseHandle(child->job);
@@ -890,19 +890,19 @@ int plat_proc_wait(PlatProc p, bool block) {
     WinProcess *child = (WinProcess *)p;
     DWORD w = WaitForSingleObject(child->process, block ? INFINITE : 0);
     if (w == WAIT_TIMEOUT) return -1;
-    DWORD code = 255;
+    DWORD code = SF2C_WINDOWS_N_255_9556;
     if (w == WAIT_OBJECT_0) GetExitCodeProcess(child->process, &code);
     CloseHandle(child->process);
     if (child->job) CloseHandle(child->job);
     free(child);
-    return code > 255 ? 255 : (int)code;  // (a crash's NTSTATUS, e.g. 0xC0000005, is not "still running" (-1))
+    return code > SF2C_WINDOWS_N_255_9556 ? SF2C_WINDOWS_N_255_9556 : (int)code;  // (a crash's NTSTATUS, e.g. 0xC0000005, is not "still running" (-1))
 }
 
 // rm -rf that never goes through a link: a junction or symlink inside is removed itself (RemoveDirectory /
 // DeleteFile on the reparse point), never what it points to. Cloud placeholders (OneDrive: also reparse points, but
 // not redirects) are ordinary files and folders. w: a \\?\ path in a 32768-wide buffer, len its length; attr and
 // tag: its FindFirstFile attributes and reparse tag.
-static bool cloud_placeholder(DWORD tag) { return (tag & 0xFFFF0FFF) == 0x9000001A; }  // IO_REPARSE_TAG_CLOUD(_1.._F)
+static bool cloud_placeholder(DWORD tag) { return (tag & SF2C_WINDOWS_N_0XFFFF0FFF_5D5D) == SF2C_WINDOWS_N_0X9000001A_90FB; }  // IO_REPARSE_TAG_CLOUD(_1.._F)
 static bool remove_tree_w(wchar_t *w, size_t len, DWORD attr, DWORD tag) {
     bool dir = attr & FILE_ATTRIBUTE_DIRECTORY;
     if ((attr & FILE_ATTRIBUTE_REPARSE_POINT) && !cloud_placeholder(tag))  // junction / symlink: the link only
@@ -910,17 +910,17 @@ static bool remove_tree_w(wchar_t *w, size_t len, DWORD attr, DWORD tag) {
     if (attr & FILE_ATTRIBUTE_READONLY) SetFileAttributesW(w, attr & ~FILE_ATTRIBUTE_READONLY);
     if (!dir) return DeleteFileW(w) != 0;
     bool ok = true;
-    if (len + 3 >= 32768) return false;
-    wcscpy(w + len, L"\\*");
+    if (len + SF2C_WINDOWS_N_3_4E07 >= SF2C_WINDOWS_N_32768_D196) return false;
+    wcscpy(w + len, SF2C_WINDOWS_S_L_35DA);
     WIN32_FIND_DATAW fd;
     HANDLE h = FindFirstFileExW(w, FindExInfoBasic, &fd, FindExSearchNameMatch, NULL, 0);
     w[len] = 0;
     if (h != INVALID_HANDLE_VALUE) {
         do {
-            if (!wcscmp(fd.cFileName, L".") || !wcscmp(fd.cFileName, L"..")) continue;
+            if (!wcscmp(fd.cFileName, SF2C_WINDOWS_S_L_9BA3) || !wcscmp(fd.cFileName, SF2C_WINDOWS_S_L_D295)) continue;
             size_t k = wcslen(fd.cFileName);
-            if (len + 1 + k >= 32768) { ok = false; continue; }
-            w[len] = L'\\';
+            if (len + 1 + k >= SF2C_WINDOWS_N_32768_D196) { ok = false; continue; }
+            w[len] = SF2C_WINDOWS_CH_L_ACE1;
             wcscpy(w + len + 1, fd.cFileName);
             ok &= remove_tree_w(w, len + 1 + k, fd.dwFileAttributes,
                                 (fd.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) ? fd.dwReserved0 : 0);
@@ -932,21 +932,21 @@ static bool remove_tree_w(wchar_t *w, size_t len, DWORD attr, DWORD tag) {
 }
 
 bool plat_remove_tree(const char *dir) {
-    static __thread wchar_t rel[MAX_PATH * 4], w[32768];
-    if (MultiByteToWideChar(CP_UTF8, 0, dir, -1, rel, MAX_PATH * 4) <= 1) return false;
-    for (wchar_t *p = rel; *p; p++) if (*p == L'/') *p = L'\\';
-    DWORD n = GetFullPathNameW(rel, 32768 - 8, w + 4, NULL);  // (absolute, then \\?\ for long paths)
-    if (!n || n >= 32768 - 8) return false;
+    static __thread wchar_t rel[MAX_PATH * SF2C_WINDOWS_N_4_4B22], w[SF2C_WINDOWS_N_32768_D196];
+    if (MultiByteToWideChar(CP_UTF8, 0, dir, -1, rel, MAX_PATH * SF2C_WINDOWS_N_4_4B22) <= 1) return false;
+    for (wchar_t *p = rel; *p; p++) if (*p == SF2C_WINDOWS_CH_L_A8E7) *p = SF2C_WINDOWS_CH_L_ACE1;
+    DWORD n = GetFullPathNameW(rel, SF2C_WINDOWS_N_32768_D196 - SF2C_WINDOWS_N_8_2C62, w + SF2C_WINDOWS_N_4_4B22, NULL);  // (absolute, then \\?\ for long paths)
+    if (!n || n >= SF2C_WINDOWS_N_32768_D196 - SF2C_WINDOWS_N_8_2C62) return false;
     size_t len;
-    if (w[4] == L'\\' && w[5] == L'\\') {  // \\server\share -> \\?\UNC\server\share
-        memmove(w + 8, w + 6, (n - 1) * sizeof *w);
-        memcpy(w, L"\\\\?\\UNC\\", 8 * sizeof *w);
-        len = n + 6;
+    if (w[SF2C_WINDOWS_N_4_4B22] == SF2C_WINDOWS_CH_L_ACE1 && w[SF2C_WINDOWS_N_5_EF2D] == SF2C_WINDOWS_CH_L_ACE1) {  // \\server\share -> \\?\UNC\server\share
+        memmove(w + SF2C_WINDOWS_N_8_2C62, w + SF2C_WINDOWS_N_6_E7F6, (n - 1) * sizeof *w);
+        memcpy(w, SF2C_WINDOWS_S_L_UNC_2256, SF2C_WINDOWS_N_8_2C62 * sizeof *w);
+        len = n + SF2C_WINDOWS_N_6_E7F6;
     } else {
-        memcpy(w, L"\\\\?\\", 4 * sizeof *w);
-        len = n + 4;
+        memcpy(w, SF2C_WINDOWS_S_L_99A3, SF2C_WINDOWS_N_4_4B22 * sizeof *w);
+        len = n + SF2C_WINDOWS_N_4_4B22;
     }
-    while (len > 7 && w[len - 1] == L'\\') len--;  // (no trailing separator: "\\*" is appended)
+    while (len > SF2C_WINDOWS_N_7_7902 && w[len - 1] == SF2C_WINDOWS_CH_L_ACE1) len--;  // (no trailing separator: "\\*" is appended)
     w[len] = 0;
     WIN32_FIND_DATAW fd;
     HANDLE h = FindFirstFileExW(w, FindExInfoBasic, &fd, FindExSearchNameMatch, NULL, 0);
@@ -968,36 +968,36 @@ static bool final_path(const wchar_t *p, wchar_t *out, DWORD n) {
     }
     if (!k || k >= n) k = GetFullPathNameW(p, n, out, NULL);  // (can't be opened: as written)
     if (!k || k >= n) return false;
-    if (!wcsncmp(out, L"\\\\?\\UNC\\", 8)) memmove(out + 2, out + 8, (wcslen(out + 8) + 1) * sizeof *out);
-    else if (!wcsncmp(out, L"\\\\?\\", 4)) memmove(out, out + 4, (wcslen(out + 4) + 1) * sizeof *out);
-    for (wchar_t *c = out; *c; c++) if (*c == L'/') *c = L'\\';
-    for (size_t l = wcslen(out); l > 3 && out[l - 1] == L'\\';) out[--l] = 0;
+    if (!wcsncmp(out, SF2C_WINDOWS_S_L_UNC_2256, SF2C_WINDOWS_N_8_2C62)) memmove(out + SF2C_WINDOWS_N_2_D473, out + SF2C_WINDOWS_N_8_2C62, (wcslen(out + SF2C_WINDOWS_N_8_2C62) + 1) * sizeof *out);
+    else if (!wcsncmp(out, SF2C_WINDOWS_S_L_99A3, SF2C_WINDOWS_N_4_4B22)) memmove(out, out + SF2C_WINDOWS_N_4_4B22, (wcslen(out + SF2C_WINDOWS_N_4_4B22) + 1) * sizeof *out);
+    for (wchar_t *c = out; *c; c++) if (*c == SF2C_WINDOWS_CH_L_A8E7) *c = SF2C_WINDOWS_CH_L_ACE1;
+    for (size_t l = wcslen(out); l > SF2C_WINDOWS_N_3_4E07 && out[l - 1] == SF2C_WINDOWS_CH_L_ACE1;) out[--l] = 0;
     return true;
 }
 
 #ifndef FILE_ATTRIBUTE_PINNED
-#define FILE_ATTRIBUTE_PINNED 0x00080000
-#define FILE_ATTRIBUTE_UNPINNED 0x00100000
+#define FILE_ATTRIBUTE_PINNED SF2C_WINDOWS_FILE_ATTRIBUTE_PINNED
+#define FILE_ATTRIBUTE_UNPINNED SF2C_WINDOWS_FILE_ATTRIBUTE_UNPINNED
 #endif
 #ifndef FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS
-#define FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS 0x00400000
+#define FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS SF2C_WINDOWS_FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS
 #endif
 
 // Under one of the OneDrive folders the environment names (personal, work / school), or a cloud file itself
 bool plat_onedrive_synced(const char *dir) {
-    wchar_t w[MAX_PATH], d[1024], r[1024], v[1024];
-    if (MultiByteToWideChar(CP_UTF8, 0, dir, -1, w, MAX_PATH) <= 1 || !final_path(w, d, 1024)) return false;
+    wchar_t w[MAX_PATH], d[SF2C_WINDOWS_N_1024_E39E], r[SF2C_WINDOWS_N_1024_E39E], v[SF2C_WINDOWS_N_1024_E39E];
+    if (MultiByteToWideChar(CP_UTF8, 0, dir, -1, w, MAX_PATH) <= 1 || !final_path(w, d, SF2C_WINDOWS_N_1024_E39E)) return false;
     DWORD a = GetFileAttributesW(d);
     if (a != INVALID_FILE_ATTRIBUTES &&
         (a & (FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS | FILE_ATTRIBUTE_PINNED | FILE_ATTRIBUTE_UNPINNED)))
         return true;
-    static const wchar_t *const vars[] = {L"OneDrive", L"OneDriveConsumer", L"OneDriveCommercial"};
-    for (int i = 0; i < 3; i++) {
-        DWORD k = GetEnvironmentVariableW(vars[i], v, 1024);
-        if (!k || k >= 1024 || !final_path(v, r, 1024)) continue;
+    static const wchar_t *const vars[] = {SF2C_WINDOWS_S_L_ONEDRIVE_146A, SF2C_WINDOWS_S_L_ONEDRIVECONSUMER_7B8C, SF2C_WINDOWS_S_L_ONEDRIVECOMMERCIAL_1458};
+    for (int i = 0; i < SF2C_WINDOWS_N_3_4E07; i++) {
+        DWORD k = GetEnvironmentVariableW(vars[i], v, SF2C_WINDOWS_N_1024_E39E);
+        if (!k || k >= SF2C_WINDOWS_N_1024_E39E || !final_path(v, r, SF2C_WINDOWS_N_1024_E39E)) continue;
         size_t l = wcslen(r);
-        if (r[l - 1] == L'\\') l--;  // (a drive's root: "D:\")
-        if (!_wcsnicmp(d, r, l) && (!d[l] || d[l] == L'\\')) return true;
+        if (r[l - 1] == SF2C_WINDOWS_CH_L_ACE1) l--;  // (a drive's root: "D:\")
+        if (!_wcsnicmp(d, r, l) && (!d[l] || d[l] == SF2C_WINDOWS_CH_L_ACE1)) return true;
     }
     return false;
 }

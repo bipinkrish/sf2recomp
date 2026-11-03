@@ -1,3 +1,4 @@
+#include "../../constants/nvn_vulkan.h"
 // Vulkan backend for the NVN layer (Windows; macOS uses runtime/nvn/metal.m + renderer.m).
 // Files: device.c (instance, window, swapchain, present, screenshots, ImGui hooks), textures.c (images, uploads,
 // views), exec.c (command execution: passes, draws, clears, copies, compute), shaders.c (GLSL -> SPIR-V, programs,
@@ -22,7 +23,7 @@
 
 void vk_device_fault_report(void);
 #define VK_CHECK(x) do { VkResult r_ = (x); if (r_ != VK_SUCCESS) { if (r_ == VK_ERROR_DEVICE_LOST) vk_device_fault_report(); \
-    FATAL("%s failed: %d (%s:%d)\n", #x, r_, __FILE__, __LINE__); } } while (0)
+    FATAL(SF2C_VK_S_S_FAILED_D_S_D_N_F130, #x, r_, __FILE__, __LINE__); } } while (0)
 
 typedef struct {
     VkInstance inst;
@@ -60,8 +61,8 @@ typedef struct {
     VkFormat sc_format;
     VkExtent2D sc_extent;
     uint32_t sc_count;
-    VkImage sc_images[8];
-    VkImageView sc_views[8];
+    VkImage sc_images[SF2C_VK_N_8_2C62];
+    VkImageView sc_views[SF2C_VK_N_8_2C62];
 } VkG;
 void vk_log_memory(const char *why);  // (device.c: per-heap budget and use, at start and on allocation failures)
 extern VkG g_vk;
@@ -78,11 +79,11 @@ void vk_end_pass(void);
 void vk_submit_extra(VkSemaphore wait, VkSemaphore signal, VkCommandBuffer extra);  // submit + one more cb (present)
 // GPU timer (exec.c gpu_timer_add): the window image's submission starts its counted work here (after its acquire wait)
 void vk_gpu_timer_window_start(void);
-bool vk_gpu_split_ns(uint64_t out[4]);  // cumulative: game GPU ns, window GPU ns, frame spans' ns, frames; false: no timer
+bool vk_gpu_split_ns(uint64_t out[SF2C_VK_N_4_4B22]);  // cumulative: game GPU ns, window GPU ns, frame spans' ns, frames; false: no timer
 uint64_t vk_cum_wait_ns(void);          // cumulative vk_wait_seq time
 // (device.c) CPU time blocked presenting, cumulative ns: [0] frame slot's fence, [1] window image acquire, [2] present;
 // [3]: frames presented
-extern uint64_t g_vk_frame_waits[4];
+extern uint64_t g_vk_frame_waits[SF2C_VK_N_4_4B22];
 
 // Transient GPU-visible memory that lives until the submission it was allocated for completes.
 typedef struct { VkBuffer buf; uint64_t off; void *ptr; } VkSpan;
@@ -114,7 +115,7 @@ typedef struct TexBackend {
     bool astc_srgb;
     int reg;  // slot in textures.c's live list + 1 (a reboot destroys them all)
     // (g_vk.lean_usage) the only formats views of this image may have: nview_fmt 0 = any compatible one
-    VkFormat view_fmt[2];
+    VkFormat view_fmt[SF2C_VK_N_2_D473];
     uint8_t nview_fmt;
 } TexBackend;
 

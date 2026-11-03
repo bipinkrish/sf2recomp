@@ -1,3 +1,4 @@
+#include "../constants/hle.h"
 // Controller input: SDL keyboard/gamepad -> nn::hid Npad state.
 //
 // Both go through the player's bindings (runtime/hle/bindings.c, defaults there: keyboard WASD left stick, arrows
@@ -25,10 +26,10 @@ enum {
     BTN_A = 0, BTN_B, BTN_X, BTN_Y, BTN_LSTICK, BTN_RSTICK, BTN_L, BTN_R, BTN_ZL, BTN_ZR, BTN_PLUS, BTN_MINUS,
     BTN_LEFT, BTN_UP, BTN_RIGHT, BTN_DOWN
 };
-enum { LOCAL_PLAYER_COUNT = 2 };
+enum { LOCAL_PLAYER_COUNT = SF2C_INPUT_N_2_D473 };
 
-_Static_assert(BTN_DOWN == BIND_DOWN && BTN_ZL == BIND_ZL, "bindings follow the button bits");
-_Static_assert(LOCAL_PLAYER_COUNT == RUMBLE_PLAYER_COUNT, "input and rumble player slots must agree");
+_Static_assert(BTN_DOWN == BIND_DOWN && BTN_ZL == BIND_ZL, SF2C_INPUT_S_BINDINGS_FOLLOW_THE_BUTTON_B_BD36);
+_Static_assert(LOCAL_PLAYER_COUNT == RUMBLE_PLAYER_COUNT, SF2C_INPUT_S_INPUT_AND_RUMBLE_PLAYER_SLOT_54D3);
 
 typedef struct {
     SDL_Gamepad *handle;       // UI thread only
@@ -36,7 +37,7 @@ typedef struct {
     _Atomic bool connected;    // published to guest input threads
     _Atomic uint64_t buttons;
     _Atomic int32_t lx, ly, rx, ry;
-    bool trigger_down[2];      // UI thread only
+    bool trigger_down[SF2C_INPUT_N_2_D473];      // UI thread only
 } LocalPad;
 
 static _Atomic uint64_t key_buttons;
@@ -77,7 +78,7 @@ void input_rumble_send(uint32_t h, const RumbleValue *v) {
     SDL_UnlockSpinlock(&rumble_lock);
 }
 RumbleValue input_rumble_get(uint32_t h) {
-    RumbleValue v = {0, 160, 0, 320};
+    RumbleValue v = {0, SF2C_INPUT_N_160_A512, 0, SF2C_INPUT_N_320_8882};
     int index = rumble_index(h);
     SDL_LockSpinlock(&rumble_lock);
     if (index >= 0 && rumble_allowed) v = rumble_values[index];
@@ -103,7 +104,7 @@ void input_rumble_poll(void) {
     // Renew SDL's 250 ms effect every 100 ms while frames are progressing.
     // A stalled render/UI thread therefore cannot leave an infinite effect.
     // This watchdog is a host policy, not a duration supplied by the game.
-    bool stalled = now > last_frame && now - last_frame > 250;
+    bool stalled = now > last_frame && now - last_frame > SF2C_INPUT_N_250_1E47;
     for (int player = 0; player < LOCAL_PLAYER_COUNT; player++) {
         SDL_Gamepad *pad = pads[player].handle;
         uint16_t lo = 0, hi = 0;
@@ -114,13 +115,13 @@ void input_rumble_poll(void) {
         else if (rumble_allowed) {
             rumble_mix(rumble_values, player, &lo, &hi);
             int pct = g_settings.rumble_strength;  // (Controls tab: Intensity)
-            if (pct > 0 && pct < 100) lo = (uint16_t)(lo * pct / 100), hi = (uint16_t)(hi * pct / 100);
+            if (pct > 0 && pct < SF2C_INPUT_N_100_AD57) lo = (uint16_t)(lo * pct / SF2C_INPUT_N_100_AD57), hi = (uint16_t)(hi * pct / SF2C_INPUT_N_100_AD57);
         }
         SDL_UnlockSpinlock(&rumble_lock);
         if (pad && (lo != rumble_last_lo[player] || hi != rumble_last_hi[player] ||
-                    ((lo || hi) && now - rumble_last_ms[player] >= 100))) {
-            if (!SDL_RumbleGamepad(pad, lo, hi, (lo || hi) ? 250 : 0) && !rumble_warned[player]) {
-                LOG("[rumble] player %d unavailable: %s\n", player + 1, SDL_GetError());
+                    ((lo || hi) && now - rumble_last_ms[player] >= SF2C_INPUT_N_100_AD57))) {
+            if (!SDL_RumbleGamepad(pad, lo, hi, (lo || hi) ? SF2C_INPUT_N_250_1E47 : 0) && !rumble_warned[player]) {
+                LOG(SF2C_INPUT_S_RUMBLE_PLAYER_D_UNAVAILABLE__2B46, player + 1, SDL_GetError());
                 rumble_warned[player] = true;  // keyboard/non-rumble pads are still usable
             }
             rumble_last_ms[player] = now;
@@ -158,17 +159,17 @@ static void recompute_keyboard(void) {
         return;
     }
     for (int i = 0; i < BIND_PAD_COUNT; i++)
-        if (held_key(g_bind_key[i])) b |= 1ull << i;
+        if (held_key(g_bind_key[i])) b |= SF2C_INPUT_N_1ULL_622E << i;
     if(input_menu_navigation_active()) {
-        if(held_key(SDL_SCANCODE_ESCAPE) && bind_key_unassigned(SDL_SCANCODE_ESCAPE))b|=1ull<<input_menu_back_binding();
+        if(held_key(SDL_SCANCODE_ESCAPE) && bind_key_unassigned(SDL_SCANCODE_ESCAPE))b|=SF2C_INPUT_N_1ULL_622E<<input_menu_back_binding();
         if((held_key(SDL_SCANCODE_RETURN) && bind_key_unassigned(SDL_SCANCODE_RETURN)) ||
-           (held_key(SDL_SCANCODE_KP_ENTER) && bind_key_unassigned(SDL_SCANCODE_KP_ENTER)))b|=1ull<<BIND_A;
-    } else if(held_key(SDL_SCANCODE_ESCAPE) && bind_key_unassigned(SDL_SCANCODE_ESCAPE))b|=1ull<<BIND_PLUS;
+           (held_key(SDL_SCANCODE_KP_ENTER) && bind_key_unassigned(SDL_SCANCODE_KP_ENTER)))b|=SF2C_INPUT_N_1ULL_622E<<BIND_A;
+    } else if(held_key(SDL_SCANCODE_ESCAPE) && bind_key_unassigned(SDL_SCANCODE_ESCAPE))b|=SF2C_INPUT_N_1ULL_622E<<BIND_PLUS;
     key_buttons = b;
-    key_lx = (held_key(g_bind_key[BIND_LS_RIGHT]) - held_key(g_bind_key[BIND_LS_LEFT])) * 32767;
-    key_ly = (held_key(g_bind_key[BIND_LS_UP]) - held_key(g_bind_key[BIND_LS_DOWN])) * 32767;
-    key_rx = (held_key(g_bind_key[BIND_RS_RIGHT]) - held_key(g_bind_key[BIND_RS_LEFT])) * 32767;
-    key_ry = (held_key(g_bind_key[BIND_RS_UP]) - held_key(g_bind_key[BIND_RS_DOWN])) * 32767;
+    key_lx = (held_key(g_bind_key[BIND_LS_RIGHT]) - held_key(g_bind_key[BIND_LS_LEFT])) * SF2C_INPUT_N_32767_D844;
+    key_ly = (held_key(g_bind_key[BIND_LS_UP]) - held_key(g_bind_key[BIND_LS_DOWN])) * SF2C_INPUT_N_32767_D844;
+    key_rx = (held_key(g_bind_key[BIND_RS_RIGHT]) - held_key(g_bind_key[BIND_RS_LEFT])) * SF2C_INPUT_N_32767_D844;
+    key_ry = (held_key(g_bind_key[BIND_RS_UP]) - held_key(g_bind_key[BIND_RS_DOWN])) * SF2C_INPUT_N_32767_D844;
 }
 
 // Controller buttons (and the triggers as buttons) -> Switch buttons through g_bind_pad; the sticks stay the sticks.
@@ -178,13 +179,13 @@ static void recompute_pad(int player) {
     uint32_t host = player == 0 ? test_pad : 0;
     if (p->handle && !host_test) {
         for (int i = 0; i < SDL_GAMEPAD_BUTTON_COUNT; i++)
-            if (SDL_GetGamepadButton(p->handle, (SDL_GamepadButton)i)) host |= 1u << i;
-        if (SDL_GetGamepadAxis(p->handle, SDL_GAMEPAD_AXIS_LEFT_TRIGGER) > 16000) host |= 1u << PADB_LTRIGGER;
-        if (SDL_GetGamepadAxis(p->handle, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) > 16000) host |= 1u << PADB_RTRIGGER;
+            if (SDL_GetGamepadButton(p->handle, (SDL_GamepadButton)i)) host |= SF2C_INPUT_N_1U_B8E6 << i;
+        if (SDL_GetGamepadAxis(p->handle, SDL_GAMEPAD_AXIS_LEFT_TRIGGER) > SF2C_INPUT_N_16000_2570) host |= SF2C_INPUT_N_1U_B8E6 << PADB_LTRIGGER;
+        if (SDL_GetGamepadAxis(p->handle, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) > SF2C_INPUT_N_16000_2570) host |= SF2C_INPUT_N_1U_B8E6 << PADB_RTRIGGER;
     }
     uint64_t b = 0;
     for (int i = 0; i < BIND_PAD_COUNT; i++)
-        if (g_bind_pad[i] >= 0 && g_bind_pad[i] < PADB_HOST_COUNT && (host >> g_bind_pad[i] & 1)) b |= 1ull << i;
+        if (g_bind_pad[i] >= 0 && g_bind_pad[i] < PADB_HOST_COUNT && (host >> g_bind_pad[i] & 1)) b |= SF2C_INPUT_N_1ULL_622E << i;
     atomic_store(&p->buttons, b);
     if (!p->handle || host_test) {
         atomic_store(&p->lx, player == 0 ? test_lx : 0);
@@ -210,16 +211,16 @@ static _Atomic uint32_t input_generation[LOCAL_PLAYER_COUNT];
 static uint64_t pad_bits(int host) {   // the game buttons bound to host button `host` (SDL button / PADB_*TRIGGER)
     uint64_t b = 0;
     for (int i = 0; i < BIND_PAD_COUNT; i++)
-        if (g_bind_pad[i] == host) b |= 1ull << i;
+        if (g_bind_pad[i] == host) b |= SF2C_INPUT_N_1ULL_622E << i;
     return b;
 }
 static void note_press(int player, uint64_t down, uint64_t up) {
     if (player < 0 || player >= LOCAL_PLAYER_COUNT) return;
     // The original VideoPlayerController accepts HintID A or B to skip.
-    if (movie_overlay_active() && (down & 3)) {
+    if (movie_overlay_active() && (down & SF2C_INPUT_N_3_4E07)) {
         movie_request_skip();
-        atomic_fetch_or(&movie_consumed[player], down & 3);
-        down &= ~3ull;
+        atomic_fetch_or(&movie_consumed[player], down & SF2C_INPUT_N_3_4E07);
+        down &= ~SF2C_INPUT_N_3ULL_BD3E;
     }
     if (up) atomic_fetch_and(&movie_consumed[player], ~up);
     if (down) atomic_fetch_or(&press_unseen[player], down);
@@ -247,7 +248,7 @@ void input_reset(void) {
 volatile int g_debug_frame_request;  // F9: dump the next frame's passes (build/pass_*.png) + draw log
 
 // Events a test pushes (LARECOMP_HOST_INPUT type: / sdlkey: / sdlpad: / mouse:) carry this device id: they go the whole way, menu first.
-#define TEST_DEVICE 0x7E57u
+#define TEST_DEVICE SF2C_INPUT_TEST_DEVICE
 static bool test_event(const SDL_Event *e) {
     switch (e->type) {
     case SDL_EVENT_KEY_DOWN: case SDL_EVENT_KEY_UP: return e->key.which == TEST_DEVICE;
@@ -265,10 +266,10 @@ static bool test_event(const SDL_Event *e) {
 bool input_user_blocked(const SDL_Event *e) {
     static int on = -1;
     if (on < 0) {
-        const char *v = getenv("LARECOMP_NO_USER_INPUT");
-        on = v ? atoi(v) != 0 : (getenv("LARECOMP_INPUT") || getenv("LARECOMP_DOORJUMP_TEST") || getenv("LARECOMP_PLACE") ||
-                                 getenv("LARECOMP_HOST_INPUT") || getenv("LARECOMP_BIND_TEST"));
-        if (on) LOG("[input] scripted run: keyboard, mouse and controllers ignored\n");
+        const char *v = getenv(SF2C_INPUT_S_LARECOMP_NO_USER_INPUT_EB20);
+        on = v ? atoi(v) != 0 : (getenv(SF2C_INPUT_S_LARECOMP_INPUT_D0A3) || getenv(SF2C_INPUT_S_LARECOMP_DOORJUMP_TEST_AF02) || getenv(SF2C_INPUT_S_LARECOMP_PLACE_61F0) ||
+                                 getenv(SF2C_INPUT_S_LARECOMP_HOST_INPUT_8D91) || getenv(SF2C_INPUT_S_LARECOMP_BIND_TEST_C2F2));
+        if (on) LOG(SF2C_INPUT_S_INPUT_SCRIPTED_RUN_KEYBOARD__420D);
     }
     if (!on) return false;
     if (test_event(e)) return false;  // (LARECOMP_HOST_INPUT type: / sdlkey: / sdlpad: - the test's own presses)
@@ -299,10 +300,10 @@ void input_cursor_event(const SDL_Event *e) {
         hide = !e->key.repeat && !(e->key.scancode >= SDL_SCANCODE_LCTRL && e->key.scancode <= SDL_SCANCODE_RGUI);
         break;
     case SDL_EVENT_GAMEPAD_BUTTON_DOWN: hide = true; break;
-    case SDL_EVENT_GAMEPAD_AXIS_MOTION: hide = abs(e->gaxis.value) > 12000; break;  // (stick drift stays below)
+    case SDL_EVENT_GAMEPAD_AXIS_MOTION: hide = abs(e->gaxis.value) > SF2C_INPUT_N_12000_C5D1; break;  // (stick drift stays below)
     case SDL_EVENT_MOUSE_MOTION:
         moved += fabsf(e->motion.xrel) + fabsf(e->motion.yrel);
-        show = moved > 6;
+        show = moved > SF2C_INPUT_N_6_E7F6;
         break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN: case SDL_EVENT_MOUSE_WHEEL: show = true; break;
     default: break;
@@ -310,13 +311,13 @@ void input_cursor_event(const SDL_Event *e) {
     if (hide && !cursor_hidden) {
         SDL_HideCursor();
         cursor_hidden = true, moved = 0;
-        LOG("[cursor] hidden (%s): SDL cursor visible=%d\n", e->type == SDL_EVENT_KEY_DOWN ? "key" : "controller",
+        LOG(SF2C_INPUT_S_CURSOR_HIDDEN_S_SDL_CURSOR_V_F786, e->type == SDL_EVENT_KEY_DOWN ? SF2C_INPUT_S_KEY_C0C1 : SF2C_INPUT_S_CONTROLLER_E1A8,
             SDL_CursorVisible());
     } else if (show && cursor_hidden) {
         SDL_ShowCursor();
         cursor_hidden = false;
-        LOG("[cursor] shown (mouse %s): SDL cursor visible=%d\n",
-            e->type == SDL_EVENT_MOUSE_MOTION ? "moved" : e->type == SDL_EVENT_MOUSE_WHEEL ? "wheel" : "button",
+        LOG(SF2C_INPUT_S_CURSOR_SHOWN_MOUSE_S_SDL_CUR_0846,
+            e->type == SDL_EVENT_MOUSE_MOTION ? SF2C_INPUT_S_MOVED_485A : e->type == SDL_EVENT_MOUSE_WHEEL ? SF2C_INPUT_S_WHEEL_721D : SF2C_INPUT_S_BUTTON_A7B7,
             SDL_CursorVisible());
     }
 }
@@ -330,7 +331,7 @@ bool input_any_gamepad_connected(void) {
     return atomic_load(&pads[0].connected) || atomic_load(&pads[1].connected);
 }
 void input_apply_background(void) {
-    SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, g_settings.bg_input ? "1" : "0");
+    SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, g_settings.bg_input ? SF2C_INPUT_S_1_3915 : SF2C_INPUT_S_0_9808);
 }
 
 // A controller SDL has no mapping for (on macOS e.g. a generic Bluetooth HID pad, such as a phone app posing as one)
@@ -338,10 +339,10 @@ void input_apply_background(void) {
 // player's own mappings, in SDL's format (lines for other platforms are skipped, so SDL_GameControllerDB's file works
 // as is). Called right after SDL_Init: a pad already connected becomes a gamepad then (SDL sends GAMEPAD_ADDED).
 void input_load_user_mappings(void) {
-    if (!SDL_GetPathInfo("gamecontrollerdb.txt", NULL)) return;
-    int n = SDL_AddGamepadMappingsFromFile("gamecontrollerdb.txt");
-    if (n < 0) LOG("[input] gamecontrollerdb.txt: %s\n", SDL_GetError());
-    else LOG("[input] gamecontrollerdb.txt: %d controller mapping(s) added\n", n);
+    if (!SDL_GetPathInfo(SF2C_INPUT_S_GAMECONTROLLERDB_TXT_BBE9, NULL)) return;
+    int n = SDL_AddGamepadMappingsFromFile(SF2C_INPUT_S_GAMECONTROLLERDB_TXT_BBE9);
+    if (n < 0) LOG(SF2C_INPUT_S_INPUT_GAMECONTROLLERDB_TXT_S_4E98, SDL_GetError());
+    else LOG(SF2C_INPUT_S_INPUT_GAMECONTROLLERDB_TXT_D_CAB3, n);
 }
 
 // Controller family for input labels and menus: 0 Nintendo / none, 1 Xbox
@@ -352,7 +353,7 @@ void input_load_user_mappings(void) {
 int input_family_of_type(int type) {
     switch (SDL_GetGamepadButtonLabelForType((SDL_GamepadType)type, SDL_GAMEPAD_BUTTON_SOUTH)) {
     case SDL_GAMEPAD_BUTTON_LABEL_B: return 0;
-    case SDL_GAMEPAD_BUTTON_LABEL_CROSS: return 2;
+    case SDL_GAMEPAD_BUTTON_LABEL_CROSS: return SF2C_INPUT_N_2_D473;
     default: return 1;
     }
 }
@@ -360,14 +361,14 @@ static _Atomic int pad_family;
 static void note_family(void) {
     SDL_Gamepad *pad = pads[0].handle ? pads[0].handle : pads[1].handle;
     int f = pad ? input_family_of_type(SDL_GetGamepadType(pad)) : 0;
-    if (f != pad_family) LOG("[input] button prompts: %s controller\n", f == 1 ? "Xbox" : f == 2 ? "PlayStation" : "Nintendo");
+    if (f != pad_family) LOG(SF2C_INPUT_S_INPUT_BUTTON_PROMPTS_S_CONTR_75BA, f == 1 ? SF2C_INPUT_S_XBOX_B4A3 : f == SF2C_INPUT_N_2_D473 ? SF2C_INPUT_S_PLAYSTATION_824F : SF2C_INPUT_S_NINTENDO_853F);
     pad_family = f;
 }
 int input_pad_family(void) {
-    static int env = -2;
-    if (env == -2) {
-        const char *e = getenv("LARECOMP_PAD_TYPE");
-        env = !e ? -1 : !strcmp(e, "xbox") ? 1 : !strcmp(e, "playstation") || !strcmp(e, "ps") ? 2 : 0;
+    static int env = -SF2C_INPUT_N_2_D473;
+    if (env == -SF2C_INPUT_N_2_D473) {
+        const char *e = getenv(SF2C_INPUT_S_LARECOMP_PAD_TYPE_2AEC);
+        env = !e ? -1 : !strcmp(e, SF2C_INPUT_S_XBOX_76AE) ? 1 : !strcmp(e, SF2C_INPUT_S_PLAYSTATION_15B2) || !strcmp(e, SF2C_INPUT_S_PS_5831) ? SF2C_INPUT_N_2_D473 : 0;
     }
     return env >= 0 ? env : pad_family;
 }
@@ -381,10 +382,10 @@ int input_menu_family(SDL_JoystickID which) {
     switch (g_settings.prompts) {
     case PROMPTS_NINTENDO: return 0;
     case PROMPTS_XBOX: return 1;
-    case PROMPTS_PLAYSTATION: return 2;
+    case PROMPTS_PLAYSTATION: return SF2C_INPUT_N_2_D473;
     default: break;
     }
-    if (getenv("LARECOMP_PAD_TYPE")) return input_pad_family();
+    if (getenv(SF2C_INPUT_S_LARECOMP_PAD_TYPE_2AEC)) return input_pad_family();
     if (which && SDL_IsGamepad(which)) return input_family_of_type(SDL_GetGamepadTypeForID(which));
     return bind_label_family();
 }
@@ -400,12 +401,12 @@ static void attach_pad(SDL_JoystickID id) {
     int player;
     for (player = first_pad_player(); player < LOCAL_PLAYER_COUNT && pads[player].handle; player++) {}
     if (player == LOCAL_PLAYER_COUNT) {
-        LOG("[input] ignoring gamepad %d: no free controller slot in this player setup\n", id);
+        LOG(SF2C_INPUT_S_INPUT_IGNORING_GAMEPAD_D_NO__D194, id);
         return;
     }
     SDL_Gamepad *pad = SDL_OpenGamepad(id);
     if (!pad) {
-        LOG("[input] cannot open gamepad %d: %s\n", id, SDL_GetError());
+        LOG(SF2C_INPUT_S_INPUT_CANNOT_OPEN_GAMEPAD_D__FA80, id, SDL_GetError());
         return;
     }
     pads[player].handle = pad;
@@ -414,7 +415,7 @@ static void attach_pad(SDL_JoystickID id) {
     reset_player_edges(player);
     recompute_pad(player);
     atomic_store(&pads[player].connected, true);
-    LOG("[input] player %d gamepad: %s\n", player + 1, SDL_GetGamepadName(pad));
+    LOG(SF2C_INPUT_S_INPUT_PLAYER_D_GAMEPAD_S_N_EF37, player + 1, SDL_GetGamepadName(pad));
     note_family();
 }
 
@@ -439,7 +440,7 @@ static void detach_pad(SDL_JoystickID id) {
     rumble_last_lo[player] = rumble_last_hi[player] = 0;
     rumble_warned[player] = false;
     note_family();
-    LOG("[input] player %d gamepad disconnected\n", player + 1);
+    LOG(SF2C_INPUT_S_INPUT_PLAYER_D_GAMEPAD_DISCO_3B0C, player + 1);
 }
 
 static void scan_connected_pads(void) {
@@ -470,7 +471,7 @@ void input_handle_event(const SDL_Event *e) {
     // away, so it cannot activate a menu item while the next scene is loading.
     static uint32_t movie_mouse_consumed;
     if (e->type == SDL_EVENT_MOUSE_BUTTON_DOWN || e->type == SDL_EVENT_MOUSE_BUTTON_UP) {
-        uint32_t bit = e->button.button > 0 && e->button.button <= 32 ? SDL_BUTTON_MASK(e->button.button) : 0;
+        uint32_t bit = e->button.button > 0 && e->button.button <= SF2C_INPUT_N_32_E29C ? SDL_BUTTON_MASK(e->button.button) : 0;
         if (e->type == SDL_EVENT_MOUSE_BUTTON_DOWN && movie_overlay_active()) {
             movie_mouse_consumed |= bit;
             menu_mouse_reset();
@@ -522,7 +523,7 @@ void input_handle_event(const SDL_Event *e) {
         if ((e->gaxis.axis == SDL_GAMEPAD_AXIS_LEFT_TRIGGER || e->gaxis.axis == SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) &&
             player >= 0 && !host_test) {  // triggers are buttons past halfway
             int t = e->gaxis.axis == SDL_GAMEPAD_AXIS_RIGHT_TRIGGER;
-            bool on = e->gaxis.value > 16000;
+            bool on = e->gaxis.value > SF2C_INPUT_N_16000_2570;
             if (on != pads[player].trigger_down[t]) {
                 uint64_t b = pad_bits(PADB_LTRIGGER + t);
                 note_press(player, on ? b : 0, on ? 0 : b);
@@ -568,37 +569,37 @@ uint32_t g_window_resize_request;  // (W << 16 | H: menu_apply_window_requests a
 static void test_push(uint64_t frame, unsigned long start, unsigned long len, const char *dev, const char *arg) {
     SDL_Event e;
     memset(&e, 0, sizeof e);
-    if (!strcmp(dev, "quit")) {
+    if (!strcmp(dev, SF2C_INPUT_S_QUIT_2156)) {
         if(frame==start) { e.type=SDL_EVENT_QUIT;SDL_PushEvent(&e); }
         return;
     }
-    if (!strcmp(dev, "resize")) {
+    if (!strcmp(dev, SF2C_INPUT_S_RESIZE_2ABB)) {
         unsigned w = 0, h = 0;
-        if (frame == start && sscanf(arg, "%ux%u", &w, &h) == 2 && w && h && w < 65536 && h < 65536) {
-            LOG("[input] test: window to %ux%u\n", w, h);
-            __atomic_store_n(&g_window_resize_request, w << 16 | h, __ATOMIC_RELAXED);
+        if (frame == start && sscanf(arg, SF2C_INPUT_S_UX_U_5273, &w, &h) == SF2C_INPUT_N_2_D473 && w && h && w < SF2C_INPUT_N_65536_0F25 && h < SF2C_INPUT_N_65536_0F25) {
+            LOG(SF2C_INPUT_S_INPUT_TEST_WINDOW_TO_UX_U_N_B2C5, w, h);
+            __atomic_store_n(&g_window_resize_request, w << SF2C_INPUT_N_16_B17E | h, __ATOMIC_RELAXED);
         }
         return;
     }
-    if (!strcmp(dev, "mouse")) {
+    if (!strcmp(dev, SF2C_INPUT_S_MOUSE_9C7C)) {
         if (frame != start) return;
         static bool positioned;
         static float mx, my;
         if (!positioned) SDL_GetMouseState(&mx, &my), positioned = true;
-        if (!strcmp(arg, "click") || !strcmp(arg, "down") || !strcmp(arg, "up")) {
-            bool down = strcmp(arg, "up") != 0;
+        if (!strcmp(arg, SF2C_INPUT_S_CLICK_FE4C) || !strcmp(arg, SF2C_INPUT_S_DOWN_DE3A) || !strcmp(arg, SF2C_INPUT_S_UP_5CC8)) {
+            bool down = strcmp(arg, SF2C_INPUT_S_UP_5CC8) != 0;
             e.type = down ? SDL_EVENT_MOUSE_BUTTON_DOWN : SDL_EVENT_MOUSE_BUTTON_UP;
             e.button.which = TEST_DEVICE, e.button.button = SDL_BUTTON_LEFT, e.button.down = down, e.button.clicks = 1;
             e.button.x = mx, e.button.y = my;
-            if (!strcmp(arg, "click")) {
+            if (!strcmp(arg, SF2C_INPUT_S_CLICK_FE4C)) {
                 SDL_PushEvent(&e);
                 e.type = SDL_EVENT_MOUSE_BUTTON_UP, e.button.down = false;
             }
         } else {
             float x, y;
-            if (sscanf(arg, "at/%f/%f", &x, &y) != 2) {
+            if (sscanf(arg, SF2C_INPUT_S_AT_F_F_4191, &x, &y) != SF2C_INPUT_N_2_D473) {
                 float dx, dy;
-                if (sscanf(arg, "%f/%f", &dx, &dy) != 2) return;
+                if (sscanf(arg, SF2C_INPUT_S_F_F_4E0C, &dx, &dy) != SF2C_INPUT_N_2_D473) return;
                 x = mx + dx, y = my + dy;
             }
             e.type = SDL_EVENT_MOUSE_MOTION;
@@ -608,11 +609,11 @@ static void test_push(uint64_t frame, unsigned long start, unsigned long len, co
         SDL_PushEvent(&e);
         return;
     }
-    if (!strcmp(dev, "sdlkey")) {
+    if (!strcmp(dev, SF2C_INPUT_S_SDLKEY_0436)) {
         if (frame == start || frame == start + len) push_key(SDL_GetScancodeFromName(arg), SDL_KMOD_NONE, frame == start);
         return;
     }
-    if (!strcmp(dev, "sdlpad")) {
+    if (!strcmp(dev, SF2C_INPUT_S_SDLPAD_091E)) {
         int b = bind_pad_from_name(arg);
         if (b < 0 || b >= SDL_GAMEPAD_BUTTON_COUNT || (frame != start && frame != start + len)) return;
         e.type = frame == start ? SDL_EVENT_GAMEPAD_BUTTON_DOWN : SDL_EVENT_GAMEPAD_BUTTON_UP;
@@ -621,13 +622,13 @@ static void test_push(uint64_t frame, unsigned long start, unsigned long len, co
         return;
     }
     if (frame != start) return;
-    LOG("[input] test: typing \"%s\"\n", arg);
-    static char ascii[128][2];  // (a text event keeps a pointer to its text: these live on)
+    LOG(SF2C_INPUT_S_INPUT_TEST_TYPING_S_N_FA03, arg);
+    static char ascii[SF2C_INPUT_N_128_2747][SF2C_INPUT_N_2_D473];  // (a text event keeps a pointer to its text: these live on)
     for (const char *p = arg; *p; p++) {
-        if (*p == '{' && strchr(p, '}')) {  // a named key
-            char nm[32];
-            size_t n = (size_t)(strchr(p, '}') - p - 1);
-            snprintf(nm, sizeof nm, "%.*s", (int)(n < sizeof nm ? n : sizeof nm - 1), p + 1);
+        if (*p == SF2C_INPUT_CH_EMPTY_E88E && strchr(p, SF2C_INPUT_CH_EMPTY_9AC4)) {  // a named key
+            char nm[SF2C_INPUT_N_32_E29C];
+            size_t n = (size_t)(strchr(p, SF2C_INPUT_CH_EMPTY_9AC4) - p - 1);
+            snprintf(nm, sizeof nm, SF2C_INPUT_S_S_F03C, (int)(n < sizeof nm ? n : sizeof nm - 1), p + 1);
             SDL_Scancode sc = SDL_GetScancodeFromName(nm);
             push_key(sc, SDL_KMOD_NONE, true), push_key(sc, SDL_KMOD_NONE, false);
             p += n + 1;
@@ -637,7 +638,7 @@ static void test_push(uint64_t frame, unsigned long start, unsigned long len, co
         SDL_Scancode sc = SDL_GetScancodeFromKey((SDL_Keycode)tolower((unsigned char)*p), &mod);
         if (isupper((unsigned char)*p)) mod |= SDL_KMOD_LSHIFT;
         push_key(sc, mod, true);
-        int c = *p & 0x7f;
+        int c = *p & SF2C_INPUT_N_0X7F_0AFB;
         ascii[c][0] = (char)c;
         memset(&e, 0, sizeof e);
         e.type = SDL_EVENT_TEXT_INPUT, e.text.windowID = TEST_DEVICE, e.text.text = ascii[c];
@@ -649,18 +650,18 @@ static void test_push(uint64_t frame, unsigned long start, unsigned long len, co
 static void host_test_frame(uint64_t frame) {
     static const char *hspec, *bspec;
     static int init;
-    if (!init) { init = 1; hspec = getenv("LARECOMP_HOST_INPUT"); bspec = getenv("LARECOMP_BIND_TEST"); host_test = hspec; }
+    if (!init) { init = 1; hspec = getenv(SF2C_INPUT_S_LARECOMP_HOST_INPUT_8D91); bspec = getenv(SF2C_INPUT_S_LARECOMP_BIND_TEST_C2F2); host_test = hspec; }
     // Developer UI automation can append future SDL events while a real match
     // is running. The converted game never needs this file or an interpreter.
     static const char *script_file;
     static bool file_checked;
     static char *file_script;
-    if(!file_checked) { file_checked=true;script_file=getenv("LARECOMP_HOST_INPUT_FILE"); }
+    if(!file_checked) { file_checked=true;script_file=getenv(SF2C_INPUT_S_LARECOMP_HOST_INPUT_FILE_D436); }
     if(script_file) {
-        if(!file_script)file_script=malloc(65537);
-        FILE *file=fopen(script_file,"rb");
+        if(!file_script)file_script=malloc(SF2C_INPUT_N_65537_D572);
+        FILE *file=fopen(script_file,SF2C_INPUT_S_RB_46CA);
         if(file && file_script) {
-            size_t n=fread(file_script,1,65536,file);file_script[n]=0;
+            size_t n=fread(file_script,1,SF2C_INPUT_N_65536_0F25,file);file_script[n]=0;
             if(!ferror(file))hspec=file_script;
         }
         if(file)fclose(file);
@@ -668,7 +669,7 @@ static void host_test_frame(uint64_t frame) {
     }
     static char *buf;  // (a copy to cut up; as long as the longest spec: a long scripted run is thousands of steps)
     static size_t cap;
-    size_t need = 2048;
+    size_t need = SF2C_INPUT_N_2048_BFA0;
     if (hspec && strlen(hspec) + 1 > need) need = strlen(hspec) + 1;
     if (bspec && strlen(bspec) + 1 > need) need = strlen(bspec) + 1;
     if (need > cap) { free(buf); buf = malloc(need); cap = need; }
@@ -676,21 +677,21 @@ static void host_test_frame(uint64_t frame) {
         uint8_t keys[SDL_SCANCODE_COUNT] = {0};
         uint32_t padm = 0;
         int32_t sx = 0, sy = 0;
-        snprintf(buf, cap, "%s", hspec);
+        snprintf(buf, cap, SF2C_INPUT_S_S_0030, hspec);
         char *save = NULL;
-        for (char *tok = strtok_r(buf, ",", &save); tok; tok = strtok_r(NULL, ",", &save)) {
-            unsigned long start = 0, len = 10;
-            char dev[8] = "", name[400] = "";
-            if (sscanf(tok, "%lu:%7[a-z]:%399[^:]:%lu", &start, dev, name, &len) < 3) continue;
-            if (!strcmp(dev, "quit") || !strcmp(dev, "type") || !strcmp(dev, "sdlpad") || !strcmp(dev, "sdlkey") || !strcmp(dev, "shot") ||
-                !strcmp(dev, "resize") || !strcmp(dev, "mouse")) {
+        for (char *tok = strtok_r(buf, SF2C_INPUT_S_EMPTY_08B5, &save); tok; tok = strtok_r(NULL, SF2C_INPUT_S_EMPTY_08B5, &save)) {
+            unsigned long start = 0, len = SF2C_INPUT_N_10_4A44;
+            char dev[SF2C_INPUT_N_8_2C62] = SF2C_INPUT_S_EMPTY_12AE, name[SF2C_INPUT_N_400_26D2] = SF2C_INPUT_S_EMPTY_12AE;
+            if (sscanf(tok, SF2C_INPUT_S_LU_7_A_Z_399_LU_3672, &start, dev, name, &len) < SF2C_INPUT_N_3_4E07) continue;
+            if (!strcmp(dev, SF2C_INPUT_S_QUIT_2156) || !strcmp(dev, SF2C_INPUT_S_TYPE_D007) || !strcmp(dev, SF2C_INPUT_S_SDLPAD_091E) || !strcmp(dev, SF2C_INPUT_S_SDLKEY_0436) || !strcmp(dev, SF2C_INPUT_S_SHOT_E3FA) ||
+                !strcmp(dev, SF2C_INPUT_S_RESIZE_2ABB) || !strcmp(dev, SF2C_INPUT_S_MOUSE_9C7C)) {
                 test_push(frame, start, len, dev, name);
                 continue;
             }
             if (frame < start || frame >= start + len) continue;
-            if (!strcmp(dev, "key")) { SDL_Scancode sc = SDL_GetScancodeFromName(name); if (sc) keys[sc] = 1; }
-            else if (!strcmp(dev, "lstick")) sscanf(name, "%d/%d", &sx, &sy);
-            else { int h = bind_pad_from_name(name); if (h >= 0) padm |= 1u << h; }
+            if (!strcmp(dev, SF2C_INPUT_S_KEY_C0C1)) { SDL_Scancode sc = SDL_GetScancodeFromName(name); if (sc) keys[sc] = 1; }
+            else if (!strcmp(dev, SF2C_INPUT_S_LSTICK_A71F)) sscanf(name, SF2C_INPUT_S_D_D_9432, &sx, &sy);
+            else { int h = bind_pad_from_name(name); if (h >= 0) padm |= SF2C_INPUT_N_1U_B8E6 << h; }
         }
         bool kch = memcmp(keys, test_keys, sizeof keys) != 0, pch = padm != test_pad || sx != test_lx || sy != test_ly;
         memcpy(test_keys, keys, sizeof keys);
@@ -700,30 +701,30 @@ static void host_test_frame(uint64_t frame) {
         if (pch) recompute_pad(0);
     }
     if (bspec) {
-        snprintf(buf, cap, "%s", bspec);
+        snprintf(buf, cap, SF2C_INPUT_S_S_0030, bspec);
         char *save = NULL;
-        for (char *tok = strtok_r(buf, ",", &save); tok; tok = strtok_r(NULL, ",", &save)) {
+        for (char *tok = strtok_r(buf, SF2C_INPUT_S_EMPTY_08B5, &save); tok; tok = strtok_r(NULL, SF2C_INPUT_S_EMPTY_08B5, &save)) {
             unsigned long start = 0;
-            char dev[8] = "", in[16] = "", host[40] = "";
-            if (sscanf(tok, "%lu:%7[a-z]:%15[a-z_]:%39[^:]", &start, dev, in, host) < 3) continue;
-            if (!strcmp(dev, "reset")) { if (frame == start) bind_reset(!strcmp(in, "key") ? BIND_DEV_KEY : BIND_DEV_PAD); continue; }
-            int d = !strcmp(dev, "key") ? BIND_DEV_KEY : BIND_DEV_PAD;
+            char dev[SF2C_INPUT_N_8_2C62] = SF2C_INPUT_S_EMPTY_12AE, in[SF2C_INPUT_N_16_B17E] = SF2C_INPUT_S_EMPTY_12AE, host[SF2C_INPUT_N_40_D59E] = SF2C_INPUT_S_EMPTY_12AE;
+            if (sscanf(tok, SF2C_INPUT_S_LU_7_A_Z_15_A_Z_39_0E69, &start, dev, in, host) < SF2C_INPUT_N_3_4E07) continue;
+            if (!strcmp(dev, SF2C_INPUT_S_RESET_1C7A)) { if (frame == start) bind_reset(!strcmp(in, SF2C_INPUT_S_KEY_C0C1) ? BIND_DEV_KEY : BIND_DEV_PAD); continue; }
+            int d = !strcmp(dev, SF2C_INPUT_S_KEY_C0C1) ? BIND_DEV_KEY : BIND_DEV_PAD;
             if (frame == start) {
-                LOG("[input] test: capture %s %s\n", dev, in);
+                LOG(SF2C_INPUT_S_INPUT_TEST_CAPTURE_S_S_N_5AD4, dev, in);
                 bind_capture_begin(d, bind_slot_from_name(in));
             }
-            if (frame == start + 90 && strcmp(host, "wait")) {
+            if (frame == start + SF2C_INPUT_N_90_69F5 && strcmp(host, SF2C_INPUT_S_WAIT_F301)) {
                 SDL_Event e;
                 memset(&e, 0, sizeof e);
-                if (!strcmp(host, "esc") || d == BIND_DEV_KEY) {
+                if (!strcmp(host, SF2C_INPUT_S_ESC_5BAB) || d == BIND_DEV_KEY) {
                     e.type = SDL_EVENT_KEY_DOWN;
-                    e.key.scancode = !strcmp(host, "esc") ? SDL_SCANCODE_ESCAPE : SDL_GetScancodeFromName(host);
+                    e.key.scancode = !strcmp(host, SF2C_INPUT_S_ESC_5BAB) ? SDL_SCANCODE_ESCAPE : SDL_GetScancodeFromName(host);
                 } else {
                     int h = bind_pad_from_name(host);
                     if (h >= PADB_LTRIGGER) {
                         e.type = SDL_EVENT_GAMEPAD_AXIS_MOTION;
                         e.gaxis.axis = h == PADB_LTRIGGER ? SDL_GAMEPAD_AXIS_LEFT_TRIGGER : SDL_GAMEPAD_AXIS_RIGHT_TRIGGER;
-                        e.gaxis.value = 32767;
+                        e.gaxis.value = SF2C_INPUT_N_32767_D844;
                     } else {
                         e.type = SDL_EVENT_GAMEPAD_BUTTON_DOWN;
                         e.gbutton.button = (Uint8)h;
@@ -740,52 +741,52 @@ volatile int g_inject_plus;  // frames to hold Plus for the game (developer inpu
 RT_ON_RESET(input_reboot_reset) { g_pad_obj = 0; g_inject_plus = 0; }  // (reboot: the controller object was guest memory)
 void input_frame(uint64_t frame) {
     atomic_store(&rumble_frame_ms, SDL_GetTicks());
-    if (g_pad_obj && getenv("LARECOMP_DUMP_PAD") && frame % 600 == 0) {
-        const uint8_t *m = (const uint8_t *)(uintptr_t)(g_pad_obj - 0x98);
-        LOG("[pad] mgr %llx 4e0=%u 4e4=%u 4e8=%u 548=%#x 54c..=%02x %02x %02x 56c=%02x\n", g_pad_obj - 0x98,
-            *(uint32_t *)(m + 0x4e0), *(uint32_t *)(m + 0x4e4), *(uint32_t *)(m + 0x4e8), *(uint32_t *)(m + 0x548),
-            m[0x54c], m[0x54d], m[0x54e], m[0x56c]);
-        for (int i = 0; i < 9; i++) {
-            const uint8_t *o = m + 0x98 + 0x48 * i;
-            uint64_t player = *(uint64_t *)(m + 0x10 * i);
-            LOG("[pad]  ctl%d id %#x style %#x btn %#x conn %d %d | player %llx [8]=%u\n", i, *(uint32_t *)(o + 8),
-                *(uint32_t *)(o + 0xc), *(uint32_t *)(o + 0x14), o[0x44], o[0x45], player,
-                player ? *(uint32_t *)(uintptr_t)(player + 8) : 0);
+    if (g_pad_obj && getenv(SF2C_INPUT_S_LARECOMP_DUMP_PAD_10A5) && frame % SF2C_INPUT_N_600_284B == 0) {
+        const uint8_t *m = (const uint8_t *)(uintptr_t)(g_pad_obj - SF2C_INPUT_N_0X98_14A1);
+        LOG(SF2C_INPUT_S_PAD_MGR_LLX_4E0_U_4E4_U_4E8__7E44, g_pad_obj - SF2C_INPUT_N_0X98_14A1,
+            *(uint32_t *)(m + SF2C_INPUT_N_0X4E0_5731), *(uint32_t *)(m + SF2C_INPUT_N_0X4E4_8500), *(uint32_t *)(m + SF2C_INPUT_N_0X4E8_E512), *(uint32_t *)(m + SF2C_INPUT_N_0X548_9D5D),
+            m[SF2C_INPUT_N_0X54C_B95A], m[SF2C_INPUT_N_0X54D_F4B6], m[SF2C_INPUT_N_0X54E_1B62], m[SF2C_INPUT_N_0X56C_5C91]);
+        for (int i = 0; i < SF2C_INPUT_N_9_1958; i++) {
+            const uint8_t *o = m + SF2C_INPUT_N_0X98_14A1 + SF2C_INPUT_N_0X48_0EF0 * i;
+            uint64_t player = *(uint64_t *)(m + SF2C_INPUT_N_0X10_BF9C * i);
+            LOG(SF2C_INPUT_S_PAD_CTL_D_ID_X_STYLE_X_BTN_X_55AF, i, *(uint32_t *)(o + SF2C_INPUT_N_8_2C62),
+                *(uint32_t *)(o + SF2C_INPUT_N_0XC_DBAA), *(uint32_t *)(o + SF2C_INPUT_N_0X14_F942), o[SF2C_INPUT_N_0X44_E723], o[SF2C_INPUT_N_0X45_17A0], player,
+                player ? *(uint32_t *)(uintptr_t)(player + SF2C_INPUT_N_8_2C62) : 0);
         }
     }
     extern void watch_arm(void);
     watch_arm();
     host_test_frame(frame);
-    const char *spec = getenv("LARECOMP_INPUT");
+    const char *spec = getenv(SF2C_INPUT_S_LARECOMP_INPUT_D0A3);
     if (!spec) return;
-    static const char *const names[] = {"A", "B", "X", "Y", "LSTICK", "RSTICK", "L", "R", "ZL", "ZR", "PLUS",
-                                        "MINUS", "LEFT", "UP", "RIGHT", "DOWN"};
+    static const char *const names[] = {SF2C_INPUT_S_A_7986, SF2C_INPUT_S_B_955C, SF2C_INPUT_S_X_DE9E, SF2C_INPUT_S_Y_DB5B, SF2C_INPUT_S_LSTICK_69E3, SF2C_INPUT_S_RSTICK_E134, SF2C_INPUT_S_L_8463, SF2C_INPUT_S_R_D742, SF2C_INPUT_S_ZL_38D1, SF2C_INPUT_S_ZR_5317, SF2C_INPUT_S_PLUS_7BAB,
+                                        SF2C_INPUT_S_MINUS_0698, SF2C_INPUT_S_LEFT_251C, SF2C_INPUT_S_UP_DC56, SF2C_INPUT_S_RIGHT_1DD8, SF2C_INPUT_S_DOWN_31A3};
     uint64_t b = 0;
     int32_t lx = 0, ly = 0, rx = 0, ry = 0;
-    static char buf[16384];  // (long scripted sessions: the perf walk is ~4 KB)
-    snprintf(buf, sizeof buf, "%s", spec);
-    for (char *tok = strtok(buf, ","); tok; tok = strtok(NULL, ",")) {
-        unsigned long start = 0, len = 10;
-        char name[32] = "";
-        if (sscanf(tok, "%lu:%31[A-Z_0-9]:%lu", &start, name, &len) < 2) continue;
+    static char buf[SF2C_INPUT_N_16384_CA90];  // (long scripted sessions: the perf walk is ~4 KB)
+    snprintf(buf, sizeof buf, SF2C_INPUT_S_S_0030, spec);
+    for (char *tok = strtok(buf, SF2C_INPUT_S_EMPTY_08B5); tok; tok = strtok(NULL, SF2C_INPUT_S_EMPTY_08B5)) {
+        unsigned long start = 0, len = SF2C_INPUT_N_10_4A44;
+        char name[SF2C_INPUT_N_32_E29C] = SF2C_INPUT_S_EMPTY_12AE;
+        if (sscanf(tok, SF2C_INPUT_S_LU_31_A_Z_0_9_LU_8035, &start, name, &len) < SF2C_INPUT_N_2_D473) continue;
         if (frame < start || frame >= start + len) continue;
-        if (!strcmp(name, "STICK_UP")) ly = 32767;
-        else if (!strcmp(name, "STICK_DOWN")) ly = -32767;
-        else if (!strcmp(name, "STICK_LEFT")) lx = -32767;
-        else if (!strcmp(name, "STICK_RIGHT")) lx = 32767;
-        else if (!strcmp(name, "RSTICK_UP")) ry = 32767;
-        else if (!strcmp(name, "RSTICK_DOWN")) ry = -32767;
-        else if (!strcmp(name, "RSTICK_LEFT")) rx = -32767;
-        else if (!strcmp(name, "RSTICK_RIGHT")) rx = 32767;
-        else if (!strncmp(name, "STICK_", 6) && name[6] >= '0' && name[6] <= '9') {
-            double r = atoi(name + 6) * 3.14159265358979 / 180;
-            lx = (int32_t)lround(cos(r) * 32767), ly = (int32_t)lround(sin(r) * 32767);
+        if (!strcmp(name, SF2C_INPUT_S_STICK_UP_D3F0)) ly = SF2C_INPUT_N_32767_D844;
+        else if (!strcmp(name, SF2C_INPUT_S_STICK_DOWN_CF04)) ly = -SF2C_INPUT_N_32767_D844;
+        else if (!strcmp(name, SF2C_INPUT_S_STICK_LEFT_0CB6)) lx = -SF2C_INPUT_N_32767_D844;
+        else if (!strcmp(name, SF2C_INPUT_S_STICK_RIGHT_8316)) lx = SF2C_INPUT_N_32767_D844;
+        else if (!strcmp(name, SF2C_INPUT_S_RSTICK_UP_B08A)) ry = SF2C_INPUT_N_32767_D844;
+        else if (!strcmp(name, SF2C_INPUT_S_RSTICK_DOWN_11CD)) ry = -SF2C_INPUT_N_32767_D844;
+        else if (!strcmp(name, SF2C_INPUT_S_RSTICK_LEFT_DE68)) rx = -SF2C_INPUT_N_32767_D844;
+        else if (!strcmp(name, SF2C_INPUT_S_RSTICK_RIGHT_D371)) rx = SF2C_INPUT_N_32767_D844;
+        else if (!strncmp(name, SF2C_INPUT_S_STICK_E164, SF2C_INPUT_N_6_E7F6) && name[SF2C_INPUT_N_6_E7F6] >= SF2C_INPUT_CH_0_59A9 && name[SF2C_INPUT_N_6_E7F6] <= SF2C_INPUT_CH_9_E453) {
+            double r = atoi(name + SF2C_INPUT_N_6_E7F6) * SF2C_INPUT_N_3_14159265358979_B9A2 / SF2C_INPUT_N_180_7B69;
+            lx = (int32_t)lround(cos(r) * SF2C_INPUT_N_32767_D844), ly = (int32_t)lround(sin(r) * SF2C_INPUT_N_32767_D844);
         }
-        for (int i = 0; i < 16; i++) if (!strcmp(name, names[i])) b |= 1ull << i;
+        for (int i = 0; i < SF2C_INPUT_N_16_B17E; i++) if (!strcmp(name, names[i])) b |= SF2C_INPUT_N_1ULL_622E << i;
     }
-    if (movie_overlay_active() && (b & ~script_buttons & 3)) {
+    if (movie_overlay_active() && (b & ~script_buttons & SF2C_INPUT_N_3_4E07)) {
         movie_request_skip();
-        atomic_fetch_or(&movie_consumed[0], b & 3);
+        atomic_fetch_or(&movie_consumed[0], b & SF2C_INPUT_N_3_4E07);
     }
     script_buttons = b;
     script_lx = lx;
@@ -801,17 +802,17 @@ uint64_t input_buttons_now(void) {
     return (menu_input_captured() ? 0 : key_buttons | atomic_load(&pads[0].buttons)) | script_buttons;
 }
 
-static int32_t clamp_axis(int32_t v) { return v > 32767 ? 32767 : v < -32767 ? -32767 : v; }
+static int32_t clamp_axis(int32_t v) { return v > SF2C_INPUT_N_32767_D844 ? SF2C_INPUT_N_32767_D844 : v < -SF2C_INPUT_N_32767_D844 ? -SF2C_INPUT_N_32767_D844 : v; }
 
 // NpadFullKeyState / NpadHandheldState / NpadJoy*State share this layout (0x28 bytes):
 // {int64 sampling, u64 buttons, AnalogStick L {x,y}, AnalogStick R {x,y}, u32 attributes}
 static void fill_state(Cpu *c) {
     uint8_t *s = (uint8_t *)(uintptr_t)c->x[0];
     uint32_t id = *(uint32_t *)(uintptr_t)c->x[1];
-    memset(s, 0, 0x28);
+    memset(s, 0, SF2C_INPUT_N_0X28_EAB9);
     *(int64_t *)s = ++sampling;
     static int nlog;
-    if (nlog < 6 && (sampling % 600) == 1) { nlog++; LOG("[input] GetNpadState id %#x lr %llx\n", id, c->x[30]); }
+    if (nlog < SF2C_INPUT_N_6_E7F6 && (sampling % SF2C_INPUT_N_600_284B) == 1) { nlog++; LOG(SF2C_INPUT_S_INPUT_GETNPADSTATE_ID_X_LR_L_5FFB, id, c->x[SF2C_INPUT_N_30_624B]); }
     if (id >= LOCAL_PLAYER_COUNT) return;  // handheld and player IDs above the two local controllers are disconnected
 
     int player = (int)id;
@@ -831,7 +832,7 @@ static void fill_state(Cpu *c) {
         tap[player] = 0;
         atomic_store(&tap_buttons[player], 0);
         atomic_store(&press_unseen[player], 0);
-        *(uint32_t *)(s + 32) = 1;
+        *(uint32_t *)(s + SF2C_INPUT_N_32_E29C) = 1;
         return;
     }
 
@@ -847,7 +848,7 @@ static void fill_state(Cpu *c) {
         uint64_t t = atomic_exchange(&tap_buttons[player], 0), f = renderer_present_count();
         if (t) {
             tap[player] |= t, tap_frame[player] = f;
-            if (getenv("LARECOMP_INPUT")) LOG("[input] short press %#llx\n", (unsigned long long)t);
+            if (getenv(SF2C_INPUT_S_LARECOMP_INPUT_D0A3)) LOG(SF2C_INPUT_S_INPUT_SHORT_PRESS_LLX_N_25D6, (unsigned long long)t);
         } else if (f > tap_frame[player]) tap[player] = 0;
     }
     uint64_t scripted_buttons = player == 0 ? script_buttons & ~consumed : 0;
@@ -857,90 +858,90 @@ static void fill_state(Cpu *c) {
     {   // injected Plus: held for ~10 presented frames
         extern uint64_t renderer_present_count(void);
         if (player == 0 && g_inject_plus > 0) {
-            inject_until[player] = renderer_present_count() + 10;
+            inject_until[player] = renderer_present_count() + SF2C_INPUT_N_10_4A44;
             g_inject_plus = 0;
         }
-        if (renderer_present_count() < inject_until[player]) b |= 1ull << BTN_PLUS;
+        if (renderer_present_count() < inject_until[player]) b |= SF2C_INPUT_N_1ULL_622E << BTN_PLUS;
     }
     int32_t lx = clamp_axis((menu ? 0 : (player == 0 ? key_lx : 0) + atomic_load(&pads[player].lx)) + scripted_lx);
     int32_t ly = clamp_axis((menu ? 0 : (player == 0 ? key_ly : 0) + atomic_load(&pads[player].ly)) + scripted_ly);
     int32_t rx = clamp_axis((menu ? 0 : (player == 0 ? key_rx : 0) + atomic_load(&pads[player].rx)) + scripted_rx);
     int32_t ry = clamp_axis((menu ? 0 : (player == 0 ? key_ry : 0) + atomic_load(&pads[player].ry)) + scripted_ry);
 
-    if (!menu && g_settings.dpad_move && (int64_t)lx * lx + (int64_t)ly * ly < 8000ll * 8000) {
+    if (!menu && g_settings.dpad_move && (int64_t)lx * lx + (int64_t)ly * ly < SF2C_INPUT_N_8000LL_9BC4 * SF2C_INPUT_N_8000_AD5F) {
         uint64_t d = held | scripted_buttons;
         int dx = (int)((d >> BTN_RIGHT) & 1) - (int)((d >> BTN_LEFT) & 1);
         int dy = (int)((d >> BTN_UP) & 1) - (int)((d >> BTN_DOWN) & 1);
-        int32_t m = dx && dy ? 23170 : 32767;
+        int32_t m = dx && dy ? SF2C_INPUT_N_23170_DE19 : SF2C_INPUT_N_32767_D844;
         if (dx || dy) lx = dx * m, ly = dy * m;
     }
 
-    if (lx < -16000) b |= 1ull << 16;
-    if (ly > 16000) b |= 1ull << 17;
-    if (lx > 16000) b |= 1ull << 18;
-    if (ly < -16000) b |= 1ull << 19;
-    if (rx < -16000) b |= 1ull << 20;
-    if (ry > 16000) b |= 1ull << 21;
-    if (rx > 16000) b |= 1ull << 22;
-    if (ry < -16000) b |= 1ull << 23;
+    if (lx < -SF2C_INPUT_N_16000_2570) b |= SF2C_INPUT_N_1ULL_622E << SF2C_INPUT_N_16_B17E;
+    if (ly > SF2C_INPUT_N_16000_2570) b |= SF2C_INPUT_N_1ULL_622E << SF2C_INPUT_N_17_4523;
+    if (lx > SF2C_INPUT_N_16000_2570) b |= SF2C_INPUT_N_1ULL_622E << SF2C_INPUT_N_18_4EC9;
+    if (ly < -SF2C_INPUT_N_16000_2570) b |= SF2C_INPUT_N_1ULL_622E << SF2C_INPUT_N_19_9400;
+    if (rx < -SF2C_INPUT_N_16000_2570) b |= SF2C_INPUT_N_1ULL_622E << SF2C_INPUT_N_20_F5CA;
+    if (ry > SF2C_INPUT_N_16000_2570) b |= SF2C_INPUT_N_1ULL_622E << SF2C_INPUT_N_21_6F4B;
+    if (rx > SF2C_INPUT_N_16000_2570) b |= SF2C_INPUT_N_1ULL_622E << SF2C_INPUT_N_22_785F;
+    if (ry < -SF2C_INPUT_N_16000_2570) b |= SF2C_INPUT_N_1ULL_622E << SF2C_INPUT_N_23_535F;
 
-    *(uint64_t *)(s + 8) = b;
-    if (b != last_b[player] && getenv("LARECOMP_INPUT"))
-        LOG("[input] id %#x buttons %#llx (sampling %lld, lr %llx)\n", id, (unsigned long long)b,
-            (long long)sampling, c->x[30]);
+    *(uint64_t *)(s + SF2C_INPUT_N_8_2C62) = b;
+    if (b != last_b[player] && getenv(SF2C_INPUT_S_LARECOMP_INPUT_D0A3))
+        LOG(SF2C_INPUT_S_INPUT_ID_X_BUTTONS_LLX_SAMPL_47C5, id, (unsigned long long)b,
+            (long long)sampling, c->x[SF2C_INPUT_N_30_624B]);
     last_b[player] = b;
-    *(int32_t *)(s + 16) = lx;
-    *(int32_t *)(s + 20) = ly;
-    *(int32_t *)(s + 24) = rx;
-    *(int32_t *)(s + 28) = ry;
-    *(uint32_t *)(s + 32) = 1;  // IsConnected
+    *(int32_t *)(s + SF2C_INPUT_N_16_B17E) = lx;
+    *(int32_t *)(s + SF2C_INPUT_N_20_F5CA) = ly;
+    *(int32_t *)(s + SF2C_INPUT_N_24_C235) = rx;
+    *(int32_t *)(s + SF2C_INPUT_N_28_59E1) = ry;
+    *(uint32_t *)(s + SF2C_INPUT_N_32_E29C) = 1;  // IsConnected
 }
 
-HLE_FUNC("_ZN2nn3hid12GetNpadStateEPNS0_16NpadFullKeyStateERKj", hid_state_fullkey) { fill_state(c); }
-HLE_FUNC("_ZN2nn3hid12GetNpadStateEPNS0_16NpadJoyDualStateERKj", hid_state_dual) { fill_state(c); }
-HLE_FUNC("_ZN2nn3hid12GetNpadStateEPNS0_16NpadJoyLeftStateERKj", hid_state_left) { fill_state(c); }
-HLE_FUNC("_ZN2nn3hid12GetNpadStateEPNS0_17NpadHandheldStateERKj", hid_state_handheld) { fill_state(c); }
-HLE_FUNC("_ZN2nn3hid12GetNpadStateEPNS0_17NpadJoyRightStateERKj", hid_state_right) { fill_state(c); }
+HLE_FUNC(SF2C_INPUT_S_ZN2NN3HID12GETNPADSTATEEPNS0_FB34, hid_state_fullkey) { fill_state(c); }
+HLE_FUNC(SF2C_INPUT_S_ZN2NN3HID12GETNPADSTATEEPNS0_6103, hid_state_dual) { fill_state(c); }
+HLE_FUNC(SF2C_INPUT_S_ZN2NN3HID12GETNPADSTATEEPNS0_545E, hid_state_left) { fill_state(c); }
+HLE_FUNC(SF2C_INPUT_S_ZN2NN3HID12GETNPADSTATEEPNS0_C279, hid_state_handheld) { fill_state(c); }
+HLE_FUNC(SF2C_INPUT_S_ZN2NN3HID12GETNPADSTATEEPNS0_9B5C, hid_state_right) { fill_state(c); }
 
 // FullKey for connected local players, including the virtual keyboard player.
-HLE_FUNC("_ZN2nn3hid15GetNpadStyleSetERKj", hid_style_set) {
+HLE_FUNC(SF2C_INPUT_S_ZN2NN3HID15GETNPADSTYLESETER_546C, hid_style_set) {
     uint32_t id = *(uint32_t *)(uintptr_t)c->x[0];
     static int nlog;
-    if (nlog++ < 4) LOG("[input] GetNpadStyleSet id %#x\n", id);
+    if (nlog++ < SF2C_INPUT_N_4_4B22) LOG(SF2C_INPUT_S_INPUT_GETNPADSTYLESET_ID_X_N_9012, id);
     c->x[0] = id < LOCAL_PLAYER_COUNT && player_connected((int)id) ? 1 : 0;
 }
 
 // BindNpadStyleSetUpdateEvent(id, SystemEventType*, clear mode): signaled once so the game sees a
 // controller connected.
 #include "../kernel.h"
-HLE_FUNC("_ZN2nn3hid27BindNpadStyleSetUpdateEventERKjPNS_2os15SystemEventTypeENS3_14EventClearModeE", hid_bind_style_event) {
+HLE_FUNC(SF2C_INPUT_S_ZN2NN3HID27BINDNPADSTYLESETU_76D5, hid_bind_style_event) {
     uint32_t w, r;
     KEvent *ev = kernel_create_event_pair(&w, &r);
     pthread_mutex_lock(&g_klock);
     kernel_signal(ev);
     pthread_mutex_unlock(&g_klock);
-    uint64_t clear_mode = c->x[2];
+    uint64_t clear_mode = c->x[SF2C_INPUT_N_2_D473];
     c->x[0] = c->x[1];
     c->x[1] = r;
-    c->x[2] = 0;
-    c->x[3] = clear_mode;
-    guest_call(c, guest_sym("_ZN2nn2os33AttachReadableHandleToSystemEventEPNS0_15SystemEventTypeEjbNS0_14EventClearModeE"));
-    LOG("[input] style set update event bound\n");
+    c->x[SF2C_INPUT_N_2_D473] = 0;
+    c->x[SF2C_INPUT_N_3_4E07] = clear_mode;
+    guest_call(c, guest_sym(SF2C_INPUT_S_ZN2NN2OS33ATTACHREADABLEHAND_FA24));
+    LOG(SF2C_INPUT_S_INPUT_STYLE_SET_UPDATE_EVENT_BFC3);
 }
 
 // The SDK vibration node graph stays recompiled; HID IPC 201/206 sends its
 // output to rumble.h / SDL using the native-layout handles below.
-HLE_FUNC("_ZN2nn3hid25InitializeVibrationDeviceERKNS0_21VibrationDeviceHandleE", hid_init_vibration) { (void)c; }
-HLE_FUNC("_ZN2nn3hid25GetVibrationDeviceHandlesEPNS0_21VibrationDeviceHandleEiRKjNS_4util10BitFlagSetILi32ENS0_12NpadStyleTagEEE", hid_vibration_handles) {
+HLE_FUNC(SF2C_INPUT_S_ZN2NN3HID25INITIALIZEVIBRATI_11B1, hid_init_vibration) { (void)c; }
+HLE_FUNC(SF2C_INPUT_S_ZN2NN3HID25GETVIBRATIONDEVIC_8173, hid_vibration_handles) {
     uint32_t *out = (uint32_t *)(uintptr_t)c->x[0];
-    int n = (int)c->x[1] < 2 ? (int)c->x[1] : 2;
-    uint32_t id = *(uint32_t *)(uintptr_t)c->x[2];
+    int n = (int)c->x[1] < SF2C_INPUT_N_2_D473 ? (int)c->x[1] : SF2C_INPUT_N_2_D473;
+    uint32_t id = *(uint32_t *)(uintptr_t)c->x[SF2C_INPUT_N_2_D473];
     // Native wire layout is style, player, device index, padding (one byte each).
     // The old synthetic handles placed the style byte in padding.
-    for (int i = 0; i < n; i++) out[i] = 3u | ((id & 0xFF) << 8) | ((uint32_t)i << 16);
+    for (int i = 0; i < n; i++) out[i] = SF2C_INPUT_N_3U_3B80 | ((id & SF2C_INPUT_N_0XFF_7312) << SF2C_INPUT_N_8_2C62) | ((uint32_t)i << SF2C_INPUT_N_16_B17E);
     c->x[0] = (uint64_t)n;
 }
-HLE_FUNC("_ZN2nn3hid22GetVibrationDeviceInfoEPNS0_19VibrationDeviceInfoERKNS0_21VibrationDeviceHandleE", hid_vibration_info) {
+HLE_FUNC(SF2C_INPUT_S_ZN2NN3HID22GETVIBRATIONDEVIC_F18A, hid_vibration_info) {
     uint32_t *info = (uint32_t *)(uintptr_t)c->x[0];
     uint32_t h = *(uint32_t *)(uintptr_t)c->x[1];
     info[0] = 1;        // VibrationDeviceType_LinearResonantActuator

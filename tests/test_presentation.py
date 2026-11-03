@@ -1,4 +1,5 @@
 """NVN presentation timing and window-size requests reach the runtime boundary."""
+from source_values import read_source
 from pathlib import Path
 import subprocess
 import tempfile
@@ -11,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class PresentationTests(unittest.TestCase):
     def test_movie_dismissal_refreshes_without_another_guest_frame(self):
         # Compile the actual UI scheduling helper without initializing Vulkan.
-        device = (ROOT / "runtime/nvn/vulkan/device.c").read_text()
+        device = read_source(ROOT / "runtime/nvn/vulkan/device.c")
         start = device.index("static void backend_movie_present(bool dismissed)")
         end = device.index("// ================================================================== UI thread", start)
         source = r'''
