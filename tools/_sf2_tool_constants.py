@@ -1717,7 +1717,42 @@ class DOWNLOADS:
 
 
 class PACKAGE_RELEASE:
-    WINDOWS_RUNTIME_DLLS = ('SDL3.dll', 'libshaderc_shared.dll', 'vulkan-1.dll')
+    RELEASE_DEVELOPMENT_SOURCES = ('tools/test_*.py', 'tools/package_release.py',
+                                    'tools/ci_release.py', 'tools/centralize_literals.py')
+    # Development APIs for embedding LLVM/Clang are not compiler inputs.
+    WINDOWS_DEVELOPMENT_HEADERS = ('clang', 'clang-c', 'llvm', 'llvm-c')
+    WINDOWS_DEVELOPMENT_LIBRARY_PREFIXES = ('libclang', 'libllvm')
+    ZIG_PACKAGE = 'ziglang'
+    PYTHON_SITE_PACKAGES = 'site-packages'
+    ZIG_LIBC = 'libc'
+    # glibc's compiler support can use musl math sources. Keep both on Linux.
+    ZIG_NATIVE_LIBC = {
+        'linux': (('glibc', 'musl'), ('linux', 'glibc', 'musl')),
+        'macos': (('darwin',), ('macos',)),
+    }
+    ZIG_UNUSED_DIRECTORIES = {
+        'linux': ('libcxx', 'libcxxabi', 'libtsan', 'docs'),
+        # The macOS release links -lc++; Zig builds these runtime sources.
+        'macos': ('libtsan', 'docs'),
+    }
+    PYTHON_STDLIB_GLOBS = ('Lib', 'lib/python3.*')
+    PYTHON_UNUSED_PREFIX_PATHS = ('include', 'libs', 'Scripts', 'tcl', 'lib/pkgconfig',
+                                  'share/man', 'share/doc', 'share/terminfo')
+    PYTHON_UNUSED_PREFIX_GLOBS = ('lib/libpython*.a', 'python*.lib', 'pythonw*.exe',
+                                  '*.pdb', 'DLLs/*.pdb', 'DLLs/_test*', 'DLLs/_tkinter*')
+    PYTHON_GUI_LIBRARY_GLOBS = ('tcl*', 'tk*', 'itcl*', 'Tix*', 'thread*')
+    PYTHON_INTERPRETER_PATTERN = r'python(?:3(?:\.\d+)?)?(?:\.exe)?'
+    PYTHON_UNUSED_STDLIB = ('ensurepip', 'idlelib', 'tkinter', 'turtledemo', 'turtle.py',
+                            'lib2to3', 'venv', 'test', 'unittest', 'doctest.py', 'pydoc.py', 'pydoc_data')
+    PYTHON_UNUSED_STDLIB_GLOBS = ('config-*', 'lib-dynload/_test*', 'lib-dynload/_tkinter*')
+    PYTHON_UNUSED_SITE_PATHS = ('pip', 'pip-*.dist-info', 'setuptools', 'setuptools-*.dist-info',
+                                'pkg_resources', '_distutils_hack', 'distutils-precedence.pth', 'lz4/frame')
+    PYTHON_UNUSED_PACKAGE_GLOBS = ('*.a', '*.lib', '*.pdb', '*.h', '*.hpp', '*.c', '*.cpp',
+                                   '*.pyi', 'py.typed', 'tests', 'test', 'examples', '__pycache__')
+    PYTHON_DIST_INFO_SUFFIX = '.dist-info'
+    DECODER_UNUSED_PATHS = ('include', 'lib/pkgconfig', 'share/man', 'share/doc')
+    DECODER_UNUSED_GLOBS = ('lib/*.a', 'lib/*.la', 'bin/*.pdb', 'lib/*.pdb')
+    WINDOWS_RUNTIME_DLLS = ('SDL3.dll', 'libshaderc_shared.dll', 'vulkan-1.dll', 'libstdc++-6.dll')
     WINDOWS_GCC_RUNTIME_LIBRARIES = ('libgcc.a', 'libgcc_eh.a')
     WINDOWS_LINK_INPUT_PATTERNS = ('*.a', '*.o')
     S_PATCHELF_5CE9 = 'patchelf*'  # tools/package_release.py:264

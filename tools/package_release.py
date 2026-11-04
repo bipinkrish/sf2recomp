@@ -41,6 +41,8 @@ def tracked_sources(destination):
     names += [K.S_ANDROID_TOOLCHAIN_PROPERTIES_C485]
     names += [K.S_TOOLS_RELEASE_REQUIREMENTS_T_C924]
     for name in sorted(set(names)):
+        if any(fnmatch.fnmatchcase(name, pattern) for pattern in K.RELEASE_DEVELOPMENT_SOURCES):
+            continue
         if (name.startswith((K.S_RUNTIME_DCB2, K.S_ANDROID_6555, K.S_LICENSES_A259, K.S_PROFILES_COMPLETED_7E4B, K.S_TOOLS_RECOMPR_D6DD))
                 or re.fullmatch(K.S_TOOLS_PY_JSON_TXT_5978, name)
                 or name in (K.S_LICENSE_6485, K.S_THIRD_PARTY_NOTICES_F9CA, K.S_SF2RECOMP_INI_8714, K.S_TOOLS_IL2CPP_CONFIG_JSON_BC09)):
@@ -182,11 +184,14 @@ def windows_toolchain(destination, prefix, helpers):
     for name in (K.S_CLANG_EXE_9FB8, K.S_LD_LLD_EXE_4C6B):
         copy(prefix / K.S_BIN_0955 / name, toolchain / K.S_BIN_0955 / name)
     shutil.copytree(prefix / K.S_LIB_CLANG_EF86, toolchain / K.S_LIB_CLANG_EF86)
-    shutil.copytree(prefix / K.S_INCLUDE_8C9D, toolchain / K.S_INCLUDE_8C9D)
+    shutil.copytree(prefix / K.S_INCLUDE_8C9D, toolchain / K.S_INCLUDE_8C9D,
+                    ignore=lambda directory, names: set(names) & set(K.WINDOWS_DEVELOPMENT_HEADERS)
+                    if Path(directory) == prefix / K.S_INCLUDE_8C9D else set())
     # UCRT64 import libraries and startup objects make linking independent of MSYS2.
     for pattern in K.WINDOWS_LINK_INPUT_PATTERNS:
         for path in (prefix / K.S_LIB_427F).glob(pattern):
-            copy(path, toolchain / K.S_LIB_427F / path.name)
+            if not path.name.lower().startswith(K.WINDOWS_DEVELOPMENT_LIBRARY_PREFIXES):
+                copy(path, toolchain / K.S_LIB_427F / path.name)
     # GCC's compiler support archives live below lib/gcc/<triple>/<version>,
     # outside the CRT/import-library glob. Ask this compiler for their locations.
     for name in K.WINDOWS_GCC_RUNTIME_LIBRARIES:
@@ -198,18 +203,109 @@ def windows_toolchain(destination, prefix, helpers):
         copy(source, toolchain / K.S_LIB_427F / name)
     # Include the Vulkan loader so CLI startup also works without a driver-installed copy.
     runtime_dlls = [prefix / K.S_BIN_0955 / name for name in K.WINDOWS_RUNTIME_DLLS]
-    seeds = [*helpers, *list((toolchain / K.S_BIN_0955).glob(K.S_EXE_4D40)), *runtime_dlls]
-    libraries = dependency_closure(seeds, [prefix / K.S_BIN_0955, *(p.parent for p in helpers)])
-    for path in [*runtime_dlls, *libraries.values()]:
+    directories = [prefix / K.S_BIN_0955, *(p.parent for p in helpers)]
+    libraries = dependency_closure([*helpers, *runtime_dlls], directories)
+    runtime_files = {path.name.lower(): path for path in [*runtime_dlls, *libraries.values()]}
+    for path in runtime_files.values():
         copy(path, destination / K.S_NATIVE_LIB_601C / path.name)
-    # LLVM's DLLs must also be adjacent to clang/LLD for loader startup.
-    for path in (destination / K.S_NATIVE_LIB_601C).glob(K.S_DLL_166A):
-        copy(path, toolchain / K.S_BIN_0955 / path.name)
+    # Compiler-only DLLs stay beside clang/LLD, outside the game's runtime DLLs.
+    # Shared dependencies resolve through native/lib on the release's PATH.
+    compilers = list((toolchain / K.S_BIN_0955).glob(K.S_EXE_4D40))
+    for name, path in dependency_closure(compilers, directories).items():
+        if name not in runtime_files:
+            copy(path, toolchain / K.S_BIN_0955 / path.name)
     resources = sorted((toolchain / K.S_LIB_CLANG_EF86).iterdir())[-1].name
     compiler = [K.S_ROOT_NATIVE_TOOLCHAIN_BIN_CL_F3AB, K.S_SYSROOT_ROOT_NATIVE_TOOLCHAI_6686,
                 K.S_TARGET_X86_64_W64_WINDOWS_GN_8EC4, K.S_RESOURCE_DIR_ROOT_NATIVE_TOO_443D + resources,
                 K.S_B_ROOT_NATIVE_TOOLCHAIN_BIN_0898, K.S_L_ROOT_NATIVE_TOOLCHAIN_LIB_AEFE]
     return compiler
+
+
+def trim_zig(python_prefix, target):
+    """Keep the native C compiler's resources, libc and runtime sources."""
+    candidates = [p for p in python_prefix.rglob(K.ZIG_PACKAGE)
+                  if p.parent.name == K.PYTHON_SITE_PACKAGES]
+    if len(candidates) != 1:
+        raise ValueError(f"Expected one bundled Zig package, found {len(candidates)} in {python_prefix}")
+    library = candidates[0] / K.S_LIB_427F
+    libc = library / K.ZIG_LIBC
+    keep_sources, keep_headers = K.ZIG_NATIVE_LIBC[target]
+    removed = []
+    for path in libc.iterdir():
+        if path.is_dir() and path.name not in (*keep_sources, K.S_INCLUDE_8C9D):
+            removed.append(path)
+    for path in (libc / K.S_INCLUDE_8C9D).iterdir():
+        if path.is_dir() and not any(word in path.name for word in keep_headers):
+            removed.append(path)
+    for name in K.ZIG_UNUSED_DIRECTORIES[target]:
+        path = library / name
+        if path.is_dir():
+            removed.append(path)
+    saved = sum(p.stat().st_size for directory in removed for p in directory.rglob(K.S_EMPTY_15A7) if p.is_file())
+    for directory in removed:
+        shutil.rmtree(directory)
+    print(f"Trimmed {saved} bytes of unused Zig resources for {target}.")
+
+
+def prune_files(paths):
+    """Remove staging-only files, counting a directory's children only once."""
+    saved = 0
+    for path in sorted(set(paths), key=lambda p: (len(p.parts), p)):
+        if path.is_symlink():
+            path.unlink()
+        elif path.is_dir():
+            saved += sum(p.stat().st_size for p in path.rglob(K.S_EMPTY_15A7)
+                         if p.is_file() and not p.is_symlink())
+            shutil.rmtree(path)
+        elif path.is_file():
+            saved += path.stat().st_size
+            path.unlink()
+    return saved
+
+
+def trim_python(python_prefix):
+    """Keep the interpreter and runtime modules, without installation/build tools."""
+    unused = [python_prefix / name for name in K.PYTHON_UNUSED_PREFIX_PATHS]
+    for pattern in K.PYTHON_UNUSED_PREFIX_GLOBS:
+        unused.extend(python_prefix.glob(pattern))
+    for pattern in K.PYTHON_GUI_LIBRARY_GLOBS:
+        unused.extend((python_prefix / K.S_LIB_427F).glob(pattern))
+    binaries = python_prefix / K.S_BIN_0955
+    if binaries.is_dir():
+        unused.extend(p for p in binaries.iterdir() if not re.fullmatch(K.PYTHON_INTERPRETER_PATTERN, p.name))
+    for pattern in K.PYTHON_STDLIB_GLOBS:
+        for stdlib in python_prefix.glob(pattern):
+            if not stdlib.is_dir():
+                continue
+            unused.extend(stdlib / name for name in K.PYTHON_UNUSED_STDLIB)
+            for pattern in K.PYTHON_UNUSED_STDLIB_GLOBS:
+                unused.extend(stdlib.glob(pattern))
+            site = stdlib / K.PYTHON_SITE_PACKAGES
+            if not site.is_dir():
+                continue
+            for pattern in K.PYTHON_UNUSED_SITE_PATHS:
+                unused.extend(site.glob(pattern))
+            for package in site.iterdir():
+                # Zig's headers/archives are compiler inputs. Package metadata
+                # also holds third-party licenses, including compiler licenses.
+                if (not package.is_dir() or package.name == K.ZIG_PACKAGE
+                        or package.name.endswith(K.PYTHON_DIST_INFO_SUFFIX)):
+                    continue
+                for pattern in K.PYTHON_UNUSED_PACKAGE_GLOBS:
+                    unused.extend(package.rglob(pattern))
+    unused.extend(python_prefix.rglob(K.S_PYCACHE_6B2B))
+    unused.extend(python_prefix.rglob(K.S_PYC_6D8E))
+    saved = prune_files(unused)
+    print(f"Trimmed {saved} bytes of unused Python development/GUI files.")
+    return saved
+
+
+def trim_decoder(prefix):
+    unused = [prefix / name for name in K.DECODER_UNUSED_PATHS]
+    for pattern in K.DECODER_UNUSED_GLOBS:
+        unused.extend(prefix.glob(pattern))
+    saved = prune_files(unused)
+    print(f"Trimmed {saved} bytes of unused decoder development files.")
 
 
 def write_launchers(destination, windows):
@@ -281,6 +377,9 @@ def main():
             if original.is_relative_to(args.python_prefix.resolve()):
                 path.unlink()
                 path.symlink_to(os.path.relpath(destination / K.S_PYTHON_0529 / original.relative_to(args.python_prefix.resolve()), path.parent))
+    trim_python(destination / K.S_PYTHON_0529)
+    if target != K.S_WINDOWS_F2ED:
+        trim_zig(destination / K.S_PYTHON_0529, target)
     objects = sorted((runtime_build / K.S_RT_3DE6).rglob(K.S_O_DB6A))
     if not objects:
         raise ValueError(K.S_NO_PREBUILT_RUNTIME_OBJECTS__5B15)
@@ -302,6 +401,7 @@ def main():
     shutil.copytree(FONT_DIRECTORY, destination / FONT_DIRECTORY.relative_to(ROOT))
     ffmpeg_destination = destination / K.S_DEPS_3548 / ffmpeg.name
     shutil.copytree(ffmpeg, ffmpeg_destination, symlinks=True)
+    trim_decoder(ffmpeg_destination)
     shutil.copytree(sdl / K.S_SHARE_LICENSES_384B, destination / K.S_NATIVE_LICENSES_9EA2, dirs_exist_ok=True) if (sdl / K.S_SHARE_LICENSES_384B).is_dir() else None
     if target == K.S_WINDOWS_F2ED:
         compiler = windows_toolchain(destination, prefix, helper_binaries)

@@ -65,6 +65,28 @@ class DownloadTests(unittest.TestCase):
 
 
 class ReleaseBoundaryTests(unittest.TestCase):
+    def test_release_sources_keep_conversion_and_android_without_development_commands(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            keep = ('tools/release.py', 'tools/setup_android.py', 'tools/recompr/gen.py', 'runtime/cpu.h')
+            omit = ('tools/test_lan.py', 'tools/package_release.py', 'tools/ci_release.py',
+                    'tools/centralize_literals.py')
+            for name in (*keep, *omit):
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(name)
+            smaa = root / package_release.K.S_THIRD_PARTY_SMAA_8DBE
+            smaa.mkdir(parents=True)
+            (smaa / 'LICENSE').write_text('shader license fixture')
+            with patch.object(package_release, 'ROOT', root), \
+                    patch.object(package_release.subprocess, 'check_output', return_value='\0'.join((*keep, *omit)).encode()):
+                destination = root / 'release'
+                package_release.tracked_sources(destination)
+            for name in keep:
+                self.assertTrue((destination / name).is_file(), name)
+            for name in omit:
+                self.assertFalse((destination / name).exists(), name)
+
     def test_windows_archive_preserves_the_full_version_and_platform_name(self):
         with tempfile.TemporaryDirectory() as temporary:
             folder = Path(temporary) / 'sf2recomp-0.1.0-windows-x86_64'
@@ -89,7 +111,11 @@ class ReleaseBoundaryTests(unittest.TestCase):
             for relative in ('bin/clang.exe', 'bin/ld.lld.exe', 'bin/SDL3.dll',
                              'bin/libshaderc_shared.dll', 'bin/vulkan-1.dll', 'include/stdio.h', 'lib/libucrt.a',
                              'lib/crt2.o', 'lib/crtbegin.o', 'lib/crtend.o',
-                             'lib/clang/23/include/stddef.h'):
+                             'lib/clang/23/include/stddef.h', 'lib/clang/23/lib/windows/clang_rt.builtins.a',
+                             'include/clang/AST.h', 'include/clang-c/Index.h',
+                             'include/llvm/Module.h', 'include/llvm-c/Core.h',
+                             'lib/libclangAST.a', 'lib/libclang-cpp.dll.a', 'lib/libLLVMCodeGen.a',
+                             'bin/libLLVM-23.dll', 'bin/libclang-cpp.dll', 'bin/libstdc++-6.dll'):
                 file = prefix / relative
                 file.parent.mkdir(parents=True, exist_ok=True)
                 file.write_bytes(relative.encode())
@@ -100,8 +126,14 @@ class ReleaseBoundaryTests(unittest.TestCase):
                 self.assertEqual(command[:2], [str(prefix / 'bin/clang.exe'), '--target=x86_64-w64-windows-gnu'])
                 name = command[2].removeprefix('-print-file-name=')
                 return str(gcc / name) + '\n'
+            def dependencies(binaries, directories):
+                shared = {'libstdc++-6.dll': prefix / 'bin/libstdc++-6.dll'}
+                if any(p.name == 'clang.exe' for p in binaries):
+                    shared.update({name.lower(): prefix / 'bin' / name
+                                   for name in ('libLLVM-23.dll', 'libclang-cpp.dll')})
+                return shared
             with patch.object(package_release.subprocess, 'check_output', side_effect=query), \
-                    patch('windows_dlls.dependency_closure', return_value={}):
+                    patch('windows_dlls.dependency_closure', side_effect=dependencies):
                 destination = root / 'portable tool'
                 package_release.windows_toolchain(destination, prefix, [])
                 self.assertEqual((destination / 'native/lib/vulkan-1.dll').read_bytes(), b'bin/vulkan-1.dll')
@@ -111,9 +143,140 @@ class ReleaseBoundaryTests(unittest.TestCase):
                 for name in ('crt2.o', 'crtbegin.o', 'crtend.o'):
                     self.assertEqual((destination / 'native/toolchain/lib' / name).read_bytes(),
                                      ('lib/' + name).encode())
+                toolchain = destination / 'native/toolchain'
+                self.assertTrue((toolchain / 'include/stdio.h').is_file())
+                self.assertTrue((toolchain / 'lib/libucrt.a').is_file())
+                self.assertTrue((toolchain / 'lib/clang/23/include/stddef.h').is_file())
+                self.assertTrue((toolchain / 'lib/clang/23/lib/windows/clang_rt.builtins.a').is_file())
+                for name in ('clang', 'clang-c', 'llvm', 'llvm-c'):
+                    self.assertFalse((toolchain / 'include' / name).exists())
+                for name in ('libclangAST.a', 'libclang-cpp.dll.a', 'libLLVMCodeGen.a'):
+                    self.assertFalse((toolchain / 'lib' / name).exists())
+                for name in ('libLLVM-23.dll', 'libclang-cpp.dll'):
+                    self.assertTrue((toolchain / 'bin' / name).is_file())
+                    self.assertFalse((destination / 'native/lib' / name).exists())
+                self.assertTrue((destination / 'native/lib/libstdc++-6.dll').is_file())
+                self.assertFalse((toolchain / 'bin/libstdc++-6.dll').exists())
+                self.assertFalse((toolchain / 'bin/vulkan-1.dll').exists())
                 (gcc / 'libgcc_eh.a').unlink()
                 with self.assertRaisesRegex(ValueError, 'required support archive libgcc_eh.a'):
                     package_release.windows_toolchain(root / 'incomplete tool', prefix, [])
+
+    def test_zig_keeps_native_headers_and_runtime_sources_without_other_platforms(self):
+        for target, source, header, other in (
+                ('linux', 'glibc', 'x86-linux-gnu', 'any-macos-any'),
+                ('macos', 'darwin', 'any-macos-any', 'any-linux-any')):
+            with self.subTest(target=target), tempfile.TemporaryDirectory() as temporary:
+                prefix = Path(temporary)
+                zig = prefix / 'lib/python3.12/site-packages/ziglang'
+                license_dir = prefix / 'lib/python3.12/site-packages/ziglang.dist-info/licenses/ziglang'
+                license_dir.mkdir(parents=True)
+                (license_dir / 'LICENSE').write_text('upstream license fixture')
+                for name in ('libc/glibc/runtime.c', 'libc/musl/runtime.c', 'libc/darwin/runtime.c',
+                             'libc/mingw/runtime.c', 'libc/include/x86-linux-gnu/stdio.h',
+                             'libc/include/any-linux-any/linux.h', 'libc/include/generic-glibc/features.h',
+                             'libc/include/any-macos-any/stdio.h', 'libc/include/any-windows-any/windows.h',
+                             'libcxx/vector', 'libcxxabi/runtime.cpp', 'libtsan/runtime.cpp',
+                             'docs/index.html', 'compiler_rt.zig', 'std/std.zig',
+                             'include/stddef.h', 'libunwind/unwind.c'):
+                    file = zig / 'lib' / name
+                    file.parent.mkdir(parents=True, exist_ok=True)
+                    file.write_text(name)
+                (zig / 'zig').write_text('compiler fixture')
+                package_release.trim_zig(prefix, target)
+                self.assertTrue((zig / 'zig').is_file())
+                self.assertTrue((license_dir / 'LICENSE').is_file())
+                self.assertTrue((zig / 'lib/libc' / source / 'runtime.c').is_file())
+                self.assertTrue((zig / 'lib/libc/include' / header / 'stdio.h').is_file())
+                self.assertFalse((zig / 'lib/libc/include' / other).exists())
+                self.assertFalse((zig / 'lib/libc/mingw').exists())
+                self.assertFalse((zig / 'lib/libtsan').exists())
+                self.assertTrue((zig / 'lib/std/std.zig').is_file())
+                self.assertTrue((zig / 'lib/compiler_rt.zig').is_file())
+                self.assertTrue((zig / 'lib/include/stddef.h').is_file())
+                if target == 'linux':
+                    self.assertTrue((zig / 'lib/libc/musl/runtime.c').is_file())
+                    self.assertTrue((zig / 'lib/libc/include/generic-glibc/features.h').is_file())
+                    self.assertFalse((zig / 'lib/libcxx').exists())
+                else:
+                    self.assertTrue((zig / 'lib/libcxx/vector').is_file())
+                    self.assertTrue((zig / 'lib/libcxxabi/runtime.cpp').is_file())
+                # Trimming an already trimmed staging folder is safe.
+                package_release.trim_zig(prefix, target)
+
+    def test_python_runtime_cleanup_keeps_shared_modules_compiler_inputs_and_licenses(self):
+        for layout in ('Lib', 'lib/python3.12'):
+            with self.subTest(layout=layout), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                stdlib = root / layout
+                for relative in ('include/Python.h', 'libs/python312.lib', 'bin/pip3',
+                                 'bin/python3-config', 'bin/python3', 'python.exe',
+                                 'lib/libpython3.12.so', 'lib/libpython3.12.a', 'lib/tcl8.6/init.tcl',
+                                 'Scripts/pip.exe', 'share/terminfo/x/xterm', 'share/licenses/python/LICENSE',
+                                 'DLLs/python-runtime.dll', 'DLLs/_tkinter.pyd'):
+                    path = root / relative
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(relative.encode())
+                for relative in ('os.py', 'sysconfig.py', '_sysconfigdata_native.py', 'ssl.py',
+                                 'ensurepip/bundled.whl', 'unittest/__init__.py', 'tkinter/__init__.py',
+                                 'config-native/Makefile', 'site-packages/pip/__init__.py',
+                                 'site-packages/pip-1.dist-info/METADATA',
+                                 'site-packages/unicorn/lib/libunicorn.a',
+                                 'site-packages/unicorn/lib/unicorn.lib',
+                                 'site-packages/unicorn/lib/libunicorn.so.2',
+                                 'site-packages/unicorn/lib/unicorn.dll',
+                                 'site-packages/unicorn/unicorn_py3/__init__.py',
+                                 'site-packages/unicorn/tests/test_runtime.py',
+                                 'site-packages/unicorn-1.dist-info/licenses/LICENSE',
+                                 'site-packages/ziglang/lib/include/stddef.h',
+                                 'site-packages/ziglang/lib/runtime.a',
+                                 'site-packages/ziglang-1.dist-info/licenses/ziglang/lib/NOTICE',
+                                 'site-packages/certifi/cacert.pem', 'site-packages/lz4/block/module.so',
+                                 'site-packages/lz4/frame/module.so', 'site-packages/cffi/__pycache__/api.pyc'):
+                    path = stdlib / relative
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(relative.encode())
+                self.assertGreater(package_release.trim_python(root), 0)
+                for relative in ('bin/python3', 'python.exe', 'lib/libpython3.12.so',
+                                 'share/licenses/python/LICENSE', 'DLLs/python-runtime.dll'):
+                    self.assertTrue((root / relative).is_file(), relative)
+                for relative in ('os.py', 'sysconfig.py', '_sysconfigdata_native.py', 'ssl.py',
+                                 'site-packages/unicorn/lib/libunicorn.so.2',
+                                 'site-packages/unicorn/lib/unicorn.dll',
+                                 'site-packages/unicorn/unicorn_py3/__init__.py',
+                                 'site-packages/unicorn-1.dist-info/licenses/LICENSE',
+                                 'site-packages/ziglang/lib/include/stddef.h',
+                                 'site-packages/ziglang/lib/runtime.a',
+                                 'site-packages/ziglang-1.dist-info/licenses/ziglang/lib/NOTICE',
+                                 'site-packages/certifi/cacert.pem', 'site-packages/lz4/block/module.so'):
+                    self.assertTrue((stdlib / relative).is_file(), relative)
+                for relative in ('include', 'libs', 'Scripts', 'bin/pip3', 'bin/python3-config',
+                                 'lib/libpython3.12.a', 'lib/tcl8.6', 'share/terminfo', 'DLLs/_tkinter.pyd'):
+                    self.assertFalse((root / relative).exists(), relative)
+                for relative in ('ensurepip', 'unittest', 'tkinter', 'config-native', 'site-packages/pip',
+                                 'site-packages/pip-1.dist-info', 'site-packages/unicorn/tests',
+                                 'site-packages/unicorn/lib/libunicorn.a', 'site-packages/unicorn/lib/unicorn.lib',
+                                 'site-packages/lz4/frame', 'site-packages/cffi/__pycache__'):
+                    self.assertFalse((stdlib / relative).exists(), relative)
+                self.assertEqual(package_release.trim_python(root), 0)
+
+    def test_decoder_cleanup_keeps_runtime_libraries_and_corresponding_source(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for relative in ('bin/ffmpeg', 'lib/libavcodec.so.1', 'lib/avcodec.dll', 'lib/libavcodec.1.dylib',
+                             'lib/libavcodec.a', 'include/avcodec.h', 'lib/pkgconfig/avcodec.pc',
+                             'share/ffmpeg/source.tar.xz', 'share/ffmpeg/BUILD.txt',
+                             'share/licenses/FFmpeg/LICENSE.md'):
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(relative.encode())
+            package_release.trim_decoder(root)
+            for relative in ('bin/ffmpeg', 'lib/libavcodec.so.1', 'lib/avcodec.dll', 'lib/libavcodec.1.dylib',
+                             'share/ffmpeg/source.tar.xz', 'share/ffmpeg/BUILD.txt',
+                             'share/licenses/FFmpeg/LICENSE.md'):
+                self.assertTrue((root / relative).is_file(), relative)
+            for relative in ('lib/libavcodec.a', 'include', 'lib/pkgconfig'):
+                self.assertFalse((root / relative).exists(), relative)
 
     @unittest.skipIf(os.name == 'nt', 'exercises POSIX shell forwarding')
     def test_windows_dependency_script_reuses_its_selected_bash(self):
