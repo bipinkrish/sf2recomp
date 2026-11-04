@@ -1735,12 +1735,14 @@ class PACKAGE_RELEASE:
         # The macOS release links -lc++; Zig builds these runtime sources.
         'macos': ('libtsan', 'docs'),
     }
-    PYTHON_STDLIB_GLOBS = ('Lib', 'lib/python3.*')
+    PYTHON_WINDOWS_STDLIB = 'Lib'
+    PYTHON_POSIX_STDLIB_GLOB = 'lib/python3.*'
+    PYTHON_STDLIB_SENTINEL = 'os.py'
     PYTHON_UNUSED_PREFIX_PATHS = ('include', 'libs', 'Scripts', 'tcl', 'lib/pkgconfig',
                                   'share/man', 'share/doc', 'share/terminfo')
     PYTHON_UNUSED_PREFIX_GLOBS = ('lib/libpython*.a', 'python*.lib', 'pythonw*.exe',
                                   '*.pdb', 'DLLs/*.pdb', 'DLLs/_test*', 'DLLs/_tkinter*')
-    PYTHON_GUI_LIBRARY_GLOBS = ('tcl*', 'tk*', 'itcl*', 'Tix*', 'thread*')
+    PYTHON_GUI_LIBRARY_GLOBS = ('tcl[0-9]*', 'tk[0-9]*', 'itcl[0-9]*', 'Tix[0-9]*', 'thread[0-9]*')
     PYTHON_INTERPRETER_PATTERN = r'python(?:3(?:\.\d+)?)?(?:\.exe)?'
     PYTHON_UNUSED_STDLIB = ('ensurepip', 'idlelib', 'tkinter', 'turtledemo', 'turtle.py',
                             'lib2to3', 'venv', 'test', 'unittest', 'doctest.py', 'pydoc.py', 'pydoc_data')

@@ -217,7 +217,7 @@ class ReleaseBoundaryTests(unittest.TestCase):
                     path = root / relative
                     path.parent.mkdir(parents=True, exist_ok=True)
                     path.write_bytes(relative.encode())
-                for relative in ('os.py', 'sysconfig.py', '_sysconfigdata_native.py', 'ssl.py',
+                for relative in ('os.py', 'sysconfig.py', '_sysconfigdata_native.py', 'ssl.py', 'threading.py',
                                  'ensurepip/bundled.whl', 'unittest/__init__.py', 'tkinter/__init__.py',
                                  'config-native/Makefile', 'site-packages/pip/__init__.py',
                                  'site-packages/pip-1.dist-info/METADATA',
@@ -240,7 +240,7 @@ class ReleaseBoundaryTests(unittest.TestCase):
                 for relative in ('bin/python3', 'python.exe', 'lib/libpython3.12.so',
                                  'share/licenses/python/LICENSE', 'DLLs/python-runtime.dll'):
                     self.assertTrue((root / relative).is_file(), relative)
-                for relative in ('os.py', 'sysconfig.py', '_sysconfigdata_native.py', 'ssl.py',
+                for relative in ('os.py', 'sysconfig.py', '_sysconfigdata_native.py', 'ssl.py', 'threading.py',
                                  'site-packages/unicorn/lib/libunicorn.so.2',
                                  'site-packages/unicorn/lib/unicorn.dll',
                                  'site-packages/unicorn/unicorn_py3/__init__.py',
@@ -259,6 +259,38 @@ class ReleaseBoundaryTests(unittest.TestCase):
                                  'site-packages/lz4/frame', 'site-packages/cffi/__pycache__'):
                     self.assertFalse((stdlib / relative).exists(), relative)
                 self.assertEqual(package_release.trim_python(root), 0)
+
+    def test_gui_cleanup_removes_versioned_data_directories_without_touching_threading(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            library = root / 'lib'
+            (library / 'thread2.8.7').mkdir(parents=True)
+            (library / 'thread2.8.7/pkgIndex.tcl').write_text('unused Tcl data')
+            # Windows Lib and lib refer to the same directory. The Tcl cleanup
+            # must not match the threading.py module used by subprocess.
+            (library / 'threading.py').write_text('stdlib threading fixture')
+            package_release.trim_python(root)
+            self.assertTrue((library / 'threading.py').is_file())
+            self.assertFalse((library / 'thread2.8.7').exists())
+
+    def test_literal_stdlib_lookup_does_not_depend_on_case_sensitive_glob(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            stdlib = root / 'Lib'
+            (stdlib / 'ensurepip').mkdir(parents=True)
+            (stdlib / 'os.py').write_text('stdlib fixture')
+            (stdlib / 'ensurepip/bundled.whl').write_bytes(b'unused installer')
+            original_glob = Path.glob
+            def glob(path, pattern):
+                # Models macOS: literal Lib exists, but POSIX glob sees the
+                # directory's on-disk spelling lib and does not match Lib.
+                if path == root and pattern == 'Lib':
+                    return iter(())
+                return original_glob(path, pattern)
+            with patch.object(Path, 'glob', glob):
+                package_release.trim_python(root)
+            self.assertTrue((stdlib / 'os.py').is_file())
+            self.assertFalse((stdlib / 'ensurepip').exists())
 
     def test_decoder_cleanup_keeps_runtime_libraries_and_corresponding_source(self):
         with tempfile.TemporaryDirectory() as temporary:

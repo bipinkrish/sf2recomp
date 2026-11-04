@@ -269,30 +269,33 @@ def trim_python(python_prefix):
     for pattern in K.PYTHON_UNUSED_PREFIX_GLOBS:
         unused.extend(python_prefix.glob(pattern))
     for pattern in K.PYTHON_GUI_LIBRARY_GLOBS:
-        unused.extend((python_prefix / K.S_LIB_427F).glob(pattern))
+        unused.extend(p for p in (python_prefix / K.S_LIB_427F).glob(pattern) if p.is_dir())
     binaries = python_prefix / K.S_BIN_0955
     if binaries.is_dir():
         unused.extend(p for p in binaries.iterdir() if not re.fullmatch(K.PYTHON_INTERPRETER_PATTERN, p.name))
-    for pattern in K.PYTHON_STDLIB_GLOBS:
-        for stdlib in python_prefix.glob(pattern):
-            if not stdlib.is_dir():
+    # POSIX glob is case-sensitive even on macOS volumes where Lib aliases lib.
+    # Look up literal paths directly; os.py distinguishes a stdlib from lib/.
+    stdlibs = [python_prefix / K.PYTHON_WINDOWS_STDLIB,
+               *python_prefix.glob(K.PYTHON_POSIX_STDLIB_GLOB)]
+    for stdlib in stdlibs:
+        if not (stdlib / K.PYTHON_STDLIB_SENTINEL).is_file():
+            continue
+        unused.extend(stdlib / name for name in K.PYTHON_UNUSED_STDLIB)
+        for pattern in K.PYTHON_UNUSED_STDLIB_GLOBS:
+            unused.extend(stdlib.glob(pattern))
+        site = stdlib / K.PYTHON_SITE_PACKAGES
+        if not site.is_dir():
+            continue
+        for pattern in K.PYTHON_UNUSED_SITE_PATHS:
+            unused.extend(site.glob(pattern))
+        for package in site.iterdir():
+            # Zig's headers/archives are compiler inputs. Package metadata
+            # also holds third-party licenses, including compiler licenses.
+            if (not package.is_dir() or package.name == K.ZIG_PACKAGE
+                    or package.name.endswith(K.PYTHON_DIST_INFO_SUFFIX)):
                 continue
-            unused.extend(stdlib / name for name in K.PYTHON_UNUSED_STDLIB)
-            for pattern in K.PYTHON_UNUSED_STDLIB_GLOBS:
-                unused.extend(stdlib.glob(pattern))
-            site = stdlib / K.PYTHON_SITE_PACKAGES
-            if not site.is_dir():
-                continue
-            for pattern in K.PYTHON_UNUSED_SITE_PATHS:
-                unused.extend(site.glob(pattern))
-            for package in site.iterdir():
-                # Zig's headers/archives are compiler inputs. Package metadata
-                # also holds third-party licenses, including compiler licenses.
-                if (not package.is_dir() or package.name == K.ZIG_PACKAGE
-                        or package.name.endswith(K.PYTHON_DIST_INFO_SUFFIX)):
-                    continue
-                for pattern in K.PYTHON_UNUSED_PACKAGE_GLOBS:
-                    unused.extend(package.rglob(pattern))
+            for pattern in K.PYTHON_UNUSED_PACKAGE_GLOBS:
+                unused.extend(package.rglob(pattern))
     unused.extend(python_prefix.rglob(K.S_PYCACHE_6B2B))
     unused.extend(python_prefix.rglob(K.S_PYC_6D8E))
     saved = prune_files(unused)
