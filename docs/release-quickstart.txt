@@ -2,8 +2,11 @@ SF2Recomp
 
 1. Extract this entire folder to a writable location. Keep its contents together.
 2. Open sf2recomp.cmd on Windows, SF2Recomp.command on macOS, or sf2recomp on Linux.
-3. Enter your NSP path, prod.keys path and output folder when prompted.
-4. Wait for conversion. Open sf2.exe or sf2 in the output folder to play.
+3. In the converter window, browse for your NSP, prod.keys and output folder.
+   For extracted updated files, select "Extracted game folder" as the input type.
+4. Click Convert. Progress and errors appear in the window; full logs stay under
+   build/logs in the tool folder.
+5. When conversion finishes, click Open output folder. Run sf2.exe or sf2 to play.
 
 Supported input: Shadow Fight 2 combined base + v1.1.0/update v131072 NSP,
 including its CNMT XML sidecars and tickets. Other NSP layouts and NSZ are not
@@ -14,10 +17,12 @@ Command-line examples (Windows: replace ./sf2recomp with sf2recomp.cmd):
 
   ./sf2recomp --version
   ./sf2recomp --check
+  ./sf2recomp --cli
   ./sf2recomp --nsp "/path/game.nsp" --keys "/path/prod.keys" --output "/path/SF2" --play
   ./sf2recomp --game "/path/extracted/update" --output "/path/SF2"
 
-Android is optional. Select Android at the prompt, or run:
+Android is optional. Choose Android phone (ARM64) under Convert for, read and
+accept the SDK terms in the window, then click Convert. Or run:
 
   ./sf2recomp --android --nsp "/path/game.nsp" --keys "/path/prod.keys" --output "/path/APK" --accept-android-licenses
 

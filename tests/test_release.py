@@ -25,6 +25,8 @@ import setup_ffmpeg
 import centralize_literals
 import host_tools
 import ci_release
+import windows_dlls
+import release_support
 
 
 class DownloadTests(unittest.TestCase):
@@ -64,13 +66,41 @@ class DownloadTests(unittest.TestCase):
                 self.assertTrue((root / 'installed/bin/tool').stat().st_mode & 0o111)
 
 
+@unittest.skipUnless(os.name != 'nt' and shutil.which('clang'), 'Requires a configured native Clang toolchain')
+class ReleaseCompilerTests(unittest.TestCase):
+    def test_compile_and_link_do_not_emit_unused_argument_warnings(self):
+        with tempfile.TemporaryDirectory(prefix='sf2 compiler ') as temporary:
+            root = Path(temporary)
+            source = root / 'module.c'
+            source.write_text('int main(void) { return 0; }\n')
+            # Older manifests put -L in the compiler command. This triggers the
+            # reported warning on each compile, and -Werror makes it testable.
+            data = {'compiler': [shutil.which('clang'), '-Werror', '-L' + str(root / 'lib')],
+                    'cflags': [], 'ldflags': [], 'probe_ldflags': [],
+                    'version': 'test', 'build_id': 'test'}
+            run = subprocess.run
+            diagnostics = []
+            def capture(command, **options):
+                result = run(command, capture_output=True, text=True, **options)
+                diagnostics.append(result.stderr)
+                return result
+            with patch.object(release_support, 'ROOT', root), \
+                    patch.object(release_support, 'manifest', return_value=data), \
+                    patch.object(release_support.subprocess, 'run', side_effect=capture):
+                binary = release_support.compile_sources([source], root / ('probe.exe' if os.name == 'nt' else 'probe'), runtime=False)
+            self.assertEqual(diagnostics, ['', ''])
+            run([str(binary)], check=True)
+
+
 class ReleaseBoundaryTests(unittest.TestCase):
     def test_release_sources_keep_conversion_and_android_without_development_commands(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            keep = ('tools/release.py', 'tools/setup_android.py', 'tools/recompr/gen.py', 'runtime/cpu.h')
+            keep = ('tools/release.py', 'tools/converter_ui.py', 'tools/setup_android.py', 'tools/recompr/gen.py',
+                    'runtime/cpu.h', 'assets/sf2recomp.png', 'assets/sf2recomp.ico', 'assets/README.md',
+                    'assets/sf2recomp-readme.png')
             omit = ('tools/test_lan.py', 'tools/package_release.py', 'tools/ci_release.py',
-                    'tools/centralize_literals.py')
+                    'tools/centralize_literals.py', 'tools/check_doc_links.py', 'tools/prepare_icon.py')
             for name in (*keep, *omit):
                 path = root / name
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -135,7 +165,8 @@ class ReleaseBoundaryTests(unittest.TestCase):
             with patch.object(package_release.subprocess, 'check_output', side_effect=query), \
                     patch('windows_dlls.dependency_closure', side_effect=dependencies):
                 destination = root / 'portable tool'
-                package_release.windows_toolchain(destination, prefix, [])
+                compiler = package_release.windows_toolchain(destination, prefix, [])
+                self.assertFalse(any(arg.startswith('-L') for arg in compiler))
                 self.assertEqual((destination / 'native/lib/vulkan-1.dll').read_bytes(), b'bin/vulkan-1.dll')
                 for name in ('libgcc.a', 'libgcc_eh.a'):
                     self.assertEqual((destination / 'native/toolchain/lib' / name).read_bytes(),
@@ -238,9 +269,10 @@ class ReleaseBoundaryTests(unittest.TestCase):
                     path.write_bytes(relative.encode())
                 self.assertGreater(package_release.trim_python(root), 0)
                 for relative in ('bin/python3', 'python.exe', 'lib/libpython3.12.so',
-                                 'share/licenses/python/LICENSE', 'DLLs/python-runtime.dll'):
+                                 'share/licenses/python/LICENSE', 'DLLs/python-runtime.dll',
+                                 'lib/tcl8.6/init.tcl', 'DLLs/_tkinter.pyd'):
                     self.assertTrue((root / relative).is_file(), relative)
-                for relative in ('os.py', 'sysconfig.py', '_sysconfigdata_native.py', 'ssl.py', 'threading.py',
+                for relative in ('os.py', 'sysconfig.py', '_sysconfigdata_native.py', 'ssl.py', 'threading.py', 'tkinter/__init__.py',
                                  'site-packages/unicorn/lib/libunicorn.so.2',
                                  'site-packages/unicorn/lib/unicorn.dll',
                                  'site-packages/unicorn/unicorn_py3/__init__.py',
@@ -251,16 +283,16 @@ class ReleaseBoundaryTests(unittest.TestCase):
                                  'site-packages/certifi/cacert.pem', 'site-packages/lz4/block/module.so'):
                     self.assertTrue((stdlib / relative).is_file(), relative)
                 for relative in ('include', 'libs', 'Scripts', 'bin/pip3', 'bin/python3-config',
-                                 'lib/libpython3.12.a', 'lib/tcl8.6', 'share/terminfo', 'DLLs/_tkinter.pyd'):
+                                 'lib/libpython3.12.a', 'share/terminfo'):
                     self.assertFalse((root / relative).exists(), relative)
-                for relative in ('ensurepip', 'unittest', 'tkinter', 'config-native', 'site-packages/pip',
+                for relative in ('ensurepip', 'unittest', 'config-native', 'site-packages/pip',
                                  'site-packages/pip-1.dist-info', 'site-packages/unicorn/tests',
                                  'site-packages/unicorn/lib/libunicorn.a', 'site-packages/unicorn/lib/unicorn.lib',
                                  'site-packages/lz4/frame', 'site-packages/cffi/__pycache__'):
                     self.assertFalse((stdlib / relative).exists(), relative)
                 self.assertEqual(package_release.trim_python(root), 0)
 
-    def test_gui_cleanup_removes_versioned_data_directories_without_touching_threading(self):
+    def test_python_cleanup_preserves_tcl_data_and_threading_for_the_converter(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             library = root / 'lib'
@@ -271,7 +303,27 @@ class ReleaseBoundaryTests(unittest.TestCase):
             (library / 'threading.py').write_text('stdlib threading fixture')
             package_release.trim_python(root)
             self.assertTrue((library / 'threading.py').is_file())
-            self.assertFalse((library / 'thread2.8.7').exists())
+            self.assertTrue((library / 'thread2.8.7/pkgIndex.tcl').is_file())
+
+    def test_windows_decoder_collects_external_transitive_imports_before_release(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            decoder, system = root / 'decoder', root / 'ucrt64/bin'
+            (decoder / 'bin').mkdir(parents=True)
+            system.mkdir(parents=True)
+            for path in (decoder / 'bin/ffmpeg.exe', decoder / 'bin/avcodec-1.dll',
+                         system / 'libwinpthread-1.dll'):
+                path.write_bytes(path.name.encode())
+            graph = {'ffmpeg.exe': ['avcodec-1.dll'], 'avcodec-1.dll': ['libwinpthread-1.dll'],
+                     'libwinpthread-1.dll': ['KERNEL32.dll']}
+            with patch.object(windows_dlls, 'imports', side_effect=lambda path, _: graph[path.name]):
+                package_release.bundle_windows_decoder(decoder, [system])
+            self.assertEqual((decoder / 'bin/libwinpthread-1.dll').read_bytes(), b'libwinpthread-1.dll')
+            (decoder / 'bin/libwinpthread-1.dll').unlink()
+            (system / 'libwinpthread-1.dll').unlink()
+            with patch.object(windows_dlls, 'imports', side_effect=lambda path, _: graph[path.name]):
+                with self.assertRaisesRegex(ValueError, 'Missing Windows DLL libwinpthread-1.dll'):
+                    package_release.bundle_windows_decoder(decoder, [system])
 
     def test_literal_stdlib_lookup_does_not_depend_on_case_sensitive_glob(self):
         with tempfile.TemporaryDirectory() as temporary:

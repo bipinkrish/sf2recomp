@@ -1,6 +1,6 @@
 # Gameplay screenshots
 
-These are unmodified captures from the native Linux and Android builds.
+Gameplay images are unmodified captures from the native Linux and Android builds.
 The original Linux gallery captures use Vulkan on an NVIDIA RTX 4070 Laptop GPU,
 captured on 2026-10-31, with the footer-free character selection updated on 2026-11-01.
 The original Android emulator capture is from 2026-11-02. Additional feature
@@ -8,9 +8,13 @@ captures were selected from saved development runs on 2026-11-03. They document
 the recomp's output; the game artwork is from Shadow Fight 2.
 The Settings image was recaptured from the current Linux build on 2026-11-03
 using Mesa lavapipe, with the bottom controller hints hidden.
+The converter screenshot shows the desktop tool on 2026-11-05, using its
+release-pinned Python 3.12.12 runtime. Its input fields are empty and its output
+path is an example; no game files or keys are shown.
 
 | Image | Resolution | Capture source (local, ignored build output) |
 | --- | --- | --- |
+| `converter-ui.png` | 820×650 | Live Tk window from `tools/converter_ui.py` |
 | `ultrawide-night.png` | 5120×1440, 32:9 | `build/validation/campaign-aspects/floor-night-corrected/build/frames/frame_02800.png` |
 | `main-menu.png` | 1920×1080, 16:9 | `build/validation/aspect-ratios/16-10/build/frames/frame_00120.png` |
 | `sparring.png` | 1728×1080, 16:10 | `build/validation/aspect-ratios/16-10/build/frames/frame_03000.png` |

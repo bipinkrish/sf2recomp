@@ -64,13 +64,11 @@ and compares combat-step traces across FPS and graphics settings. It is a
 diagnostic experiment and is not a complete state serializer.
 The [LAN Sparring implementation](lan-sparring.md) reuses its controlled setup
 and observer to synchronize separate local game instances.
-The [replay results](combat-replay-results.md) retain the original fixed-settings
-divergence and the subsequent controlled initialization/RNG experiment. Use
-`--seed` to opt into fixed-step native round/stance setup and scoped random streams.
-The [PvP framing fix](combat-arena-framing-results.md) keeps combat geometry at its
-original reference aspect while the viewport honors the selected display aspect.
-The [half-resolution GPU investigation](combat-half-resolution-results.md) records
-the artwork upload fix and subsequent graphics-setting replay coverage.
+The harness guide describes fixed-settings divergence and the
+[controlled initialization/RNG experiment](combat-replay.md#controlled-initialization-and-randomness).
+Use `--seed` to opt into fixed-step native round/stance setup and scoped random streams.
+Its PvP framing section explains how combat geometry keeps its original reference
+aspect while the viewport honors the selected display aspect.
 
 ## Conversion output and packaging
 
@@ -140,7 +138,7 @@ and original control icon. No game icon is shipped in the public source tree.
 
 A guarded CPU buffer-copy change improved one matched software-Vulkan Story test
 from 49.38 to 55.87 FPS (+13.1%). This is not a combat or native-GPU performance
-claim. [Working findings](findings.md) retain the historical measurements;
+claim. Working findings retain the historical measurements;
 normal campaign Tournament combat has since been checked at 16:10, 21:9 and
 32:9 (see the widescreen findings). Full combat stability and campaign completion
 remain unverified.

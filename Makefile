@@ -34,7 +34,7 @@ endif
 endif
 
 # The generated game code (tools/recompr/gen.py), compiled like the generator expects:
-GENFLAGS := -O1 -mcx16 -fno-strict-aliasing -Wno-return-type -Wno-unused-label -fvisibility=hidden -fPIC -Iruntime
+GENFLAGS := -O1 -mcx16 -fno-strict-aliasing -Wno-return-type -Wno-unused-label -Wno-unused-command-line-argument -fvisibility=hidden -fPIC -Iruntime
 RTFLAGS  := -O2 -g -mcx16 -fno-strict-aliasing -Wall -Wno-unused-function -Wno-format \
             -Iruntime -Iruntime/nvn -Ithird_party/smaa -Ithird_party/smaa/Textures $(SDL_CFLAGS) -MMD -MP
 CXXFLAGS := -O2 -g -mcx16 -std=c++17 -fno-strict-aliasing -Wall -Wno-unused-function -Wno-format \

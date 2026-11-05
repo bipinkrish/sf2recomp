@@ -1,11 +1,42 @@
-# Settings and controls
+# INI configuration and controls
 
 [Back to the README](../README.md#settings-and-controls).
 
 ## Configuration file
 
-Edit **the INI beside the converted executable**, then restart. Its contents are
-read at runtime and are never embedded into generated code. For example:
+Use **`sf2recomp.ini` beside `sf2.exe` or `sf2`** in your converted game folder.
+On Android, it is in `Android/data/org.sf2recomp.app/files/sf2recomp.ini`.
+
+1. Close the game.
+2. Make a backup of your INI, then open it in a plain-text editor.
+3. Change the values you want, save the file, and start the game again.
+
+You do not need to convert or rebuild the game after editing. Converting into
+the same output folder preserves an existing INI and your saves.
+The [supplied INI](../sf2recomp.ini) lists the shipped settings and comments.
+
+### Common changes
+
+These are the values in the supplied file, which can differ from the runtime's
+built-in fallback defaults.
+
+| Setting | Shipped value | What to change |
+| --- | --- | --- |
+| `[general] language` | `en-US` | Use `auto` for your system language, or a locale such as `fr`, `de`, or `ja`. |
+| `[audio] volume` | `1.0` | Choose `0.0` to `1.0`; `0.0` mutes the game. |
+| `[video] fullscreen` | `true` | Set `false` for a resizable window. |
+| `[video] target_fps` | `120` | Choose `30` to `360`; match your display's refresh rate separately. |
+| `[video] internal_resolution` | `auto` | Use `dynamic` to adapt to GPU load, or a fixed scale such as `0.75x`. |
+| `[video] aspect_ratio` | `original` | Use `native` for your window/device ratio; `16:10`, `21:9`, and `32:9` are experimental. |
+| `[input] player_setup` | `keyboard_vs_controller` | Use `solo` for keyboard and the first controller on P1, or `two_controllers` for separate gamepads. |
+| `[gameplay] show_intro` | `true` | Set `false` to skip the opening video. |
+| `[storage] use_completed_save` | `false` | Set `true` to use the bundled completed campaign in a separate profile. |
+
+Keep each key under its named `[section]`. Comments start with `#` or `;`.
+Use `true` or `false` for switches. Unknown sections and keys are ignored.
+
+The example below changes some shipped settings: it uses a window, targets
+60 FPS, puts the keyboard and first controller on P1, and maps A to Space.
 
 ```ini
 [general]
@@ -43,6 +74,18 @@ ls_up = W
 a = east
 b = south
 ```
+
+### Find a setting
+
+| Change | Reference |
+| --- | --- |
+| Resolution, frame rate, aspect ratio, FSR, or anti-aliasing | [Graphics and frame rate](#graphics-and-frame-rate) |
+| Key bindings, controllers, or mouse menus | [Keyboard and controller bindings](#keyboard-and-controller-bindings) |
+| Which controller belongs to each player | [Player assignment](#player-assignment) |
+| Save folder, imported saves, or completed profile | [Saves](#saves) |
+| Unlocked fighters, Shadow, or Titan | [Sparring roster](#sparring-roster) |
+| Console, trainer, or overlays | [Developer console and overlays](#developer-console-and-overlays) |
+| Language, alternate INI, or writable data folder | [Language and file locations](#language-and-file-locations) |
 
 ## Offline networking
 
@@ -236,7 +279,7 @@ Button remapping is independent of player assignment.
 
 ## Keyboard and controller bindings
 
-The [supplied INI](../sf2recomp.ini) lists every keyboard/button default. Defaults include K/J/L/I
+The supplied INI lists every keyboard/button default. Defaults include K/J/L/I
 for A/B/X/Y, WASD for the left stick and arrows for the d-pad. Keyboard values use
 SDL key names (`Space`, `Return`, `Keypad 0`); gamepad values name physical
 positions (`east`, `south`, `north`, `west`, `ltrigger`, `rtrigger`, etc.). `none`

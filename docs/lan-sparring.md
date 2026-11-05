@@ -223,8 +223,8 @@ failure in the checks below; the CPU regressions establish the synchronization
 fixes, rather than proving the driver can never time out.
 
 See the recorded results and limits in that directory and the final validation
-summary. Existing [replay investigations](combat-replay-results.md) retain the
-pre-LAN history and original failed experiments.
+summary. The [replay guide](combat-replay.md) describes the controlled experiments
+and their limits.
 
 
 ### Final main-worktree checks (2026-10-31)

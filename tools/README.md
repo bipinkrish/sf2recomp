@@ -55,6 +55,11 @@ executes translated C. LZ4 reads NSOs; cryptography validates user-supplied keys
 
 ## Prepare a supported package
 
+For a file-picker interface in a source checkout, run `python3 tools/converter_ui.py`
+with a Python installation that includes Tk support. On Debian/Ubuntu, the system
+Python uses the `python3-tk` package. Desktop releases bundle the UI dependencies
+and open the conversion window when launched without arguments.
+
 ```sh
 python3 tools/extract.py '/path/to/your/base-and-update.nsp' '/path/to/your/prod.keys'
 python3 tools/analyze_il2cpp.py

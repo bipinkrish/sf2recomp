@@ -61,7 +61,7 @@ def compile_sources(sources, output, jobs=1, *, runtime=True):
         raise ValueError(K.S_THIS_COMMAND_REQUIRES_AN_ASS_09C1)
     compiler = expand(data[K.S_COMPILER_01AF])
     common = expand(data[K.S_CFLAGS_4DFE]) + [K.S_FVISIBILITY_HIDDEN_226F, K.S_FNO_STRICT_ALIASING_E1F5, K.S_WNO_RETURN_TYPE_2049,
-        K.S_WNO_UNUSED_LABEL_4FFF, K.S_I_C6C0 + str(ROOT / K.S_RUNTIME_A233)]
+        K.S_WNO_UNUSED_LABEL_4FFF, K.S_WNO_UNUSED_COMMAND_LINE_ARGU_8018, K.S_I_C6C0 + str(ROOT / K.S_RUNTIME_A233)]
     cache = ROOT / K.S_BUILD_RELEASE_OBJECTS_054C
     cache.mkdir(parents=True, exist_ok=True)
     env = environment()

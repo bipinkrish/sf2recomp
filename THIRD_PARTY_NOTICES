@@ -56,6 +56,10 @@ Local extraction and analysis (not linked into the game)
   package licenses accompany their installed distributions.
 
 Portable release tools
+- Project icon: artwork selected by the project owner from SteamGridDB.
+  Original ownership is retained; it is not covered by the project's MIT license.
+  Source and generated-format details are in assets/README.md.
+  https://cdn2.steamgriddb.com/icon/2b4a378ec7e82d072253e1a1de3052aa.png
 - CPython / python-build-standalone: the distribution retains its PSF and bundled
   dependency licenses inside python/. https://github.com/astral-sh/python-build-standalone
 - Zig 0.15.2 via ziglang: MIT, with LLVM/Clang and bundled runtime notices retained
@@ -72,7 +76,7 @@ Portable release tools
   into extensions/android. Their upstream notices remain in those distributions.
 
 The public source package excludes game/, generated C, game-derived executables,
-assets, tickets and user keys. The conversion output is generated locally and
+game assets, tickets and user keys. The conversion output is generated locally and
 contains original game-derived code/data; it is not the compiler source package.
 
 License layout: root LICENSE covers project contributions; licenses/ holds the

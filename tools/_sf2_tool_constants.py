@@ -1717,8 +1717,14 @@ class DOWNLOADS:
 
 
 class PACKAGE_RELEASE:
+    S_ASSETS_SF2RECOMP_README_PNG_6BA4 = 'assets/sf2recomp-readme.png'  # tools/package_release.py:43
+    S_BIN_FFMPEG_EXE_31C1 = 'bin/ffmpeg.exe'  # tools/package_release.py:309
+    S_ASSETS_README_MD_E66D = 'assets/README.md'  # tools/package_release.py:43
+    S_ASSETS_SF2RECOMP_ICO_D724 = 'assets/sf2recomp.ico'  # tools/package_release.py:43
+    S_ASSETS_SF2RECOMP_PNG_B232 = 'assets/sf2recomp.png'  # tools/package_release.py:43
     RELEASE_DEVELOPMENT_SOURCES = ('tools/test_*.py', 'tools/package_release.py',
-                                    'tools/ci_release.py', 'tools/centralize_literals.py')
+                                    'tools/ci_release.py', 'tools/centralize_literals.py',
+                                    'tools/check_doc_links.py', 'tools/prepare_icon.py')
     # Development APIs for embedding LLVM/Clang are not compiler inputs.
     WINDOWS_DEVELOPMENT_HEADERS = ('clang', 'clang-c', 'llvm', 'llvm-c')
     WINDOWS_DEVELOPMENT_LIBRARY_PREFIXES = ('libclang', 'libllvm')
@@ -1738,15 +1744,14 @@ class PACKAGE_RELEASE:
     PYTHON_WINDOWS_STDLIB = 'Lib'
     PYTHON_POSIX_STDLIB_GLOB = 'lib/python3.*'
     PYTHON_STDLIB_SENTINEL = 'os.py'
-    PYTHON_UNUSED_PREFIX_PATHS = ('include', 'libs', 'Scripts', 'tcl', 'lib/pkgconfig',
+    PYTHON_UNUSED_PREFIX_PATHS = ('include', 'libs', 'Scripts', 'lib/pkgconfig',
                                   'share/man', 'share/doc', 'share/terminfo')
     PYTHON_UNUSED_PREFIX_GLOBS = ('lib/libpython*.a', 'python*.lib', 'pythonw*.exe',
-                                  '*.pdb', 'DLLs/*.pdb', 'DLLs/_test*', 'DLLs/_tkinter*')
-    PYTHON_GUI_LIBRARY_GLOBS = ('tcl[0-9]*', 'tk[0-9]*', 'itcl[0-9]*', 'Tix[0-9]*', 'thread[0-9]*')
+                                  '*.pdb', 'DLLs/*.pdb', 'DLLs/_test*')
     PYTHON_INTERPRETER_PATTERN = r'python(?:3(?:\.\d+)?)?(?:\.exe)?'
-    PYTHON_UNUSED_STDLIB = ('ensurepip', 'idlelib', 'tkinter', 'turtledemo', 'turtle.py',
+    PYTHON_UNUSED_STDLIB = ('ensurepip', 'idlelib', 'turtledemo', 'turtle.py',
                             'lib2to3', 'venv', 'test', 'unittest', 'doctest.py', 'pydoc.py', 'pydoc_data')
-    PYTHON_UNUSED_STDLIB_GLOBS = ('config-*', 'lib-dynload/_test*', 'lib-dynload/_tkinter*')
+    PYTHON_UNUSED_STDLIB_GLOBS = ('config-*', 'lib-dynload/_test*')
     PYTHON_UNUSED_SITE_PATHS = ('pip', 'pip-*.dist-info', 'setuptools', 'setuptools-*.dist-info',
                                 'pkg_resources', '_distutils_hack', 'distutils-precedence.pth', 'lz4/frame')
     PYTHON_UNUSED_PACKAGE_GLOBS = ('*.a', '*.lib', '*.pdb', '*.h', '*.hpp', '*.c', '*.cpp',
@@ -2362,6 +2367,29 @@ class CONVERT:
 
 
 class RELEASE:
+    S_USE_INTERACTIVE_TERMINAL_PRO_EA78 = 'use interactive terminal prompts'  # tools/release.py:178
+    S_CLI_30A2 = '--cli'  # tools/release.py:178
+    S_OPEN_THE_CONVERSION_WINDOW_1417 = 'open the conversion window'  # tools/release.py:177
+    S_STORE_TRUE_430C = 'store_true'  # tools/release.py:177
+    S_GUI_39FA = '--gui'  # tools/release.py:177
+    S_VERSION_88D4 = '-version'  # tools/release.py:130
+    S_SYSTEM32_0C2E = 'System32'  # tools/release.py:129
+    S_C_WINDOWS_D008 = 'C:/Windows'  # tools/release.py:129
+    S_SYSTEMROOT_D7DA = 'SystemRoot'  # tools/release.py:129
+    S_LIB_5A09 = 'lib'  # tools/release.py:127
+    S_LD_LIBRARY_PATH_6EAC = 'LD_LIBRARY_PATH'  # tools/release.py:127
+    S_DYLD_INSERT_LIBRARIES_7927 = 'DYLD_INSERT_LIBRARIES'  # tools/release.py:124
+    S_DYLD_LIBRARY_PATH_A363 = 'DYLD_LIBRARY_PATH'  # tools/release.py:123
+    S_LD_PRELOAD_A3F7 = 'LD_PRELOAD'  # tools/release.py:122
+    S_EMPTY_12AE = ''  # tools/release.py:121
+    S_PATH_8306 = 'PATH'  # tools/release.py:121
+    S_WINDOWS_E294 = 'windows'  # tools/release.py:119
+    S_FFMPEG_EXE_C804 = 'ffmpeg.exe'  # tools/release.py:119
+    S_BIN_49FE = 'bin'  # tools/release.py:118
+    S_LINUX_F32A = 'linux'  # tools/release.py:118
+    S_FFMPEG_B521 = 'ffmpeg'  # tools/release.py:118
+    S_DEPS_E72A = 'deps'  # tools/release.py:118
+    S_INFO_PATCHLEVEL_1337 = 'info patchlevel'  # tools/release.py:52
     WINDOWS_RUNTIME_DLL_GLOB = '*.dll'
     S_THE_PREBUILT_RUNTIME_VERSION_E19F = 'The prebuilt runtime version does not match this release; rebuild runtime-objs'  # tools/release.py:88
     S_SF2RECOMP_8F7E = 'SF2Recomp:'  # tools/release.py:199
@@ -2475,6 +2503,7 @@ class RELEASE:
 
 
 class RELEASE_SUPPORT:
+    S_WNO_UNUSED_COMMAND_LINE_ARGU_8018 = '-Wno-unused-command-line-argument'  # tools/release_support.py:64
     S_LINKING_GAME_3235 = 'Linking game...'  # tools/release_support.py:102
     N_25_B7A5 = 25  # tools/release_support.py:95
     S_TMP_31A6 = '.tmp'  # tools/release_support.py:83
@@ -2554,3 +2583,182 @@ class RELEASE_SUPPORT:
     N_183_B8AE = 183  # tools/release_support.py:15
     N_47_3148 = 47  # tools/release_support.py:15
     S_RELEASE_JSON_5FBE = 'release.json'  # tools/release_support.py:14
+
+
+class CONVERTER_UI:
+    APP_NAME = 'SF2Recomp'
+    S_MAIN_8B1C = '__main__'  # tools/converter_ui.py:291
+    S_WAIT_FOR_CONVERSION_TO_FINIS_F367 = 'Wait for conversion to finish before closing this window.'  # tools/converter_ui.py:270
+    S_CONVERSION_IS_RUNNING_1D2F = 'Conversion is running'  # tools/converter_ui.py:270
+    S_HTTPS_DEVELOPER_ANDROID_COM__AE58 = 'https://developer.android.com/studio/terms'  # tools/converter_ui.py:266
+    S_COULD_NOT_OPEN_FOLDER_8FB6 = 'Could not open folder'  # tools/converter_ui.py:262
+    S_XDG_OPEN_1D79 = 'xdg-open'  # tools/converter_ui.py:260
+    S_DARWIN_8867 = 'darwin'  # tools/converter_ui.py:260
+    S_OPEN_35FF = 'open'  # tools/converter_ui.py:260
+    S_CONVERSION_FAILED_SEE_THE_LO_6278 = 'Conversion failed. See the log above for the error and full log location.'  # tools/converter_ui.py:252
+    S_CONVERSION_COMPLETE_OPEN_THE_8DF6 = 'Conversion complete. Open the output folder to play or install the APK.'  # tools/converter_ui.py:250
+    S_INSTALL_THIS_APK_430C = 'Install this APK'  # tools/converter_ui.py:236
+    S_NATIVE_GAME_FOLDER_912C = 'Native game folder:'  # tools/converter_ui.py:236
+    S_LINKING_GAME_1BED = 'Linking game'  # tools/converter_ui.py:236
+    S_BUILDING_GAME_EAA9 = 'Building game:'  # tools/converter_ui.py:236
+    N_1000_4051 = 1000  # tools/converter_ui.py:232
+    S_EMPTY_7299 = '.'  # tools/converter_ui.py:231
+    S_END_1C_EA5D = 'end-1c'  # tools/converter_ui.py:231
+    N_200_27BA = 200  # tools/converter_ui.py:223
+    S_SF2_CONVERTER_070A = 'sf2-converter'  # tools/converter_ui.py:219
+    S_DONE_58BF = 'done'  # tools/converter_ui.py:217
+    S_LINE_42D2 = 'line'  # tools/converter_ui.py:213
+    S_CONVERTING_THIS_CAN_TAKE_A_W_6E30 = 'Converting. This can take a while; progress appears below.'  # tools/converter_ui.py:206
+    S_END_2410 = 'end'  # tools/converter_ui.py:203
+    S_1_0_A511 = '1.0'  # tools/converter_ui.py:203
+    S_CHECK_CONVERSION_INPUTS_FE61 = 'Check conversion inputs'  # tools/converter_ui.py:198
+    S_LOG_0386 = '.log'  # tools/converter_ui.py:195
+    S_CONVERSION_D39C = 'conversion-'  # tools/converter_ui.py:195
+    S_BUILD_LOGS_31AC = 'build/logs'  # tools/converter_ui.py:193
+    S_CHOOSE_OUTPUT_FOLDER_56E2 = 'Choose output folder'  # tools/converter_ui.py:183
+    S_EMPTY_ED72 = '*'  # tools/converter_ui.py:178
+    S_ALL_FILES_B6F9 = 'All files'  # tools/converter_ui.py:178
+    S_KEYS_4302 = '*.keys'  # tools/converter_ui.py:178
+    S_KEY_FILES_2617 = 'Key files'  # tools/converter_ui.py:178
+    S_CHOOSE_PROD_KEYS_B9A7 = 'Choose prod.keys'  # tools/converter_ui.py:178
+    S_CHOOSE_EXTRACTED_UPDATED_GAM_C1FC = 'Choose extracted updated game'  # tools/converter_ui.py:173
+    S_NSP_7CDC = '*.nsp'  # tools/converter_ui.py:172
+    S_NSP_FILES_817B = 'NSP files'  # tools/converter_ui.py:172
+    S_CHOOSE_THE_COMBINED_NSP_15AA = 'Choose the combined NSP'  # tools/converter_ui.py:172
+    S_NORMAL_82FB = 'normal'  # tools/converter_ui.py:161
+    N_100_AD57 = 100  # tools/converter_ui.py:157
+    S_WM_DELETE_WINDOW_20BA = 'WM_DELETE_WINDOW'  # tools/converter_ui.py:156
+    S_OPEN_OUTPUT_FOLDER_43A5 = 'Open output folder'  # tools/converter_ui.py:154
+    S_E_8C86 = 'e'  # tools/converter_ui.py:153
+    S_CONVERT_C44A = 'Convert'  # tools/converter_ui.py:152
+    N_11_4FC8 = 11  # tools/converter_ui.py:151
+    S_WORD_3E29 = 'word'  # tools/converter_ui.py:146
+    S_DISABLED_F693 = 'disabled'  # tools/converter_ui.py:146
+    N_80_4844 = 80  # tools/converter_ui.py:146
+    N_10_4A44 = 10  # tools/converter_ui.py:146
+    S_INDETERMINATE_DC8D = 'indeterminate'  # tools/converter_ui.py:144
+    S_I_ACCEPT_THE_ANDROID_SDK_TER_EB06 = 'I accept the Android SDK terms'  # tools/converter_ui.py:140
+    S_READ_ANDROID_SDK_TERMS_A742 = 'Read Android SDK terms'  # tools/converter_ui.py:138
+    S_FIRST_ANDROID_SETUP_DOWNLOAD_DBCD = 'First Android setup downloads several GB.'  # tools/converter_ui.py:137
+    N_7_7902 = 7  # tools/converter_ui.py:136
+    S_CONVERT_FOR_B340 = 'Convert for'  # tools/converter_ui.py:134
+    S_BROWSE_36B5 = 'Browse...'  # tools/converter_ui.py:131
+    N_54_2FCA = 54  # tools/converter_ui.py:129
+    S_OUTPUT_FOLDER_362F = 'Output folder'  # tools/converter_ui.py:126
+    N_5_EF2D = 5  # tools/converter_ui.py:126
+    S_PROD_KEYS_8404 = 'prod.keys'  # tools/converter_ui.py:125
+    N_4_4B22 = 4  # tools/converter_ui.py:125
+    S_GAME_INPUT_A49F = 'Game input'  # tools/converter_ui.py:124
+    S_COMBOBOXSELECTED_E8BC = '<<ComboboxSelected>>'  # tools/converter_ui.py:122
+    S_INPUT_TYPE_C617 = 'Input type'  # tools/converter_ui.py:121
+    S_EW_F64D = 'ew'  # tools/converter_ui.py:117
+    N_2_D473 = 2  # tools/converter_ui.py:117
+    S_READONLY_C4A4 = 'readonly'  # tools/converter_ui.py:116
+    N_12_6B51 = 12  # tools/converter_ui.py:115
+    S_CHOOSE_YOUR_GAME_FILES_TO_BE_2FE6 = 'Choose your game files to begin.'  # tools/converter_ui.py:109
+    N_20_F5CA = 20  # tools/converter_ui.py:102
+    N_6_E7F6 = 6  # tools/converter_ui.py:102
+    N_650_2099 = 650  # tools/converter_ui.py:102
+    S_USE_YOUR_COMBINED_BASE_V1_1__75D0 = 'Use your combined base + v1.1.0 / update v131072 NSP, or extracted updated files.'  # tools/converter_ui.py:101
+    S_BOLD_AD3D = 'bold'  # tools/converter_ui.py:100
+    N_19_9400 = 19  # tools/converter_ui.py:100
+    S_EMPTY_12AE = ''  # tools/converter_ui.py:100
+    N_16_B17E = 16  # tools/converter_ui.py:99
+    S_LEFT_6157 = 'left'  # tools/converter_ui.py:99
+    N_72_8722 = 72  # tools/converter_ui.py:98
+    S_232A36_D57D = '#232a36'  # tools/converter_ui.py:98
+    N_3_4E07 = 3  # tools/converter_ui.py:97
+    N_9_1958 = 9  # tools/converter_ui.py:95
+    S_NSEW_C79F = 'nsew'  # tools/converter_ui.py:93
+    N_24_C235 = 24  # tools/converter_ui.py:92
+    N_570_085B = 570  # tools/converter_ui.py:89
+    N_700_99EE = 700  # tools/converter_ui.py:89
+    N_8_2C62 = 8  # tools/converter_ui.py:88
+    S_ASSETS_SF2RECOMP_PNG_B232 = 'assets/sf2recomp.png'  # tools/converter_ui.py:86
+    S_SF2RECOMP_CONVERTER_E815 = 'SF2Recomp Converter'  # tools/converter_ui.py:85
+    S_REPLACE_197D = 'replace'  # tools/converter_ui.py:68
+    S_W_7265 = 'w'  # tools/converter_ui.py:65
+    S_NT_ABB5 = 'nt'  # tools/converter_ui.py:64
+    S_CREATIONFLAGS_23A9 = 'creationflags'  # tools/converter_ui.py:64
+    S_UTF_8_D983 = 'utf-8'  # tools/converter_ui.py:63
+    S_1_3915 = '1'  # tools/converter_ui.py:63
+    S_TOOLS_FB82 = 'tools'  # tools/converter_ui.py:57
+    S_I_C4CD = '-I'  # tools/converter_ui.py:56
+    S_UTF8_DEF4 = 'utf8'  # tools/converter_ui.py:54
+    S_X_2FB0 = '-X'  # tools/converter_ui.py:54
+    S_U_A2FD = '-u'  # tools/converter_ui.py:54
+    S_CONVERT_PY_0CD7 = 'convert.py'  # tools/converter_ui.py:53
+    S_RELEASE_ENTRY_PY_4DB7 = 'release_entry.py'  # tools/converter_ui.py:53
+    S_ACCEPT_ANDROID_LICENSES_98C2 = '--accept-android-licenses'  # tools/converter_ui.py:52
+    S_X86_64_AC0E = 'x86_64'  # tools/converter_ui.py:50
+    S_ARM64_V8A_8231 = 'arm64-v8a'  # tools/converter_ui.py:50
+    S_ABI_FB9C = '--abi'  # tools/converter_ui.py:50
+    S_ANDROID_BF78 = '--android'  # tools/converter_ui.py:50
+    S_READ_AND_ACCEPT_THE_ANDROID__CD12 = 'Read and accept the Android SDK terms before downloading the Android tools.'  # tools/converter_ui.py:49
+    S_USE_A_DESKTOP_RELEASE_FOR_AN_8E74 = 'Use a desktop release for Android conversion, or tools/build_android.py from source.'  # tools/converter_ui.py:46
+    S_KEYS_77AF = '--keys'  # tools/converter_ui.py:42
+    S_THE_SELECTED_PROD_KEYS_FILE__5C1E = 'The selected prod.keys file does not exist.'  # tools/converter_ui.py:41
+    S_CHOOSE_YOUR_PROD_KEYS_FILE_F_B4A6 = 'Choose your prod.keys file for NSP extraction.'  # tools/converter_ui.py:38
+    S_OUTPUT_E459 = '--output'  # tools/converter_ui.py:35
+    S_GAME_3AF1 = '--game'  # tools/converter_ui.py:35
+    S_NSP_14EB = '--nsp'  # tools/converter_ui.py:35
+    S_CHOOSE_AN_OUTPUT_FOLDER_SEPA_E9CC = 'Choose an output folder separate from the input and tool files.'  # tools/converter_ui.py:34
+    S_THE_OUTPUT_MUST_BE_A_FOLDER_CE58 = 'The output must be a folder.'  # tools/converter_ui.py:31
+    S_CHOOSE_THE_SUPPORTED_COMBINE_8C3C = 'Choose the supported combined base + update NSP file.'  # tools/converter_ui.py:29
+    S_NSP_98FD = '.nsp'  # tools/converter_ui.py:28
+    S_THE_SELECTED_GAME_INPUT_DOES_5F6B = 'The selected game input does not exist.'  # tools/converter_ui.py:27
+    S_EMPTY_3251 = '"'  # tools/converter_ui.py:23
+    S_CHOOSE_YOUR_GAME_INPUT_AND_A_559F = 'Choose your game input and an output folder.'  # tools/converter_ui.py:22
+    S_CHOOSE_A_SUPPORTED_INPUT_AND_A0EF = 'Choose a supported input and target.'  # tools/converter_ui.py:20
+    S_EXTRACTED_GAME_FOLDER_DCD2 = 'Extracted game folder'  # tools/converter_ui.py:19
+    S_NSP_FILE_C79E = 'NSP file'  # tools/converter_ui.py:19
+    S_ANDROID_EMULATOR_X86_64_3D7D = 'Android emulator (x86-64)'  # tools/converter_ui.py:14
+    S_ANDROID_PHONE_ARM64_BADE = 'Android phone (ARM64)'  # tools/converter_ui.py:14
+    S_THIS_COMPUTER_737B = 'This computer'  # tools/converter_ui.py:14
+
+
+class PREPARE_ICON:
+    S_ASSETS_SF2RECOMP_README_PNG_6BA4 = 'assets/sf2recomp-readme.png'  # tools/prepare_icon.py:18
+    S_RGB_FDFD = 'RGB'  # tools/prepare_icon.py:18
+    S_232A36_D57D = '#232a36'  # tools/prepare_icon.py:16
+    S_MAIN_8B1C = '__main__'  # tools/prepare_icon.py:15
+    N_256_51E8 = 256  # tools/prepare_icon.py:12
+    N_128_2747 = 128  # tools/prepare_icon.py:12
+    N_64_A68B = 64  # tools/prepare_icon.py:12
+    N_48_9801 = 48  # tools/prepare_icon.py:12
+    N_32_E29C = 32  # tools/prepare_icon.py:12
+    N_24_C235 = 24  # tools/prepare_icon.py:12
+    N_16_B17E = 16  # tools/prepare_icon.py:12
+    S_ICO_8925 = 'ICO'  # tools/prepare_icon.py:11
+    S_ASSETS_SF2RECOMP_ICO_D724 = 'assets/sf2recomp.ico'  # tools/prepare_icon.py:11
+    S_RGBA_6607 = 'RGBA'  # tools/prepare_icon.py:11
+    S_ASSETS_SF2RECOMP_PNG_B232 = 'assets/sf2recomp.png'  # tools/prepare_icon.py:10
+
+
+class CHECK_DOC_LINKS:
+    S_MAIN_8B1C = '__main__'  # tools/check_doc_links.py:87
+    S_KEEP_THE_FIRST_LINK_TO_EACH__5506 = 'keep the first link to each target and unwrap later ones'  # tools/check_doc_links.py:78
+    S_STORE_TRUE_430C = 'store_true'  # tools/check_doc_links.py:78
+    S_FIX_DUPLICATES_017C = '--fix-duplicates'  # tools/check_doc_links.py:78
+    N_2_D473 = 2  # tools/check_doc_links.py:69
+    S_MD_FBAA = '.md'  # tools/check_doc_links.py:61
+    N_4_4B22 = 4  # tools/check_doc_links.py:51
+    N_10_4A44 = 10  # tools/check_doc_links.py:46
+    S_R_BID_03B6 = '\\bid="([^"]+)"'  # tools/check_doc_links.py:36
+    S_EMPTY_01F8 = '-'  # tools/check_doc_links.py:32
+    S_EMPTY_730D = ' '  # tools/check_doc_links.py:32
+    S_R_W_S_DBAF = '[^\\w\\s-]'  # tools/check_doc_links.py:32
+    S_EMPTY_6F49 = ''  # tools/check_doc_links.py:31
+    S_R_2712 = '<[^>]*>'  # tools/check_doc_links.py:31
+    S_R_H_1_6_H_1_6_8DE4 = '<h[1-6][^>]*>(.*?)</h[1-6]>'  # tools/check_doc_links.py:28
+    S_R_1_6_S_S_545F = '^#{1,6}\\s+(.+?)\\s*#*$'  # tools/check_doc_links.py:27
+    S_UTF_8_D983 = 'utf-8'  # tools/check_doc_links.py:26
+    S_EMPTY_5210 = ' '  # tools/check_doc_links.py:22
+    S_R_N_N_N_3931 = '```[^\\n]*\\n.*?```|`[^`\\n]+`'  # tools/check_doc_links.py:21
+    S_TOOLS_README_MD_73F7 = 'tools/*/README.md'  # tools/check_doc_links.py:17
+    S_TOOLS_README_MD_7708 = 'tools/README.md'  # tools/check_doc_links.py:17
+    S_DOCS_MD_8E3F = 'docs/**/*.md'  # tools/check_doc_links.py:16
+    S_ASSETS_README_MD_E66D = 'assets/README.md'  # tools/check_doc_links.py:16
+    S_README_MD_D82A = 'README.md'  # tools/check_doc_links.py:16
+    S_R_N_S_IMG_S_SRC_7C82 = '!\\[[^\\]\\n]*\\]\\(([^)\\s]+)\\)|<img\\s+[^>]*src="([^"]+)"'  # tools/check_doc_links.py:12
+    S_R_N_S_A_S_HREF_A_681D = '(?<!!)\\[([^\\]\\n]+)\\]\\(([^)\\s]+)\\)|<a\\s+href="([^"]+)"[^>]*>(.*?)</a>'  # tools/check_doc_links.py:11

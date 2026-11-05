@@ -46,6 +46,10 @@ def check():
     import ssl
     from PIL import Image
     from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+    # Tcl initialization checks that the GUI's native module and script data
+    # survived trimming and relocation, without requiring a display in CI.
+    import tkinter
+    tkinter.Tcl().eval(K.S_INFO_PATCHLEVEL_1337)
     ssl.create_default_context(cafile=certifi.where())
     payload = K.B_B_SF2RECOMP_DEPENDENCY_CHECK_9A52
     if lz4.block.decompress(lz4.block.compress(payload)) != payload:
@@ -61,6 +65,7 @@ def check():
     data = manifest()
     if not data:
         raise ValueError(K.S_RUN_THIS_CHECK_FROM_AN_ASSEM_A6E5)
+    check_decoder(data[K.S_TARGET_0B9D])
     for command in data[K.S_HELPERS_7DB9].values():
         if not Path(expand(command)[0]).is_file():
             raise ValueError(K.S_A_BUNDLED_INPUT_HELPER_IS_MI_B2A4)
@@ -108,6 +113,24 @@ def check():
     print(K.S_RELEASE_CHECK_PASSED_PYTHON__C041)
 
 
+def check_decoder(target):
+    """Start the shipped decoder without build-host DLL directories on PATH."""
+    decoder = ROOT / K.S_DEPS_E72A / (K.S_FFMPEG_B521 if target == K.S_LINUX_F32A else f"ffmpeg-{target}") / K.S_BIN_49FE
+    decoder /= K.S_FFMPEG_EXE_C804 if target == K.S_WINDOWS_E294 else K.S_FFMPEG_B521
+    env = environment()
+    env[K.S_PATH_8306] = K.S_EMPTY_12AE
+    env.pop(K.S_LD_PRELOAD_A3F7, None)
+    env.pop(K.S_DYLD_LIBRARY_PATH_A363, None)
+    env.pop(K.S_DYLD_INSERT_LIBRARIES_7927, None)
+    # Match the movie process's private decoder library path on Linux.
+    if target == K.S_LINUX_F32A:
+        env[K.S_LD_LIBRARY_PATH_6EAC] = str(decoder.parent.parent / K.S_LIB_5A09)
+    if target == K.S_WINDOWS_E294:
+        env[K.S_PATH_8306] = str(Path(os.environ.get(K.S_SYSTEMROOT_D7DA, K.S_C_WINDOWS_D008)) / K.S_SYSTEM32_0C2E)
+    subprocess.run([str(decoder), K.S_VERSION_88D4], check=True, capture_output=True,
+                   env=env, timeout=K.N_30_624B)
+
+
 def android(args):
     from setup_android import ensure
     env = ensure(accept_licenses=args.accept_android_licenses)
@@ -151,6 +174,8 @@ def main(argv=None):
     parser.add_argument(K.S_JOBS_0E7C, type=int, default=min(os.cpu_count() or 1, K.N_8_2C62))
     parser.add_argument(K.S_CHECK_464A, action=K.S_STORE_TRUE_2C29, help=K.S_TEST_THE_RELEASE_WITHOUT_GAM_F65A)
     parser.add_argument(K.S_PLAY_7BC5, action=K.S_STORE_TRUE_2C29, help=K.S_START_THE_CONVERTED_DESKTOP__6F60)
+    parser.add_argument(K.S_GUI_39FA, action=K.S_STORE_TRUE_430C, help=K.S_OPEN_THE_CONVERSION_WINDOW_1417)
+    parser.add_argument(K.S_CLI_30A2, action=K.S_STORE_TRUE_430C, help=K.S_USE_INTERACTIVE_TERMINAL_PRO_EA78)
     args = parser.parse_args(argv)
     data = manifest()
     if not data:
@@ -158,6 +183,9 @@ def main(argv=None):
     from host_tools import host_target
     if data[K.S_TARGET_0B9D] != host_target():
         raise ValueError(K.S_DOWNLOAD_THE_SF2RECOMP_RELEA_B302)
+    if args.gui or not (sys.argv[1:] if argv is None else argv):
+        from converter_ui import main as gui_main
+        return gui_main()
     if args.jobs < 1:
         parser.error(K.S_JOBS_MUST_BE_POSITIVE_A3BA)
     if args.check:

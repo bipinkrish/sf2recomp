@@ -3,6 +3,7 @@ import ctypes
 import importlib.util
 import json
 import pathlib
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -116,6 +117,28 @@ class WindowsPackageTests(unittest.TestCase):
                 convert.package_game(self.game, self.output, self.exe, self.sdl, self.ffmpeg, "windows")
         self.assertEqual([p.name for p in self.output.iterdir()], ["sf2.exe"])
         self.assertEqual((self.output / "sf2.exe").read_bytes(), b"existing game")
+
+    def test_release_conversion_keeps_decoder_dlls_next_to_ffmpeg(self):
+        convert = test_convert.convert
+        release_root = self.base / "portable tool"
+        release_root.mkdir()
+        for name in ("sf2recomp.ini", "LICENSE", "THIRD_PARTY_NOTICES"):
+            shutil.copy2(ROOT / name, release_root / name)
+        shutil.copytree(ROOT / "profiles", release_root / "profiles")
+        native = release_root / "native/lib"
+        native.mkdir(parents=True)
+        (native / "SDL3.dll").write_bytes(b"release SDL")
+        (self.ffmpeg / "bin/avutil-1.dll").write_bytes(b"decoder dependency")
+        with patch.object(convert, "ROOT", release_root), patch.object(convert, "run"), \
+                patch.object(convert, "release_manifest", return_value={"version": "test"}), \
+                patch.object(convert, "dependency_closure", side_effect=AssertionError("No objdump needed on the user's PC")):
+            convert.package_game(self.game, self.output, self.exe, self.sdl, self.ffmpeg, "windows")
+        decoder = self.output / "lib/ffmpeg/bin"
+        self.assertEqual((decoder / "avcodec-1.dll").read_bytes(), b"codec fixture")
+        self.assertEqual((decoder / "avutil-1.dll").read_bytes(), b"decoder dependency")
+        self.assertEqual((self.output / "SDL3.dll").read_bytes(), b"release SDL")
+        report = json.loads((self.output / "windows-dlls.json").read_text())
+        self.assertEqual(report["decoder"], ["avcodec-1.dll", "avutil-1.dll"])
 
 
 if __name__ == "__main__":

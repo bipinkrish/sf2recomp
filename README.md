@@ -1,217 +1,133 @@
-# SF2Recomp
+<p align="center">
+  <img src="assets/sf2recomp-readme.png" width="112" height="112" alt="SF2Recomp icon">
+</p>
 
-Play as mad Titan himself against a friend over LAN, or face him again in a boss
-refight, with support for 4K, 120 FPS and ultrawide displays on your choosen device.
+<h1 align="center">SF2Recomp</h1>
 
-A static recompilation of **Shadow Fight 2 for Nintendo Switch** into a native application with
-offline Sparring PvP, LAN Sparring, mouse menus, remappable controls and graphics
-settings.
+<p align="center">Shadow Fight 2 for Nintendo Switch, running as a native game on your device.</p>
 
-**You supply the game files. No game code, assets or keys are included.**
+<p align="center">
+  <a href="https://github.com/bipinkrish/sf2recomp/releases">Download</a> ·
+  <a href="#settings-and-controls">Settings</a> ·
+  <a href="docs/lan-sparring.md">LAN multiplayer</a> ·
+  <a href="docs/source-guide.md">Build from source</a>
+</p>
+
+Play as Shadow or Titan in Sparring, challenge bosses again, or fight a friend
+over LAN. SF2Recomp adds mouse menus, remappable controls, Android touch controls,
+and graphics options for high resolutions, high frame rates, and ultrawide displays.
+
+**Bring your own game files. No game code, game assets, or keys are included.**
+
+## Get started
+
+You need your own **combined base + v1.1.0 / update v131072 NSP**, including its
+CNMT XML sidecars and tickets, plus your `prod.keys` file. Separate base and update
+NSPs, NSZ files, and other game versions are not supported. Already extracted
+updated game files also work and do not need keys.
+
+1. Download the desktop tool for your computer using **Download** above.
+2. Extract the entire archive into a writable folder.
+3. Open the launcher for your system:
+
+   | System | Launcher |
+   | --- | --- |
+   | Windows | `sf2recomp.cmd` |
+   | Linux | `sf2recomp` |
+   | macOS | `SF2Recomp.command` |
+
+4. In the conversion window, browse for your NSP, `prod.keys`, and output folder.
+   For extracted files, choose **Extracted game folder** under **Input type**.
+5. Leave **Convert for** set to **This computer**, then click **Convert**.
+6. When conversion finishes, click **Open output folder** and run `sf2.exe` or `sf2`.
+
+Keep the converted folder's files together. Your settings are in `sf2recomp.ini`,
+and your saves are in `save/`. The tool bundles its compiler and FFmpeg decoder;
+you do not need to install Python, a compiler, or FFmpeg to use a desktop release.
+
+If conversion fails, read the error in the window. A full log is saved under
+`build/logs/` in the tool folder. If no release is available, use the source guide
+linked above.
+
+## Conversion tool
+
+The desktop launcher opens the converter window automatically. Browse for your
+game input and keys, choose where to save the result, then click **Convert**.
+The window shows progress and errors, saves the full log, and enables
+**Open output folder** when conversion succeeds.
+
+![SF2Recomp converter with game and key file pickers, target selection, a progress log, and conversion buttons](docs/screenshots/converter-ui.png)
 
 ## Status
 
-**Supported game input:** a combined base + **v1.1.0 / update v131072** NSP with
-its CNMT XML sidecars and tickets. Separate base/update NSPs, NSZ and other
-versions are not supported yet.
+You need a compatible **Vulkan 1.3 GPU and graphics driver**. High resolutions
+and frame rates depend on your hardware;
 
-| Platform | Status |
+| Platform | Requirements |
 | --- | --- |
-| Linux x86-64 | Tested desktop development target. |
-| Windows x86-64 | Experimental; native gameplay validation pending. |
-| macOS Apple Silicon | Experimental; native gameplay and GPU validation pending. |
-| Android arm64 / x86-64 | Development builds |
-
-## Download and play
-
-1. Download the SF2Recomp tool for your computer from
-   [Releases](https://github.com/bipinkrish/sf2recomp/releases).
-2. Extract the whole archive into a writable folder.
-3. Open `sf2recomp.cmd` on Windows, `SF2Recomp.command` on macOS, or
-   `sf2recomp` on Linux.
-4. Enter your NSP and `prod.keys` paths, then choose an output folder.
-5. Wait for conversion, then run `sf2.exe` or `sf2` from the output folder.
-
-The desktop release bundles its conversion tools and compiler. You need a
-compatible Vulkan 1.3 GPU and graphics driver. Windows and macOS remain
-experimental; successful CI checks do not establish gameplay compatibility.
-
-Already extracted updated files work without
-keys through `--game`. Release packages are built by the desktop release workflow. If no downloadable
-package is available yet, use the [source build guide](docs/source-guide.md#requirements).
-
-Command-line conversion:
-
-```sh
-./sf2recomp --nsp "/path/game.nsp" --keys "/path/prod.keys" --output "/path/Shadow Fight 2" --play
-```
-
-On Windows, use `sf2recomp.cmd` in place of `./sf2recomp`.
-
-## Android
-
-Use the same desktop tool to build a private APK for your phone. Select Android
-at the prompt, or run:
-
-```sh
-./sf2recomp --android --nsp "/path/game.nsp" --keys "/path/prod.keys" --output "/path/APK" --accept-android-licenses
-```
-
-On first use, the extension downloads Java, SDK/NDK and
-build dependencies into the tool folder. It needs several GB and an internet
-connection. Later builds reuse these files. Android Studio is not required.
+| Linux x86-64 | glibc 2.39+, such as Ubuntu 24.04 or newer. |
+| Windows x86-64 | Windows 10 or 11. |
+| macOS Apple Silicon | macOS 15+. Experimental; gameplay and GPU validation pending. |
+| Android ARM64 / x86-64 | Android 13+ and compatible Vulkan 1.3 features. |
 
 ## Features
 
-Keyboard defaults: **WASD** to move, **K/J/L/I** for A/B/X/Y, and
-**Return/Backspace** for Plus/Minus. Edit `sf2recomp.ini` in the converted game
-folder for settings. Saves live under `save/` by default.
+The [complete feature guide](docs/features.md) covers every feature, its settings,
+current limitations, and the full gameplay screenshot gallery.
 
-[Settings and controls guide](docs/runtime-guide.md) ·
-[LAN guide](docs/lan-sparring.md)
+## Settings and controls
 
-The recompilation adds desktop features and graphics options beyond the Switch
-release, and exposes some of the game's original developer tools. Settings below
-live in **`sf2recomp.ini` beside the converted executable** and take effect after
-restarting; no rebuild is needed.
+Edit **`sf2recomp.ini` beside the converted executable**, then restart the game.
+Use **More settings** below for every section, examples,
+controller mappings, save imports, and graphics settings.
 
-Screenshots are from native Linux and Android builds. Click an image for full
-resolution.
+| Default key | Action |
+| --- | --- |
+| `W A S D` | Move |
+| `K / J / L / I` | Switch `A / B / X / Y` actions |
+| `Tab / Backspace` | Switch `Plus / Minus` actions |
 
-### Ultrawide and graphics
+Settings apply at launch, so changing the INI does not require another conversion. <a href="docs/runtime-guide.md">More settings</a>.
 
-- **Aspect ratios (experimental)**. `[video] aspect_ratio` accepts `16:10`, `21:9` or `32:9`, with native screen sizes of 1728×1080, 2520×1080 and 3840×1080 before uniform scaling. Restart after changing; `original` / `16:9` is the default. In 32:9, scenery is enlarged uniformly to cover the sides, cropping some background detail vertically. Fighter and HUD proportions are preserved. Movies keep their original proportions.
+## Android
 
-- **Native display resolution**. `[video] internal_resolution = auto` or `match` renders at the window's fitted drawable pixel size, following window resizing and fullscreen. Higher resolutions improve geometry edges; bitmap artwork and font atlases retain their original detail.
+Open the desktop converter and select **Android phone (ARM64)** under **Convert for**.
+Read and accept the Android SDK terms, then click **Convert**. Install the resulting
+APK on your phone. Use **Android emulator (x86-64)** for an emulator.
 
-- **Resolution scaling**. Fixed internal-resolution presets of `0.25x`, `0.50x`, `0.75x`, `1x`, `2x`, `3x` and `4x` let you trade rendering detail for performance, within the GPU's texture-size limit.
+First-time Android setup downloads several GB of Java, SDK/NDK, and build tools.
+You need an internet connection and enough space in the tool folder. Later builds
+reuse those downloads. Android Studio is not required.
 
-- **Dynamic resolution**. `[video] internal_resolution = dynamic` adjusts render scale in response to GPU load to work toward the configured frame-rate target.
+## Command line
 
-- **AMD FSR 1 upscaling**. `[video] upscaler = fsr1` enables spatial upscaling and sharpening when the rendered image is smaller than its window area. Use a lower internal resolution to activate it; `auto` selects bilinear on integrated GPUs and FSR 1 on discrete GPUs.
+The launcher also accepts command-line arguments. On Windows, replace
+`./sf2recomp` with `sf2recomp.cmd`.
 
-- **SMAA anti-aliasing**. `[video] antialiasing = smaa` enables optional post-process edge smoothing. Disabled by default.
+```sh
+# Convert and launch the desktop game
+./sf2recomp --nsp "/path/game.nsp" --keys "/path/prod.keys" --output "/path/SF2" --play
 
-- **Configurable frame rate**. `[video] target_fps` accepts **30–360**, including targets above 60 FPS, and sets the game's target frame rate and presentation pacing. Achievable performance depends on hardware; set the host display refresh rate separately.
+# Use already extracted updated game files
+./sf2recomp --game "/path/extracted/update" --output "/path/SF2"
 
-- **Desktop window modes**. A resizable window or fullscreen, selected with `[video] fullscreen`.
-
-[![Wraith versus Aquaris on the night lake stage, filling the 32:9 view](docs/screenshots/ultrawide-night.png)](docs/screenshots/ultrawide-night.png)
-
-*32:9 gameplay at 5120×1440, with scenery cover scaling.*
-
-### Desktop controls and menus
-
-- **Remappable keyboard and controllers**. `[controls.keyboard]` and `[controls.gamepad]` map desktop inputs to Switch actions, including unbinding actions and sharing inputs.
-
-- **Mouse menus**. Hover and left-click use the game's existing menu buttons. Pointer coordinates follow window resizing, black bars, HiDPI displays and configured aspect ratios; existing sliders and scroll views also receive mouse drag and wheel input.
-
-- **Menu layout**. The bottom controller-hint strips are hidden on desktop and Android. Centered dialog prompts, combat hints and the gameplay HUD remain visible.
-
-- **Desktop Exit button**. The main menu's localized **Exit** option closes the game and returns to the desktop, including in fullscreen.
-
-- **Desktop configuration**. The INI also provides language selection (including system-locale detection), master volume and reverb controls. Alternate configuration and writable data locations can be selected at launch.
-
-<p>
-  <a href="docs/screenshots/main-menu.png"><img src="docs/screenshots/main-menu.png" width="49%" alt="Desktop main menu without the bottom controller-hint strip and with an Exit option"></a>
-  <a href="docs/screenshots/mouse-settings.png"><img src="docs/screenshots/mouse-settings.png" width="49%" alt="The current desktop Settings menu with the Sound slider selected by mouse and no bottom controller hints"></a>
-</p>
-
-*Desktop main menu and Exit option · Mouse-operated settings.*
-
-### Sparring roster
-
-- **Unlocked Sparring roster**. `[gameplay] unlock_all_sparring_characters = true` makes every Sparring character available without campaign progression. Enabled by default; does not change saved Story unlocks.
-
-- **Shadow and Titan in Sparring**. Enabled by default with `[gameplay] enable_shadow_in_sparring` and `enable_titan_in_sparring`. Shadow uses his equipped campaign gear; Titan uses his own sword, ranged arm and magic. Move down past the third roster row to reveal more fighters at the original portrait size. See [roster settings](docs/runtime-guide.md#sparring-roster).
-
-<p>
-  <a href="docs/screenshots/character-select.png"><img src="docs/screenshots/character-select.png" width="49%" alt="The unlocked Sparring character roster with Fury ready and the footer hidden"></a>
-  <a href="docs/screenshots/sparring-titan.png"><img src="docs/screenshots/sparring-titan.png" width="49%" alt="Titan fighting Shogun in Sparring, with his sword and boss-power indicator visible"></a>
-</p>
-
-*Unlocked character selection · Titan versus Shogun in Sparring.*
-
-### Boss refights and movies
-
-- **Boss refights and completed save**. Defeated bosses and Gates of Shadows have a Refight button with an X shortcut, including the six boss encounters after the Gates. Refights grant no rewards and leave saves unchanged. APKs and native packages bundle a completed save, selected with `[storage] use_completed_save = true`. Disabled by default; uses a separate profile.
-
-- **Unlocked Extras movies**. `[gameplay] unlock_all_videos = true` enables gallery movie playback without changing watched-video save flags. Enabled in the supplied INI.
-
-- **Intro and gameplay toggles**. Skip the intro with mapped A/B, Space, or a mouse click, or disable it with `[gameplay] show_intro = false`. Startup data and GPU heap preparation run during playback to reduce the wait after skipping. `ai_enabled` and `show_time_results` expose the original AI and timing-display controls.
-
-<p>
-  <a href="docs/screenshots/boss-refight.png"><img src="docs/screenshots/boss-refight.png" width="49%" alt="Completed Lynx encounter with the Refight button visible on the campaign map"></a>
-  <a href="docs/screenshots/extras-movies.png"><img src="docs/screenshots/extras-movies.png" width="49%" alt="The unlocked Extras video gallery showing The Beginning and Gates of Shadows"></a>
-</p>
-
-*Completed Lynx encounter with Refight · Unlocked Extras movies.*
-
-### Developer tools
-
-- **Desktop developer console**. Opt in with `[developer] console = true`; **F1** or **backtick** opens the original console with desktop text input, command history and scrolling.
-
-- **Fight trainer and shop cheats**. Optional `[developer] trainer` and `shop_cheats` expose the original fight controls and local shop actions through the console. Disabled by default; currency, items, levels and fight results can be saved by the game.
-
-- **Debug overlays**. Opt in with `[developer] overlays = true`, then use **F2** to toggle the original FPS, memory, build and model/animation displays in supported scenes.
-
-<p>
-  <a href="docs/screenshots/developer-console.png"><img src="docs/screenshots/developer-console.png" width="49%" alt="The desktop developer console displaying available trainer commands"></a>
-  <a href="docs/screenshots/debug-overlays.png"><img src="docs/screenshots/debug-overlays.png" width="49%" alt="An active fight with a trainer command applied and FPS, memory and animation debug overlays visible"></a>
-</p>
-
-*Console and trainer commands · Trainer action and combat debug overlays.*
-
-### LAN Sparring
-
-- **LAN Sparring (experimental)**. Native Normal/LAN and Host/Join menus, local host discovery and persistent two-player sessions. Both devices must use the same SF2Recomp release and matching roster settings. No Python launcher required. See the [LAN guide](docs/lan-sparring.md).
-
-<p>
-  <a href="docs/screenshots/lan-mode.png"><img src="docs/screenshots/lan-mode.png" width="49%" alt="Sparring menu offering Normal and LAN Multiplayer modes"></a>
-  <a href="docs/screenshots/lan-host-join.png"><img src="docs/screenshots/lan-host-join.png" width="49%" alt="LAN Multiplayer menu offering Host, Join and Back"></a>
-</p>
-
-*Normal and LAN choices · Native Host and Join menu.*
-
-### Android touch controls
-
-The Android build uses the retained mobile joystick and action buttons, with
-simultaneous movement and attacks. Sparring characters with a special ability
-also get a boss-power button. Keyboard and controller input remain available.
-See [Android development](#android) for setup and device requirements.
-
-[![Lynx versus Corsair on Android, with touch controls and the boss-power button ready](docs/screenshots/android-sparring.png)](docs/screenshots/android-sparring.png)
-
-*Android Sparring with touch controls and Lynx's boss power ready.*
-
-### Saves and offline settings
-
-- **Game network blocking**. `[network] enabled = false` is the default and blocks game connections, DNS, uploads, online multiplayer, external web links and the remote developer listener. Offline Sparring remains available. Enabling networking does not implement missing online services.
-
-- **Configurable save location and imports**. `[storage] save_directory` selects a portable or custom save folder. Existing `userdata/` backups can be imported under its `save_0/` directory.
-
-See the [settings and controls guide](docs/runtime-guide.md) for setup, commands
-and limitations, and the [supplied INI](sf2recomp.ini) for shipped defaults.
-Full-game stability and timing at every supported frame-rate setting remain
-unverified; see [Status](#status).
-
+# Use terminal prompts instead of the conversion window
+./sf2recomp --cli
+```
 
 ## Development
 
-[Build from source](docs/source-guide.md#requirements) ·
-[Windows](docs/windows.md) · [macOS](docs/macos.md) ·
-[Android development](docs/source-guide.md#android-development) ·
-[Release builds and versioning](docs/releases.md) ·
-[Development and verification](docs/development.md)
-
-Linux x86-64 is the tested desktop development target. Windows x86-64 and macOS
-Apple Silicon support are experimental. Android arm64/x86-64 development
-builds exist; see the source guide for validation details.
+The source guide linked at the top covers dependencies, conversion, and Android builds.
+More specific references are available for
+[Windows](docs/windows.md), [macOS](docs/macos.md),
+[release packaging](docs/releases.md), and [development and verification](docs/development.md).
 
 ## License
 
-Project additions use the [MIT license](LICENSE). Bundled dependencies retain
-their own licenses; see [third-party notices](THIRD_PARTY_NOTICES).
-This is an independent fan project with no affiliation to Nekki or Nintendo.
+Project code uses the [MIT license](LICENSE). Dependencies and the project icon
+retain their own licenses and ownership; see the [third-party notices](THIRD_PARTY_NOTICES)
+and [icon source](assets/README.md).
+
+This is an independent fan project, unaffiliated with Nekki or Nintendo.
 Game content belongs to its respective owners. Converted output contains your
 game files and translated game code; keep it private.

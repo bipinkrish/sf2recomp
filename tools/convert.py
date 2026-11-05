@@ -186,6 +186,10 @@ def package_game(game, output, executable, sdl_dir, ffmpeg_dir, target=K.S_LINUX
     ffmpeg_lib.mkdir(parents=True)
     shutil.copy2(ffmpeg_executable, ffmpeg_bin / decoder_name)
     if windows:
+        # Releases already seal the decoder's dependency closure beside ffmpeg.exe.
+        # Keep those DLLs in the converted folder too, where Windows searches.
+        if release:
+            decoder_dlls = {path.name.lower(): path for path in ffmpeg_libraries}
         for path in game_dlls.values():
             shutil.copy2(path, output / path.name)
         for path in decoder_dlls.values():

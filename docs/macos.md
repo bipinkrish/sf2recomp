@@ -75,7 +75,7 @@ python3 tools/convert.py --target macos \
 ```
 
 The required game layout and supported version are the same as the
-[main guide](../README.md#getting-started). To convert directly from the supported
+[main guide](../README.md#get-started). To convert directly from the supported
 combined NSP, replace `--game` with `--nsp "/path/to/game.nsp" --keys
 "/path/to/prod.keys"`. Native hactool/NSTool builds go into
 `build/tools/extraction/macos` and `tools/bin/macos`; Linux ELF executables are

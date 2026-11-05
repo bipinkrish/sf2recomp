@@ -40,12 +40,15 @@ def tracked_sources(destination):
     names += [str(p.relative_to(ROOT)) for p in (ROOT / K.S_ANDROID_APP_SRC_B0FE).rglob(K.S_EMPTY_15A7) if p.is_file()]
     names += [K.S_ANDROID_TOOLCHAIN_PROPERTIES_C485]
     names += [K.S_TOOLS_RELEASE_REQUIREMENTS_T_C924]
+    names += [K.S_ASSETS_SF2RECOMP_PNG_B232, K.S_ASSETS_SF2RECOMP_ICO_D724, K.S_ASSETS_README_MD_E66D, K.S_ASSETS_SF2RECOMP_README_PNG_6BA4]
     for name in sorted(set(names)):
         if any(fnmatch.fnmatchcase(name, pattern) for pattern in K.RELEASE_DEVELOPMENT_SOURCES):
             continue
         if (name.startswith((K.S_RUNTIME_DCB2, K.S_ANDROID_6555, K.S_LICENSES_A259, K.S_PROFILES_COMPLETED_7E4B, K.S_TOOLS_RECOMPR_D6DD))
                 or re.fullmatch(K.S_TOOLS_PY_JSON_TXT_5978, name)
-                or name in (K.S_LICENSE_6485, K.S_THIRD_PARTY_NOTICES_F9CA, K.S_SF2RECOMP_INI_8714, K.S_TOOLS_IL2CPP_CONFIG_JSON_BC09)):
+                or name in (K.S_LICENSE_6485, K.S_THIRD_PARTY_NOTICES_F9CA, K.S_SF2RECOMP_INI_8714, K.S_TOOLS_IL2CPP_CONFIG_JSON_BC09,
+                            K.S_ASSETS_SF2RECOMP_PNG_B232, K.S_ASSETS_SF2RECOMP_ICO_D724, K.S_ASSETS_README_MD_E66D,
+                            K.S_ASSETS_SF2RECOMP_README_PNG_6BA4)):
             path = ROOT / name
             if path.is_file():
                 copy(path, destination / name)
@@ -217,7 +220,7 @@ def windows_toolchain(destination, prefix, helpers):
     resources = sorted((toolchain / K.S_LIB_CLANG_EF86).iterdir())[-1].name
     compiler = [K.S_ROOT_NATIVE_TOOLCHAIN_BIN_CL_F3AB, K.S_SYSROOT_ROOT_NATIVE_TOOLCHAI_6686,
                 K.S_TARGET_X86_64_W64_WINDOWS_GN_8EC4, K.S_RESOURCE_DIR_ROOT_NATIVE_TOO_443D + resources,
-                K.S_B_ROOT_NATIVE_TOOLCHAIN_BIN_0898, K.S_L_ROOT_NATIVE_TOOLCHAIN_LIB_AEFE]
+                K.S_B_ROOT_NATIVE_TOOLCHAIN_BIN_0898]
     return compiler
 
 
@@ -268,8 +271,6 @@ def trim_python(python_prefix):
     unused = [python_prefix / name for name in K.PYTHON_UNUSED_PREFIX_PATHS]
     for pattern in K.PYTHON_UNUSED_PREFIX_GLOBS:
         unused.extend(python_prefix.glob(pattern))
-    for pattern in K.PYTHON_GUI_LIBRARY_GLOBS:
-        unused.extend(p for p in (python_prefix / K.S_LIB_427F).glob(pattern) if p.is_dir())
     binaries = python_prefix / K.S_BIN_0955
     if binaries.is_dir():
         unused.extend(p for p in binaries.iterdir() if not re.fullmatch(K.PYTHON_INTERPRETER_PATTERN, p.name))
@@ -299,8 +300,20 @@ def trim_python(python_prefix):
     unused.extend(python_prefix.rglob(K.S_PYCACHE_6B2B))
     unused.extend(python_prefix.rglob(K.S_PYC_6D8E))
     saved = prune_files(unused)
-    print(f"Trimmed {saved} bytes of unused Python development/GUI files.")
+    print(f"Trimmed {saved} bytes of unused Python development files.")
     return saved
+
+
+def bundle_windows_decoder(prefix, search_dirs):
+    """Seal FFmpeg's recursive imports beside the decoder before shipping it."""
+    from windows_dlls import dependency_closure
+    binary = prefix / K.S_BIN_FFMPEG_EXE_31C1
+    libraries = dependency_closure([binary], [binary.parent, *search_dirs])
+    for path in libraries.values():
+        destination = binary.parent / path.name
+        if path.resolve() != destination.resolve():
+            copy(path, destination)
+    return libraries
 
 
 def trim_decoder(prefix):
@@ -407,9 +420,12 @@ def main():
     trim_decoder(ffmpeg_destination)
     shutil.copytree(sdl / K.S_SHARE_LICENSES_384B, destination / K.S_NATIVE_LICENSES_9EA2, dirs_exist_ok=True) if (sdl / K.S_SHARE_LICENSES_384B).is_dir() else None
     if target == K.S_WINDOWS_F2ED:
+        bundle_windows_decoder(ffmpeg_destination, [prefix / K.S_BIN_0955])
         compiler = windows_toolchain(destination, prefix, helper_binaries)
         common = [K.S_MCX16_6162, K.S_D_FILE_OFFSET_BITS_64_65D6, K.S_D_WIN32_WINNT_0X0A00_53DA]
-        probe = [K.S_FUSE_LD_LLD_F8AB, K.S_PTHREAD_AF25, K.S_LM_656A]
+        # Library search paths belong to linking; Clang warns for every generated
+        # module when -L is also passed to compile-only invocations.
+        probe = [K.S_L_ROOT_NATIVE_TOOLCHAIN_LIB_AEFE, K.S_FUSE_LD_LLD_F8AB, K.S_PTHREAD_AF25, K.S_LM_656A]
         libraries = [K.S_LSDL3_C720, K.S_LVULKAN_1_00BF, K.S_LSHADERC_SHARED_B0DE, K.S_LSTDC_1622, K.S_LWINPTHREAD_D6C4,
                      K.S_LWS2_32_F964, K.S_LWINMM_8846, K.S_LSHELL32_F44A, K.S_LOLE32_E1E5, K.S_LADVAPI32_76E9, K.S_LUSER32_B276]
         link = [*probe, K.S_WL_WHOLE_ARCHIVE_0FF3, K.S_ROOT_NATIVE_RUNTIME_A_DC0A, K.S_WL_NO_WHOLE_ARCHIVE_ED9D,

@@ -3,7 +3,7 @@
 ## Version the tool
 
 The tool version is independent of the original game's v1.1.0 display version.
-Update `SF2RECOMP_VERSION` in `runtime/version.h`, then tag the commit `v0.1.0`
+Update `SF2RECOMP_VERSION` in `runtime/version.h`, then tag the commit `v0.2.0`
 using that version. The workflow rejects a tag that disagrees with the source.
 `sf2recomp --version`, the converted game's `--version`, archive filenames and
 the native runtime use this version.

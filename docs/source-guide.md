@@ -143,7 +143,7 @@ resolution.
 The Android build uses the retained mobile joystick and action buttons, with
 simultaneous movement and attacks. Sparring characters with a special ability
 also get a boss-power button. Keyboard and controller input remain available.
-See [Android development](#android-development) for setup and device requirements.
+See Android development for setup and device requirements.
 
 [![Lynx versus Corsair on Android, with touch controls and the boss-power button ready](screenshots/android-sparring.png)](screenshots/android-sparring.png)
 
@@ -158,13 +158,13 @@ See [Android development](#android-development) for setup and device requirement
 See the [settings and controls guide](runtime-guide.md) for setup, commands
 and limitations, and the [supplied INI](../sf2recomp.ini) for shipped defaults.
 Full-game stability and timing at every supported frame-rate setting remain
-unverified; see [Status](#status).
+unverified; see Status.
 
 ## Requirements
 
 For the complete experimental Windows workflow, including local extraction and
-symbol analysis, follow the [Windows guide](windows.md).
-For Apple Silicon and Intel Macs, follow the [macOS guide](macos.md).
+symbol analysis, follow the Windows guide.
+For Apple Silicon and Intel Macs, follow the macOS guide.
 
 To build and convert on **Linux x86-64**, install:
 
@@ -209,7 +209,7 @@ supported main build ID, and the executable checks matching main/SDK identities
 before boot.
 
 **No `prod.keys` or tickets are needed for this workflow.** If your input is an
-encrypted NSP instead, use [NSP extraction](#optional-extract-from-an-nsp).
+encrypted NSP instead, use NSP extraction.
 
 ### 2. Set up Python
 
@@ -306,9 +306,9 @@ Saves default to `save/` inside the converted folder. Change
 unlocked by default; set `[gameplay] unlock_all_sparring_characters = false`
 to restore save-based unlocks.
 
-See the [settings and controls guide](runtime-guide.md) for graphics,
+See the settings and controls guide for graphics,
 language, save imports, controller prompts and optional developer tools.
-The [supplied INI](../sf2recomp.ini) lists the shipped settings and bindings.
+The supplied INI lists the shipped settings and bindings.
 
 ## Android development
 
@@ -446,7 +446,7 @@ python3 -m unittest discover -s tests -v
 - [Development and verification](development.md): regeneration, local
   launcher, GPU diagnostics and validation notes.
 - [Generator guide](../tools/recompr/README.md): translating the main and SDK modules.
-- [Working findings](findings.md): historical investigation notes.
+- Working findings: historical investigation notes.
 
 ## Legal
 
