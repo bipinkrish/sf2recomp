@@ -71,6 +71,7 @@ class ReleaseCompilerTests(unittest.TestCase):
     def test_compile_and_link_do_not_emit_unused_argument_warnings(self):
         with tempfile.TemporaryDirectory(prefix='sf2 compiler ') as temporary:
             root = Path(temporary)
+            (root / 'lib').mkdir()  # Apple's linker warns when a -L directory is missing.
             source = root / 'module.c'
             source.write_text('int main(void) { return 0; }\n')
             # Older manifests put -L in the compiler command. This triggers the
