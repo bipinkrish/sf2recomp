@@ -306,7 +306,7 @@ void plat_thread_realtime(uint64_t period_ns) {
 int plat_thread_realtime_check(uint64_t period_ns) { (void)period_ns; return -1; }
 
 // ---- process
-// GUI launches keep their own append-only log; lasrecomp.log names the latest run, with five recent backups.
+// Game launches keep an append-only session log. shadow-fight-2.log names the latest run.
 // A launcher and the game it starts share one session, so another launch cannot truncate either writer.
 static char g_log_path[MAX_PATH], g_log_latest[MAX_PATH];
 static char g_log_tag[MAX_PATH + SF2C_WINDOWS_N_16_B17E];
@@ -330,12 +330,24 @@ static int newest_log(const void *a, const void *b) {
     int time = CompareFileTime(&y->created, &x->created);
     return time ? time : strcmp(y->name, x->name);
 }
-static bool session_log_name(const char *name) {  // lasrecomp-backup-<filetime hex>-<pid>.log
-    if (strncmp(name, SF2C_WINDOWS_S_LASRECOMP_BACKUP_9CFD, SF2C_WINDOWS_N_17_4523)) return false;
-    const char *p = name + SF2C_WINDOWS_N_17_4523;
-    while ((*p >= SF2C_WINDOWS_CH_0_59A9 && *p <= SF2C_WINDOWS_CH_9_E453) || (*p >= SF2C_WINDOWS_CH_A_D749 && *p <= SF2C_WINDOWS_CH_F_CE92) || *p == SF2C_WINDOWS_CH_EMPTY_01F8) p++;
-    return p > name + SF2C_WINDOWS_N_17_4523 && !strcmp(p, SF2C_WINDOWS_S_LOG_0386);
+static bool session_log_name(const char *name) {
+    static const char prefix[] = SF2C_WINDOWS_S_SHADOW_FIGHT_2_BA56;
+    if (strncmp(name, prefix, sizeof prefix - 1)) return false;
+    const char *start = name + sizeof prefix - 1;
+    const char *p = start + strspn(start, SF2C_WINDOWS_S_0123456789_EB5E);
+    return p != start && !strcmp(p, SF2C_WINDOWS_S_LOG_0386);
 }
+
+static bool session_log_path(char *path, size_t size, const char *dir, FILETIME stamp, DWORD pid) {
+    FILETIME local;
+    SYSTEMTIME date;
+    if (!FileTimeToLocalFileTime(&stamp, &local) || !FileTimeToSystemTime(&local, &date)) return false;
+    int used = snprintf(path, size, SF2C_WINDOWS_S_SSHADOW_FIGHT_2_04D_02D_02D__4AB3, dir,
+                        date.wYear, date.wMonth, date.wDay, date.wHour, date.wMinute,
+                        date.wSecond, date.wMilliseconds, (unsigned long)pid);
+    return used >= 0 && (size_t)used < size;
+}
+
 static void keep_legacy_log(const char *dir) {
     WIN32_FILE_ATTRIBUTE_DATA old;
     if (!GetFileAttributesExA(g_log_latest, GetFileExInfoStandard, &old) ||
@@ -349,7 +361,7 @@ static void keep_legacy_log(const char *dir) {
         ReadFile(old_file, old_tag, sizeof old_tag - 1, &got, NULL); CloseHandle(old_file);
     }
     char path[MAX_PATH];
-    snprintf(path, sizeof path, SF2C_WINDOWS_S_SLASRECOMP_BACKUP_LOG_F9E4, dir);
+    snprintf(path, sizeof path, SF2C_WINDOWS_S_SSHADOW_FIGHT_2_LOG_18FE, dir);
     WIN32_FIND_DATAA data;
     HANDLE find = FindFirstFileA(path, &data);
     bool kept = false;
@@ -361,16 +373,13 @@ static void keep_legacy_log(const char *dir) {
         while (!kept && FindNextFileA(find, &data));
         FindClose(find);
     }
-    // The first launch after upgrading may only have the old lasrecomp.log; retain that report too.
-    if (!kept) {
-        unsigned long long stamp = ((unsigned long long)old.ftCreationTime.dwHighDateTime << SF2C_WINDOWS_N_32_E29C) | old.ftCreationTime.dwLowDateTime;
-        if (snprintf(path, sizeof path, SF2C_WINDOWS_S_SLASRECOMP_BACKUP_016LLX_0_L_A116, dir, stamp) < (int)sizeof path)
-            CopyFileA(g_log_latest, path, TRUE);
-    }
+    // Retain a standalone latest report if its session file is missing.
+    if (!kept && session_log_path(path, sizeof path, dir, old.ftCreationTime, 0))
+        CopyFileA(g_log_latest, path, TRUE);
 }
 static void prune_logs(const char *dir) {
     char path[MAX_PATH];
-    if (snprintf(path, sizeof path, SF2C_WINDOWS_S_SLASRECOMP_BACKUP_LOG_F9E4, dir) >= (int)sizeof path) return;
+    if (snprintf(path, sizeof path, SF2C_WINDOWS_S_SSHADOW_FIGHT_2_LOG_18FE, dir) >= (int)sizeof path) return;
     WIN32_FIND_DATAA data;
     HANDLE find = FindFirstFileA(path, &data);
     if (find == INVALID_HANDLE_VALUE) return;
@@ -397,7 +406,7 @@ static void prune_logs(const char *dir) {
     free(logs);
 }
 
-// NTFS can give the newest session both names, keeping lasrecomp.log current even after a crash. On filesystems
+// NTFS can give the newest session both names, keeping shadow-fight-2.log current even after a crash. On filesystems
 // without hard links, copy on exit instead. The unique session header identifies who owns the latest report;
 // creation times can collide for simultaneous launches. The startup mutex also covers this replacement.
 static void publish_log(void) {
@@ -418,20 +427,27 @@ static void publish_log(void) {
     ReleaseMutex(g_log_mutex);
 }
 
-static void log_to_file_without_console(void) {
-    // An inherited pipe/file (tools, terminal) is already somewhere useful. Only the GUI launch needs redirecting.
-    // A relaunched game must still join its GUI session and publish its fallback copy on exit.
+static void open_game_log(void) {
+    // Keep diagnostic commands on their caller's streams. The converter's --play requests a game log.
+    // A relaunched game joins its existing session.
     const char *inherited = getenv(SF2C_WINDOWS_S_LASRECOMP_LOG_FILE_AAE4);
     bool fresh = !inherited || !*inherited;
     HANDLE err = GetStdHandle(STD_ERROR_HANDLE);
-    if (fresh && err && err != INVALID_HANDLE_VALUE && GetFileType(err) != FILE_TYPE_UNKNOWN) return;
+    if (fresh && !getenv(SF2C_WINDOWS_S_SF2_GAME_LOG_74EB) && err && err != INVALID_HANDLE_VALUE &&
+        GetFileType(err) != FILE_TYPE_UNKNOWN) return;
     char dir[MAX_PATH];
     DWORD n = GetModuleFileNameA(NULL, dir, sizeof dir);
     if (!n || n >= sizeof dir) return;
     char *slash = strrchr(dir, SF2C_WINDOWS_CH_EMPTY_6672);
     if (!slash) return;
-    slash[1] = 0;
-    if (snprintf(g_log_latest, sizeof g_log_latest, SF2C_WINDOWS_S_SLASRECOMP_LOG_DB16, dir) >= (int)sizeof g_log_latest) return;
+    static const char directory[] = SF2C_WINDOWS_S_LOGS_A052;
+    size_t room = sizeof dir - (slash + 1 - dir);
+    if (room <= sizeof directory) return;
+    memcpy(slash + 1, directory, sizeof directory);
+    if (!CreateDirectoryA(dir, NULL) && GetLastError() != ERROR_ALREADY_EXISTS) return;
+    slash[sizeof directory] = SF2C_WINDOWS_CH_EMPTY_6672;
+    slash[sizeof directory + 1] = 0;
+    if (snprintf(g_log_latest, sizeof g_log_latest, SF2C_WINDOWS_S_SSHADOW_FIGHT_2_LOG_6F9A, dir) >= (int)sizeof g_log_latest) return;
     unsigned long long hash = SF2C_WINDOWS_N_14695981039346656037ULL_11FE;
     for (const unsigned char *p = (const unsigned char *)g_log_latest; *p; p++) hash = (hash ^ *p) * SF2C_WINDOWS_N_1099511628211ULL_D3BD;
     char mutex[SF2C_WINDOWS_N_64_A68B]; snprintf(mutex, sizeof mutex, SF2C_WINDOWS_S_LOCAL_LASRECOMP_LOGS_016LLX_47FF, hash);
@@ -439,11 +455,11 @@ static void log_to_file_without_console(void) {
     if (!lock_logs()) return;
     FILETIME now; GetSystemTimeAsFileTime(&now);
     unsigned long long stamp = ((unsigned long long)now.dwHighDateTime << SF2C_WINDOWS_N_32_E29C) | now.dwLowDateTime;
-    int used = fresh ? snprintf(g_log_path, sizeof g_log_path, SF2C_WINDOWS_S_SLASRECOMP_BACKUP_016LLX_LU__4157, dir, stamp,
-                               (unsigned long)GetCurrentProcessId())
-                     : snprintf(g_log_path, sizeof g_log_path, SF2C_WINDOWS_S_S_0030, inherited);
+    bool have_path = fresh ? session_log_path(g_log_path, sizeof g_log_path, dir, now, GetCurrentProcessId())
+                           : strlen(inherited) < sizeof g_log_path;
+    if (!fresh && have_path) strcpy(g_log_path, inherited);
     HANDLE file = INVALID_HANDLE_VALUE;
-    if (used >= 0 && (size_t)used < sizeof g_log_path)
+    if (have_path)
         file = CreateFileA(g_log_path, GENERIC_READ | FILE_APPEND_DATA | FILE_READ_ATTRIBUTES,
                            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
                            fresh ? CREATE_NEW : OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -591,7 +607,7 @@ void plat_init(void) {
 #ifdef _WRITE_ABORT_MSG  // (MinGW's stdlib.h declares it with these flags)
     _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
 #endif
-    log_to_file_without_console();
+    open_game_log();
     require_cpu();
     _fmode = _O_BINARY;  // fopen/open default to binary (the runtime's "r"/"w" files are binary or LF text)
     _setmode(_fileno(stdout), _O_BINARY);

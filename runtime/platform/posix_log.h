@@ -1,11 +1,9 @@
 #include "../constants/platform.h"
-// macOS / Linux session log (included by macos.c and linux.c): lasrecomp.log in the data folder is always the latest
-// run; a new start moves the previous one aside as lasrecomp-backup-<YYYYMMDD-HHMMSS>-<pid>.log (its last write, the
-// pid from its first line, 0 if unknown) and keeps the five newest of those, as on Windows. Moving instead of
-// truncating also means a copy still running or quitting keeps writing to its own (moved) file. Processes started by
-// this one (the start screen re-executing itself for the game) get LASRECOMP_LOG_APPEND and append to the same log.
+// Desktop and Android session logs keep the latest run and five backups.
 #pragma once
 #include <dirent.h>
+#include <errno.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,10 +26,10 @@ static void session_log_backup(const char *dir, const char *name) {
         fclose(f);
     }
     char when[SF2C_POSIX_LOG_N_32_E29C];
-    strftime(when, sizeof when, SF2C_POSIX_LOG_S_Y_M_D_H_M_S_84CE, localtime(&st.st_mtime));
-    snprintf(to, sizeof to, SF2C_POSIX_LOG_S_S_LASRECOMP_BACKUP_S_D_LOG_1DBE, dir, when, pid);
+    strftime(when, sizeof when, SF2C_POSIX_LOG_S_Y_M_D_H_M_S_D21C, localtime(&st.st_mtime));
+    snprintf(to, sizeof to, SF2C_POSIX_LOG_S_S_SHADOW_FIGHT_2_S_D_LOG_8A4E, dir, when, pid);
     for (int i = 1; access(to, F_OK) == 0 && i < SF2C_POSIX_LOG_N_100_AD57; i++)  // (never replace another backup)
-        snprintf(to, sizeof to, SF2C_POSIX_LOG_S_S_LASRECOMP_BACKUP_S_D_D_LOG_32BC, dir, when, pid, i);
+        snprintf(to, sizeof to, SF2C_POSIX_LOG_S_S_SHADOW_FIGHT_2_S_D_D_LOG_E67B, dir, when, pid, i);
     rename(from, to);
 }
 
@@ -49,9 +47,11 @@ static void session_log_prune(const char *dir) {
     size_t n = 0, cap = 0;
     char path[SF2C_POSIX_LOG_N_1400_55FD];
     for (struct dirent *e; (e = readdir(d));) {
-        size_t len = strlen(e->d_name);
-        if (strncmp(e->d_name, SF2C_POSIX_LOG_S_LASRECOMP_BACKUP_9CFD, SF2C_POSIX_LOG_N_17_4523) || len < SF2C_POSIX_LOG_N_22_785F || len >= sizeof logs->name ||
-            strcmp(e->d_name + len - SF2C_POSIX_LOG_N_4_4B22, SF2C_POSIX_LOG_S_LOG_0386)) continue;
+        static const char prefix[] = SF2C_POSIX_LOG_S_SHADOW_FIGHT_2_BA56;
+        if (strncmp(e->d_name, prefix, sizeof prefix - 1) || strlen(e->d_name) >= sizeof logs->name) continue;
+        const char *stamp = e->d_name + sizeof prefix - 1;
+        const char *suffix = stamp + strspn(stamp, SF2C_POSIX_LOG_S_0123456789_EB5E);
+        if (suffix == stamp || strcmp(suffix, SF2C_POSIX_LOG_S_LOG_0386)) continue;
         struct stat st;
         snprintf(path, sizeof path, SF2C_POSIX_LOG_S_S_S_22D8, dir, e->d_name);
         if (lstat(path, &st) != 0 || !S_ISREG(st.st_mode)) continue;
@@ -72,14 +72,19 @@ static void session_log_prune(const char *dir) {
     free(logs);
 }
 
-// stdout / stderr -> <dir>/lasrecomp.log (path_out: its path, emptied on failure).
+// stdout / stderr -> <dir>/logs/shadow-fight-2.log.
 static void session_log_open(const char *dir, char *path_out, size_t n) {
-    snprintf(path_out, n, SF2C_POSIX_LOG_S_S_LASRECOMP_LOG_22EC, dir);
+    char logs[PATH_MAX];
+    if (snprintf(logs, sizeof logs, SF2C_POSIX_LOG_S_S_LOGS_59C6, dir) >= (int)sizeof logs ||
+        (mkdir(logs, SF2C_POSIX_LOG_N_0755_64A5) && errno != EEXIST) ||
+        snprintf(path_out, n, SF2C_POSIX_LOG_S_S_SHADOW_FIGHT_2_LOG_4EF0, logs) >= (int)n) {
+        path_out[0] = 0;
+        return;
+    }
     bool append = getenv(SF2C_POSIX_LOG_S_LASRECOMP_LOG_APPEND_A5DB) != NULL;
     if (!append) {
-        session_log_backup(dir, SF2C_POSIX_LOG_S_LASRECOMP_PREV_LOG_2ADB);  // (the earlier macOS scheme's one backup)
-        session_log_backup(dir, SF2C_POSIX_LOG_S_LASRECOMP_LOG_B1B2);
-        session_log_prune(dir);
+        session_log_backup(logs, SF2C_POSIX_LOG_S_SHADOW_FIGHT_2_LOG_6C33);
+        session_log_prune(logs);
     }
     if (!freopen(path_out, SF2C_POSIX_LOG_S_A_AC8D, stderr)) { path_out[0] = 0; return; }
     setvbuf(stderr, NULL, _IONBF, 0);
@@ -96,7 +101,6 @@ static void session_log_open(const char *dir, char *path_out, size_t n) {
 // The open-file limit: a macOS app starts with 256 (Linux usually 1024). Raised toward the hard limit (at most
 // 10240, macOS's OPEN_MAX) so a long session never runs out - running out fails saves ("could not be saved") and
 // game file reads. Called first thing (plat_init), after the log is set up.
-#include <errno.h>
 #include <sys/resource.h>
 static void raise_open_file_limit(void) {
     struct rlimit rl;

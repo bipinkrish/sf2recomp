@@ -90,9 +90,12 @@ Vulkan loader, MoltenVK, shaderc and any system-supplied SDL remain dependencies
 of the Homebrew/SDK installation used for compilation.
 
 Keep the output together and in a writable location. Settings, saves and caches
-live beside `sf2`; reconversion preserves settings and saves. This produces a
-Terminal-launched folder for the host architecture. It does not produce a Finder
-`.app`, notarized release or `.dmg`. `--install-desktop` is Linux-only.
+live beside `sf2` and reconversion preserves settings and saves. Open
+`Shadow Fight 2.app` in Finder or run `./sf2` in Terminal. Keep the app beside
+the rest of the converted folder. Game logs go to `logs/shadow-fight-2.log`.
+
+The portable converter opens from `SF2Recomp.app` or from `./sf2recomp` in
+Terminal.
 
 ## Development checks
 

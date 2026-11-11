@@ -63,10 +63,18 @@ GENFLAGS := $(filter-out -fPIC,$(GENFLAGS)) $(OSFLAGS)
 RTFLAGS += $(OSFLAGS)
 CXXFLAGS += $(OSFLAGS)
 SHADERC := $(shell pkg-config --libs shaderc 2>/dev/null || echo -lshaderc_shared)
-LDFLAGS := -fuse-ld=lld -Wl,--stack,16777216 $(SDL_LIBS) -lvulkan-1 $(SHADERC) \
+LDFLAGS := -fuse-ld=lld -mwindows -Wl,--stack,16777216 $(SDL_LIBS) -lvulkan-1 $(SHADERC) \
            -pthread -lm -lws2_32 -lwinmm -lshell32 -lole32 -ladvapi32 -luser32
 EXE := $(B)/sf2.exe
 WINDRES ?= windres
+else
+POSIX_LAUNCHER_FLAGS := $(if $(filter macos,$(TARGET)),$(MACFLAGS),-no-pie)
+$(B)/sf2recomp: tools/posix_launcher.c Makefile
+	@mkdir -p $(dir $@)
+	$(CC) -O2 -Wall $(POSIX_LAUNCHER_FLAGS) $< -o $@
+
+.PHONY: desktop-launcher
+desktop-launcher: $(B)/sf2recomp
 endif
 
 # Native host gate, independent of proprietary files and graphics initialization.
@@ -96,9 +104,21 @@ GEN_OBJ := $(patsubst $(GEN)/%.c,$(B)/obj/%.o,$(GEN_SRC))
 RT_OBJ  := $(patsubst runtime/%.c,$(B)/rt/%.o,$(RT_SRC)) $(patsubst runtime/%.cpp,$(B)/rt/%.o,$(RT_CXX_SRC))
 ifeq ($(TARGET),windows)
 RT_OBJ += $(B)/rt/platform/windows_rc.o
-$(B)/rt/platform/windows_rc.o: runtime/platform/windows.rc runtime/platform/windows.manifest
+WINDOWS_RESOURCES := runtime/platform/windows.rc runtime/platform/windows.manifest assets/sf2recomp.ico runtime/version.h runtime/lan_protocol.h tools/version.py
+WINDOWS_RC_FLAGS = -Iruntime/platform -Iassets -DSF2_WINDOWS_VERSION=$(shell $(PYTHON) tools/version.py --windows) -O coff
+$(B)/rt/platform/windows_rc.o: $(WINDOWS_RESOURCES) Makefile
 	@mkdir -p $(dir $@)
-	$(WINDRES) -Iruntime/platform -O coff $< -o $@
+	$(WINDRES) $(WINDOWS_RC_FLAGS) $< -o $@
+
+$(B)/converter_rc.o: $(WINDOWS_RESOURCES) Makefile
+	@mkdir -p $(dir $@)
+	$(WINDRES) $(WINDOWS_RC_FLAGS) -DSF2_CONVERTER $< -o $@
+
+$(B)/sf2recomp.exe: tools/windows_launcher.c $(B)/converter_rc.o Makefile
+	$(CC) -O2 -Wall -municode -mwindows -fuse-ld=lld $(filter-out Makefile,$^) -lshell32 -luser32 -o $@
+
+.PHONY: windows-launcher
+windows-launcher: $(B)/sf2recomp.exe
 endif
 DEPS    := $(RT_OBJ:.o=.d)
 

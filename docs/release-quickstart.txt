@@ -1,19 +1,27 @@
 SF2Recomp
 
 1. Extract this entire folder to a writable location. Keep its contents together.
-2. Open sf2recomp.cmd on Windows, SF2Recomp.command on macOS, or sf2recomp on Linux.
+2. Open sf2recomp.exe on Windows, SF2Recomp.app on macOS, or sf2recomp on Linux.
 3. In the converter window, browse for your NSP, prod.keys and output folder.
    For extracted updated files, select "Extracted game folder" as the input type.
-4. Click Convert. Progress and errors appear in the window; full logs stay under
-   build/logs in the tool folder.
-5. When conversion finishes, click Open output folder. Run sf2.exe or sf2 to play.
+4. Click Convert. The window shows progress and the full log. Each conversion
+   also saves an sf2recomp-conversion-<timestamp>.log in the tool's logs folder.
+5. When conversion finishes, click Open output folder. Open sf2.exe on Windows,
+   the generated desktop launcher on Linux, or Shadow Fight 2.app on macOS.
+   The latest game log is logs/shadow-fight-2.log in the converted folder.
+
+On Linux, run ./sf2recomp --install-desktop to add the converter to the app menu.
+On macOS, keep each .app with the rest of its folder.
 
 Supported input: Shadow Fight 2 combined base + v1.1.0/update v131072 NSP,
 including its CNMT XML sidecars and tickets. Other NSP layouts and NSZ are not
 supported. Already extracted updated files can be supplied with --game instead.
 No game data or keys are included. Conversion and game data remain local.
 
-Command-line examples (Windows: replace ./sf2recomp with sf2recomp.cmd):
+Command-line examples (Windows: replace ./sf2recomp with sf2recomp.exe):
+
+  In interactive Command Prompt, use start "" /wait sf2recomp.exe --check
+  when you need the prompt to wait for completion.
 
   ./sf2recomp --version
   ./sf2recomp --check

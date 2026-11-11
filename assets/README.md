@@ -12,4 +12,7 @@ both light and dark README themes. Regenerate both with
 
 The artwork retains its original owners' rights and is separate from the project's
 MIT-licensed code. Converted games retain their official icon from the user's
-game files.
+game files for the game window. Windows Explorer uses `sf2recomp.ico` for both
+the converter and the game executable. The macOS app bundles use an ICNS
+generated from `sf2recomp.png`. The Linux converter uses the dark-backed
+`sf2recomp-readme.png` for its window and application menu.

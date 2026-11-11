@@ -123,14 +123,17 @@ class ReleaseBoundaryTests(unittest.TestCase):
             folder = Path(temporary) / 'sf2recomp-0.1.0-windows-x86_64'
             (folder / 'python').mkdir(parents=True)
             (folder / 'python/python.exe').write_bytes(b'interpreter fixture')
+            (folder / 'sf2recomp.exe').write_bytes(b'native launcher fixture')
             (folder / 'release.json').write_text(json.dumps({'version': '0.1.0'}))
             windows = SimpleNamespace(name='nt', environ=os.environ)
-            with patch.object(ci_release, 'os', windows), patch.object(ci_release.subprocess, 'run'):
+            with patch.object(ci_release, 'os', windows), patch.object(ci_release.subprocess, 'run') as run:
                 ci_release.verify_and_archive(folder)
+            self.assertEqual(Path(run.call_args.args[0][0]).name, 'sf2recomp.exe')
             archive = folder.with_name(folder.name + '.zip')
             self.assertTrue(archive.is_file())
             with zipfile.ZipFile(archive) as contents:
                 self.assertIn(folder.name + '/python/python.exe', contents.namelist())
+                self.assertIn(folder.name + '/sf2recomp.exe', contents.namelist())
             self.assertEqual(archive.with_name(archive.name + '.sha256').read_text(),
                              hashlib.sha256(archive.read_bytes()).hexdigest() + '  ' + archive.name + '\n')
 

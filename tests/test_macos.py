@@ -2,6 +2,7 @@
 import json
 import importlib.util
 import os
+import plistlib
 from pathlib import Path
 import subprocess
 import sys
@@ -128,6 +129,13 @@ class MacOSConversionTests(unittest.TestCase):
         self.assertEqual((self.output / "lib/libSDL3.dylib").readlink(), Path("libSDL3.0.dylib"))
         self.assertTrue((self.output / "lib/ffmpeg/lib/libavcodec.62.dylib").is_file())
         self.assertFalse(list(self.output.rglob("*.so*")))
+        contents = self.output / "Shadow Fight 2.app/Contents"
+        info = plistlib.loads((contents / "Info.plist").read_bytes())
+        self.assertEqual(info["CFBundleIdentifier"], convert.APP_ID)
+        self.assertEqual(info["CFBundleExecutable"], "sf2")
+        self.assertEqual((contents / "Resources/AppIcon.icns").read_bytes()[:4], b"icns")
+        self.assertTrue((contents / "MacOS/sf2").samefile(self.output / "sf2"))
+        self.assertTrue((contents / "MacOS/lib").samefile(self.output / "lib"))
         self.assertFalse(list(self.output.glob("*.desktop")))
         self.assertEqual((self.output / "sf2recomp.ini").read_text(), "custom")
         self.assertEqual((self.output / "save/progress").read_text(), "keep")

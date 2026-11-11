@@ -364,7 +364,7 @@ and saves migrate once without replacing external files. Uninstalling the app
 removes its files, so back up saves and settings first. Inspect them with:
 
 ```sh
-adb shell cat /sdcard/Android/data/org.sf2recomp.app/files/lasrecomp.log
+adb shell cat /sdcard/Android/data/org.sf2recomp.app/files/logs/shadow-fight-2.log
 adb shell cat /sdcard/Android/data/org.sf2recomp.app/files/sf2recomp.ini
 ```
 

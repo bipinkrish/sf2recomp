@@ -138,8 +138,10 @@ DLL dependencies are resolved recursively and case-insensitively using
 `lib/ffmpeg/bin/ffmpeg.exe`. Missing DLLs and MSYS/Cygwin runtime dependencies
 are rejected before updating an existing package. Windows dependency licenses
 are copied from the selected UCRT64 prefix. Rebuilding preserves the existing
-INI and saves. The current executable uses a console subsystem; GUI-only release
-packaging and a native Explorer icon remain future polish.
+INI and saves. `sf2.exe` launches without a console window. Explorer shows the
+project icon and SF2Recomp file version. The game window uses the official icon
+from the extracted game. The latest game log is `logs/shadow-fight-2.log` beside
+`sf2.exe`. Recent sessions also have timestamped filenames in that folder.
 
 ## Graphics and cutscenes
 

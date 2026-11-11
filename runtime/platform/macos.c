@@ -33,17 +33,16 @@ void rt_crash_explain(char *out, size_t n, const char *log_path);  // runtime/cr
 
 static mach_timebase_info_data_t tb;
 
-// Started as the app (Finder, Dock: no terminal): stdout / stderr go to sf2recomp.log in the data folder, with five
-// backups (posix_log.h; as on Linux / Windows), and a fatal error is explained in an alert instead of the app
-// vanishing. Runs from a terminal or a test script (not the .app's executable) keep their own output.
 static char g_log_path[SF2C_MACOS_N_1024_E39E];
 
-static void log_to_file_in_app(void) {
-    char exe[SF2C_MACOS_N_1024_E39E];
+static void open_game_log(void) {
+    char exe[PATH_MAX];
     uint32_t sz = sizeof exe;
-    if (isatty(STDERR_FILENO) || _NSGetExecutablePath(exe, &sz) != 0 || !strstr(exe, SF2C_MACOS_S_APP_CONTENTS_MACOS_D431)) return;
+    if (!getenv(SF2C_MACOS_S_SF2_GAME_LOG_74EB) &&
+        (isatty(STDERR_FILENO) || _NSGetExecutablePath(exe, &sz) || !strstr(exe, SF2C_MACOS_S_APP_CONTENTS_MACOS_D431)))
+        return;
     char dir[SF2C_MACOS_N_900_BDC5];
-    if (!rt_data_root_early(dir, sizeof dir)) return;  // (runtime/paths.h: the data folder, wherever it was moved)
+    if (!rt_data_root_early(dir, sizeof dir)) return;
     mkdir(dir, SF2C_MACOS_N_0755_64A5);
     session_log_open(dir, g_log_path, sizeof g_log_path);
 }
@@ -91,7 +90,7 @@ void plat_init(void) {
         }
     }
     mach_timebase_info(&tb);
-    log_to_file_in_app();
+    open_game_log();
     raise_open_file_limit();
 }
 
@@ -177,17 +176,31 @@ void plat_thread_guest(int prio) {
     if (on) pthread_set_qos_class_self_np(prio <= SF2C_MACOS_N_44_71EE ? QOS_CLASS_USER_INTERACTIVE : QOS_CLASS_USER_INITIATED, 0);
 }
 
-bool plat_exe_path(char *buf, size_t size) {
-    char executable[PATH_MAX], resolved[PATH_MAX];
+static bool actual_executable(char *resolved) {
+    char executable[PATH_MAX];
     uint32_t len = sizeof executable;
-    if (_NSGetExecutablePath(executable, &len) || !realpath(executable, resolved)) return false;
+    return !_NSGetExecutablePath(executable, &len) && realpath(executable, resolved);
+}
+
+bool plat_exe_path(char *buf, size_t size) {
+    char resolved[PATH_MAX];
+    if (!actual_executable(resolved)) return false;
+    // Finder launches the Mach-O inside the app. Game assets and settings
+    // belong to the portable folder beside the app and the CLI executable.
+    static const char suffix[] = SF2C_MACOS_S_APP_CONTENTS_MACOS_SF2_1C4A;
+    size_t length = strlen(resolved);
+    if (length >= sizeof suffix - 1 && !strcmp(resolved + length - (sizeof suffix - 1), suffix)) {
+        char *slash = resolved + length - (sizeof suffix - 1);
+        while (slash > resolved && *slash != SF2C_MACOS_CH_EMPTY_0825) slash--;
+        strcpy(slash, SF2C_MACOS_S_SF2_ED26);
+    }
     return snprintf(buf, size, SF2C_MACOS_S_S_0030, resolved) < (int)size;
 }
 
 void plat_exec(char *const argv[]) {
     if (argv) { execv(argv[0], argv); return; }
-    char path[SF2C_MACOS_N_4096_8B92];
-    if (plat_exe_path(path, sizeof path)) execv(path, *_NSGetArgv());
+    char path[PATH_MAX];
+    if (actual_executable(path)) execv(path, *_NSGetArgv());
 }
 
 const char *plat_symbol(uint64_t pc, uint64_t *offset) {

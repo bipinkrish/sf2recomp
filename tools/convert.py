@@ -12,6 +12,9 @@ import sys
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / K.S_TOOLS_F83E))
+from conversion_log import LOG_ACTIVE, run_logged_cli
+from conversion_progress import ConversionProgress
+from desktop_integration import desktop_exec, linux_desktop, register_linux_desktop, write_macos_app
 from game_metadata import APP_ID, parse_nacp
 from setup_ffmpeg import ARCHIVE_NAME as FFMPEG_ARCHIVE_NAME, VERSION as FFMPEG_VERSION
 from setup_fonts import FONT_DIRECTORY, prepare as prepare_fonts
@@ -43,45 +46,19 @@ def source_ids(game):
     return ids
 
 
-
-
-def desktop_text(text):
-    """Escape the desktop-entry string format independently of command quoting."""
-    return str(text).replace(K.S_EMPTY_6672, K.S_EMPTY_0AC2).replace(K.S_N_AD65, K.S_N_631B).replace(K.S_R_4859, K.S_R_2D02).replace(K.S_T_27AE, K.S_T_8CDA)
-
-
-def desktop_exec(path):
-    # Exec has a second quoting layer; percent signs are field-code escapes.
-    if K.S_EMPTY_C874 in str(path):
-        raise ValueError(K.S_DESKTOP_EXECUTABLE_PATHS_CAN_9851)
-    quoted = K.S_EMPTY_6F49.join(K.S_EMPTY_6672 + c if c in K.S_EMPTY_5F0D else c for c in str(path))
-    return desktop_text(K.S_EMPTY_3251 + quoted.replace(K.S_EMPTY_D77D, K.S_EMPTY_E9B8) + K.S_EMPTY_3251)
-
-
 def write_desktop(output, info):
     desktop = output / (APP_ID + K.S_DESKTOP_5B29)
-    desktop.write_text(
-        "[Desktop Entry]\nVersion=1.0\nType=Application\n"
-        "Name=Shadow Fight 2 (sf2recomp)\n"
-        f"Exec={desktop_exec(output / K.S_SF2_4CDA)}\n"
-        f"Path={desktop_text(output)}\nIcon={desktop_text(output / K.S_ICON_PNG_9A4E)}\n"
-        "Terminal=false\nCategories=Game;\n"
-        f"StartupWMClass={APP_ID}\nX-AppVersion={desktop_text(info[K.S_DISPLAY_VERSION_3D6E])}\n")
+    desktop.write_text(linux_desktop(output / K.S_SF2_4CDA, output / K.S_ICON_PNG_9A4E,
+                                    title=K.S_SHADOW_FIGHT_2_SF2RECOMP_891C, identifier=APP_ID,
+                                    version=info[K.S_DISPLAY_VERSION_3D6E], category=K.S_GAME_3173), encoding=K.S_UTF_8_D983)
     desktop.chmod(K.N_493_560A)
     return desktop
 
 
 def install_desktop(output):
     """Explicit opt-in: register this local output in the user's application menu."""
-    data = Path(os.environ.get(K.S_XDG_DATA_HOME_06D3, Path.home() / K.S_LOCAL_SHARE_288D))
-    if not data.is_absolute():
-        raise ValueError(K.S_XDG_DATA_HOME_MUST_BE_AN_ABS_F571)
-    applications = data / K.S_APPLICATIONS_1408
-    applications.mkdir(parents=True, exist_ok=True)
-    target = applications / (APP_ID + K.S_DESKTOP_5B29)
-    shutil.copy2(output.resolve() / (APP_ID + K.S_DESKTOP_5B29), target)
-    print(f"Registered user application: {target}")
-    return target
+    desktop = output.resolve() / (APP_ID + K.S_DESKTOP_5B29)
+    return register_linux_desktop(APP_ID, desktop.read_text(encoding=K.S_UTF_8_D983))
 
 
 def package_game(game, output, executable, sdl_dir, ffmpeg_dir, target=K.S_LINUX_09D1):
@@ -130,7 +107,12 @@ def package_game(game, output, executable, sdl_dir, ffmpeg_dir, target=K.S_LINUX
         shutil.copy2(game / K.S_EXEFS_00A0 / name, exefs / name)
     shutil.copytree(game / K.S_ROMFS_0A7E, output / K.S_EXTRACTED_ROMFS_A728, dirs_exist_ok=True)
     # Install the executable after its data. Existing user settings and saves stay.
-    shutil.copy2(executable, output / exe_name)
+    if macos:
+        staged = output / K.S_SF2_PENDING_FB91
+        shutil.copy2(executable, staged)
+        staged.replace(output / exe_name)
+    else:
+        shutil.copy2(executable, output / exe_name)
     # Earlier conversions used the compiler project's name for the game binary.
     # Remove that generated file when refreshing an existing converted folder.
     legacy = output / K.S_SF2RECOMP_14FD
@@ -252,7 +234,7 @@ def package_game(game, output, executable, sdl_dir, ffmpeg_dir, target=K.S_LINUX
         )
     elif macos:
         (output / K.S_RUN_TXT_0818).write_text(
-            K.S_RUN_SF2_FROM_TERMINAL_KEEP_E_5755
+            K.S_OPEN_SHADOW_FIGHT_2_APP_IN_F_DB7A
         )
     else:
         (output / K.S_RUN_TXT_0818).write_text(
@@ -272,14 +254,19 @@ def package_game(game, output, executable, sdl_dir, ffmpeg_dir, target=K.S_LINUX
                         K.S_WINDOWS_F2ED: K.S_WINDOWS_10_11_X64_CMPXCHG16B_C9BD,
                         K.S_MACOS_91E2: K.S_MACOS_15_ON_THIS_BUILD_S_CPU_54A4}
         (output / K.S_RUN_TXT_0818).write_text(
-            f"Run {exe_name}. Keep extracted/, lib/, licenses/ and the packaged libraries together.\n"
+            (K.S_OPEN_SHADOW_FIGHT_2_APP_IN_F_98A0 if macos else f"Run {exe_name}.\n")
+            + "Keep extracted/, lib/, licenses/ and the packaged libraries together.\n"
             f"SF2Recomp {release[K.S_VERSION_25EB]}; original game {info[K.S_DISPLAY_VERSION_3D6E]}.\n"
             f"Requirements: {requirements[target]}\n"
             "No Python, .NET SDK, compiler, Homebrew or Android SDK installation is needed to play this folder.\n"
             "Edit sf2recomp.ini and restart to apply settings. Saves are in save/ by default.\n")
-    with (output / K.S_RUN_TXT_0818).open(K.S_A_D749) as instructions:
-        instructions.write(
-            K.S_LAN_SPARRING_START_THE_SAME__C79B)
+    with (output / K.S_RUN_TXT_0818).open(K.S_A_D749, encoding=K.S_UTF_8_D983) as instructions:
+        instructions.write(K.S_GAME_LOGS_ARE_IN_LOGS_SHADOW_04FE)
+        instructions.write(K.S_LAN_SPARRING_START_THE_SAME__C79B)
+    if macos:
+        from version import read
+        write_macos_app(output, output / exe_name, ROOT / K.S_ASSETS_SF2RECOMP_PNG_B232,
+                        title=K.S_SHADOW_FIGHT_2_5A40, identifier=APP_ID, version=read()[K.S_VERSION_43CC], hardlink=True)
     print(f"Native game folder: {output}")
 
 
@@ -299,6 +286,8 @@ def main(argv=None):
                     help=K.S_EXPLICITLY_REGISTER_THE_OUTP_DE51)
     args = ap.parse_args(argv)
     try:
+        if argv is None and not os.environ.get(LOG_ACTIVE):
+            return run_logged_cli(__file__, sys.argv[1:])
         windows = args.target == K.S_WINDOWS_F2ED
         require_host(args.target)
         if args.target != K.S_LINUX_09D1 and args.install_desktop:
@@ -309,18 +298,31 @@ def main(argv=None):
             args.output = ROOT / f"out/shadow-fight-2-{args.target}"
         if args.jobs < 1:
             raise ValueError(K.S_JOBS_MUST_BE_POSITIVE_A3BA)
+        release = release_manifest()
+        generate = not (args.package_only or args.skip_generation)
+        steps = [K.S_VALIDATE_INPUT_2904, K.S_EXTRACT_GAME_AA35] if args.nsp else []
+        steps += [K.S_PREPARE_CONVERSION_936A]
+        if generate:
+            steps += [K.S_PREPARE_SYMBOLS_683B, K.S_TRANSLATE_GAME_CODE_80DD, K.S_TRANSLATE_SDK_CODE_912B]
+        if not args.package_only:
+            steps += [K.S_COMPILE_GAME_5C31]
+            if release:
+                steps.append(K.S_LINK_GAME_A897)
+        progress = ConversionProgress([*steps, K.S_PACKAGE_GAME_69F7])
         if args.nsp:
             if not args.keys:
                 raise ValueError(K.S_NSP_REQUIRES_KEYS_POINTING_T_B937)
             if args.package_only:
                 raise ValueError(K.S_PACKAGE_ONLY_REQUIRES_GAME_7CAF)
+            progress.advance()
             run(sys.executable, ROOT / K.S_TOOLS_EXTRACT_PY_B0D4, args.nsp.resolve(), args.keys.resolve(), K.S_VALIDATE_ONLY_9863)
+            progress.advance()
             run(sys.executable, ROOT / K.S_TOOLS_EXTRACT_PY_B0D4, args.nsp.resolve(), args.keys.resolve())
             game = ROOT / K.S_GAME_EXTRACTED_UPDATE_E969
         else:
             game = args.game.resolve(strict=True)
+        progress.advance()
         source_ids(game)
-        release = release_manifest()
         prefix = None if release else os.environ.get(K.S_SDL_DIR_2C71)
         if windows and not prefix and not release:
             prefix = subprocess.check_output([K.S_CYGPATH_26B1, K.S_M_705B, os.environ.get(K.S_MINGW_PREFIX_49B8, K.S_UCRT64_3FD8)], text=True).strip()
@@ -329,7 +331,7 @@ def main(argv=None):
             K.S_DEPS_FFMPEG_660D if args.target == K.S_LINUX_09D1 else f"deps/ffmpeg-{args.target}"))).resolve()
         if release:
             ffmpeg_dir = ROOT / (K.S_DEPS_FFMPEG_660D if args.target == K.S_LINUX_09D1 else f"deps/ffmpeg-{args.target}")
-        if not args.package_only and not args.skip_generation:
+        if generate:
             missing = [name for name in (K.S_CAPSTONE_C514, K.S_UNICORN_D491, K.S_LZ4_7811, K.S_CRYPTOGRAPHY_DE2A, K.S_PIL_17DB)
                        if importlib.util.find_spec(name) is None]
             if missing:
@@ -340,15 +342,20 @@ def main(argv=None):
             run(build_bash(), ROOT / K.S_TOOLS_SETUP_RUNTIME_SH_9A82, K.S_ENSURE_C475, env=environment)
         if not release:
             run(sys.executable, ROOT / K.S_TOOLS_SETUP_FFMPEG_PY_88E9, K.S_ENSURE_C475, K.S_TARGET_2BBE, args.target)
-        if not args.package_only and not args.skip_generation:
+        if generate:
+            progress.advance()
             if args.symbols:
                 symbols = args.symbols.resolve(strict=True)
             else:
                 symbols = prepare_symbols(game)
+            progress.advance()
             run(sys.executable, ROOT / K.S_TOOLS_RECOMPR_GEN_PY_1453, K.S_MAIN_13FD, game / K.S_EXEFS_MAIN_8CC5,
                 K.S_0X7000000000_2DF4, ROOT / K.S_GAME_GEN_MAIN_DE2C, K.S_SYMBOLS_1344, symbols)
+            progress.advance()
             run(sys.executable, ROOT / K.S_TOOLS_RECOMPR_GEN_PY_1453, K.S_SDK_0065, game / K.S_EXEFS_SDK_9162,
                 K.S_0X7004000000_DDC3, ROOT / K.S_GAME_GEN_SDK_7AA1)
+        if not args.package_only:
+            progress.advance()
         if not args.package_only and not release:
             make = K.S_GMAKE_E81C if args.target == K.S_MACOS_91E2 else K.S_MAKE_D1F9
             run(make, f"-j{args.jobs}", f"TARGET={args.target}", f"SDL_DIR={sdl_dir.as_posix()}",
@@ -357,7 +364,8 @@ def main(argv=None):
                              K.S_BUILD_MACOS_SF2_D728 if args.target == K.S_MACOS_91E2 else K.S_BUILD_SF2_ECEA)
         if release and not args.package_only:
             sources = list((ROOT / K.S_GAME_GEN_45C5).glob(K.S_C_E03C))
-            compile_sources(sources, executable, args.jobs)
+            compile_sources(sources, executable, args.jobs, before_link=progress.advance)
+        progress.advance()
         package_game(game, args.output, executable, sdl_dir, ffmpeg_dir, args.target)
         if args.install_desktop:
             install_desktop(args.output)

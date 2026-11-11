@@ -133,13 +133,6 @@ int main(int argc, char **argv) {
         return 1;
     }
 #endif
-    plat_init();
-    log_startup_info();
-#ifdef _WIN32
-    setvbuf(stderr, NULL, _IONBF, 0);  // the Windows CRT treats _IOLBF as full buffering
-#else
-    setvbuf(stderr, NULL, _IOLBF, 0);
-#endif
     const char *argument = NULL;
     bool check_only = false;
     for (int i = 1; i < argc; ++i) {
@@ -152,6 +145,14 @@ int main(int argc, char **argv) {
             return SF2C_MAIN_N_2_D473;
         } else argument = argv[i];
     }
+    if (!check_only) setenv(SF2C_MAIN_S_SF2_GAME_LOG_74EB, SF2C_MAIN_S_1_3915, 0);
+    plat_init();
+    log_startup_info();
+#ifdef _WIN32
+    setvbuf(stderr, NULL, _IONBF, 0);  // the Windows CRT treats _IOLBF as full buffering
+#else
+    setvbuf(stderr, NULL, _IOLBF, 0);
+#endif
     char default_root[SF2C_MAIN_N_4096_8B92], resolved_root[SF2C_MAIN_N_4096_8B92];
     if (!argument) {
         if (!plat_exe_path(default_root, sizeof default_root)) return 1;

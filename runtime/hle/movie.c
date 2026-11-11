@@ -8,7 +8,9 @@
 #include <limits.h>
 #include <pthread.h>
 #include <signal.h>
-#if !defined(__ANDROID__) && !defined(_WIN32) && !defined(SF2_MOVIE_SDL_PROCESS)
+#ifdef _WIN32
+#include <windows.h>
+#elif !defined(__ANDROID__) && !defined(SF2_MOVIE_SDL_PROCESS)
 #include <spawn.h>
 #include <sys/wait.h>
 #endif
@@ -317,6 +319,9 @@ static bool movie_spawn_decoder(const char *path, const MovieDecoder *decoder,
         SDL_SetNumberProperty(props, SDL_PROP_PROCESS_CREATE_STDIN_NUMBER, SDL_PROCESS_STDIO_NULL) &&
         SDL_SetNumberProperty(props, SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER, SDL_PROCESS_STDIO_APP) &&
         SDL_SetNumberProperty(props, SDL_PROP_PROCESS_CREATE_STDERR_NUMBER, SDL_PROCESS_STDIO_APP);
+#ifdef _WIN32
+    ok = ok && SDL_SetBooleanProperty(props, SDL_PROP_PROCESS_CREATE_BACKGROUND_BOOLEAN, true);
+#endif
     SDL_Process *process = ok ? SDL_CreateProcessWithProperties(props) : NULL;
     SDL_DestroyProperties(props);
     if (!process) { LOG(SF2C_MOVIE_S_MOVIE_CANNOT_START_DECODER_S_9488, SDL_GetError()); return false; }
@@ -378,6 +383,16 @@ static void movie_child_kill(MovieChild child) {
 static int movie_child_wait(MovieChild child) {
 #ifdef __ANDROID__
     return android_movie_failed(child) ? 1 : 0;
+#elif defined(_WIN32)
+    // SDL hides the console in background mode and reports a synthetic exit code.
+    // SDL still holds the decoder's process handle, so its PID cannot be reused here.
+    DWORD pid = (DWORD)SDL_GetNumberProperty(SDL_GetProcessProperties(child), SDL_PROP_PROCESS_PID_NUMBER, 0);
+    HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    bool exited = SDL_WaitProcess(child, true, NULL);
+    DWORD status = SF2C_MOVIE_N_255_9556;
+    bool have_status = process && exited && GetExitCodeProcess(process, &status);
+    if (process) CloseHandle(process);
+    return have_status ? (int)status : SF2C_MOVIE_N_255_9556;
 #elif defined(MOVIE_SDL_PROCESS)
     int status = SF2C_MOVIE_N_255_9556;
     return SDL_WaitProcess(child, true, &status) ? status : SF2C_MOVIE_N_255_9556;

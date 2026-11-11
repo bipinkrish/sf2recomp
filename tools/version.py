@@ -24,8 +24,13 @@ if __name__ == K.S_MAIN_ACB5:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(K.S_CHECK_TAG_0950)
     parser.add_argument(K.S_JSON_5AD0, action=K.S_STORE_TRUE_2C29)
+    parser.add_argument(K.S_WINDOWS_AF25, action=K.S_STORE_TRUE_430C, help=K.S_PRINT_THE_FOUR_NUMERIC_PE_VE_06B6)
     args = parser.parse_args()
     data = read()
     if args.check_tag and args.check_tag != K.S_V_DEAF + data[K.S_VERSION_25EB]:
         parser.error(f"tag must be v{data[K.S_VERSION_25EB]}, matching runtime/version.h")
-    print(json.dumps(data) if args.json else data[K.S_VERSION_25EB])
+    if args.windows:
+        fields = re.match(K.S_R_D_D_D_8DC2, data[K.S_VERSION_25EB]).groups()
+        print(K.S_EMPTY_08B5.join((*fields, K.S_0_9808)))
+    else:
+        print(json.dumps(data) if args.json else data[K.S_VERSION_25EB])

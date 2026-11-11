@@ -354,7 +354,7 @@ also calls the original managed completion handler, including on skip, so the
 game can leave the video screen immediately. Skipping does not mark a video as
 watched to the end.
 
-Android stores `sf2recomp.ini`, `save/` and `lasrecomp.log` in
+Android stores `sf2recomp.ini`, `save/` and `logs/shadow-fight-2.log` in
 `Android/data/org.sf2recomp.app/files`. The bundled game stays in private app
 storage; editing the INI does not require re-extracting it.
 

@@ -324,15 +324,12 @@ def trim_decoder(prefix):
     print(f"Trimmed {saved} bytes of unused decoder development files.")
 
 
-def write_launchers(destination, windows):
-    if windows:
-        (destination / K.S_SF2RECOMP_CMD_6CF6).write_text(K.S_ECHO_OFF_R_NSETLOCAL_R_NSET__6F91, encoding=K.S_UTF_8_5383)
-    else:
-        text = K.S_BIN_SH_NCASE_0_IN_FOLDER_0_F_F136
-        for name in (K.S_SF2RECOMP_14FD, K.S_SF2RECOMP_COMMAND_D317):
-            path = destination / name
-            path.write_text(text, encoding=K.S_UTF_8_5383)
-            path.chmod(K.N_493_560A)
+def write_launchers(destination, launcher, target, version):
+    binary = copy(launcher, destination / launcher.name)
+    if target == K.S_MACOS_91E2:
+        from desktop_integration import CONVERTER_ID, write_macos_app
+        write_macos_app(destination, binary, destination / K.S_ASSETS_SF2RECOMP_PNG_B232,
+                        title=K.S_SF2RECOMP_2D44, identifier=CONVERTER_ID, version=version)
 
 
 def audit(destination):
@@ -429,7 +426,7 @@ def main():
         libraries = [K.S_LSDL3_C720, K.S_LVULKAN_1_00BF, K.S_LSHADERC_SHARED_B0DE, K.S_LSTDC_1622, K.S_LWINPTHREAD_D6C4,
                      K.S_LWS2_32_F964, K.S_LWINMM_8846, K.S_LSHELL32_F44A, K.S_LOLE32_E1E5, K.S_LADVAPI32_76E9, K.S_LUSER32_B276]
         link = [*probe, K.S_WL_WHOLE_ARCHIVE_0FF3, K.S_ROOT_NATIVE_RUNTIME_A_DC0A, K.S_WL_NO_WHOLE_ARCHIVE_ED9D,
-                K.S_WL_STACK_16777216_AC84, *libraries]
+                K.S_MWINDOWS_224D, K.S_WL_STACK_16777216_AC84, *libraries]
     else:
         compiler = [K.S_PYTHON_44E8, K.S_M_705B, K.S_ZIGLANG_DE01, K.S_CC_C2C9]
         triple = (K.S_AARCH64_E802 if arch == K.S_ARM64_6AF1 else K.S_X86_64_CB4A) + (K.S_MACOS_15_0_F78C if target == K.S_MACOS_91E2 else K.S_LINUX_GNU_2_39_ACD3)
@@ -455,7 +452,12 @@ def main():
               K.S_BUILD_ID_34C8: hashlib.sha256(archive.read_bytes()).hexdigest(),
               K.S_COMPILER_01AF: compiler, K.S_CFLAGS_4DFE: common, K.S_LDFLAGS_861D: link, K.S_PROBE_LDFLAGS_BA61: probe, K.S_HELPERS_7DB9: helpers}
     (destination / K.S_RELEASE_JSON_5FBE).write_text(json.dumps(config, indent=K.N_2_D473) + K.S_N_AD65, encoding=K.S_UTF_8_5383)
-    write_launchers(destination, target == K.S_WINDOWS_F2ED)
+    windows = target == K.S_WINDOWS_F2ED
+    launcher_target = K.S_WINDOWS_LAUNCHER_46F8 if windows else K.S_DESKTOP_LAUNCHER_CBAD
+    run(make, f"TARGET={target}", K.S_B_BUILD_RELEASE_RUNTIME_108D,
+        f"PYTHON={Path(sys.executable).as_posix()}", launcher_target, cwd=ROOT)
+    launcher = runtime_build / (K.S_SF2RECOMP_EXE_FA88 if windows else K.S_SF2RECOMP_50A6)
+    write_launchers(destination, launcher, target, args.version)
     copy(ROOT / K.S_DOCS_RELEASE_QUICKSTART_TXT_C3FA, destination / K.S_START_HERE_TXT_AEEE)
     audit(destination)
     inventory = {str(p.relative_to(destination)): hashlib.sha256(p.read_bytes()).hexdigest()

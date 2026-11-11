@@ -8,9 +8,15 @@
 
 <p align="center">
   <a href="https://github.com/bipinkrish/sf2recomp/releases">Download</a> ·
+  <a href="docs/features.md">Features</a> ·
   <a href="#settings-and-controls">Settings</a> ·
   <a href="docs/lan-sparring.md">LAN multiplayer</a> ·
   <a href="docs/source-guide.md">Build from source</a>
+</p>
+
+<p align="center">
+  <a href="https://playported.com/ports/1207-shadow-fight-2/"><img src="https://playported.com/badge.svg" alt="Listed on PlayPorted" width="168" height="24"></a>
+  <a href="https://quiverlauncher.com/apps/shadow-fight-2-sf2recomp"><img src="https://img.shields.io/badge/Listed%20on-Quiver%20Launcher-7c3aed?style=flat-square" alt="Listed on Quiver Launcher" height="24"></a>
 </p>
 
 Play as Shadow or Titan in Sparring, challenge bosses again, or fight a friend
@@ -18,6 +24,18 @@ over LAN. SF2Recomp adds mouse menus, remappable controls, Android touch control
 and graphics options for high resolutions, high frame rates, and ultrawide displays.
 
 **Bring your own game files. No game code, game assets, or keys are included.**
+
+## Status
+
+You need a compatible **Vulkan 1.3 GPU and graphics driver**. High resolutions
+and frame rates depend on your hardware.
+
+| Platform | Requirements |
+| --- | --- |
+| Linux x86-64 | glibc 2.39+, such as Ubuntu 24.04 or newer. |
+| Windows x86-64 | Windows 10 or 11. |
+| macOS Apple Silicon | macOS 15+. Experimental; gameplay and GPU validation pending. |
+| Android ARM64 / x86-64 | Android 13+ and compatible Vulkan 1.3 features. |
 
 ## Get started
 
@@ -32,48 +50,25 @@ updated game files also work and do not need keys.
 
    | System | Launcher |
    | --- | --- |
-   | Windows | `sf2recomp.cmd` |
+   | Windows | `sf2recomp.exe` |
    | Linux | `sf2recomp` |
-   | macOS | `SF2Recomp.command` |
+   | macOS | `SF2Recomp.app` |
 
 4. In the conversion window, browse for your NSP, `prod.keys`, and output folder.
    For extracted files, choose **Extracted game folder** under **Input type**.
 5. Leave **Convert for** set to **This computer**, then click **Convert**.
-6. When conversion finishes, click **Open output folder** and run `sf2.exe` or `sf2`.
+6. When conversion finishes, click **Open output folder**. Open `sf2.exe` on
+   Windows, the generated desktop launcher on Linux, or `Shadow Fight 2.app`
+   on macOS.
 
 Keep the converted folder's files together. Your settings are in `sf2recomp.ini`,
 and your saves are in `save/`. The tool bundles its compiler and FFmpeg decoder;
 you do not need to install Python, a compiler, or FFmpeg to use a desktop release.
 
-If conversion fails, read the error in the window. A full log is saved under
-`build/logs/` in the tool folder. If no release is available, use the source guide
-linked above.
-
-## Conversion tool
-
-The desktop launcher opens the converter window automatically. Browse for your
-game input and keys, choose where to save the result, then click **Convert**.
-The window shows progress and errors, saves the full log, and enables
-**Open output folder** when conversion succeeds.
-
-![SF2Recomp converter with game and key file pickers, target selection, a progress log, and conversion buttons](docs/screenshots/converter-ui.png)
-
-## Status
-
-You need a compatible **Vulkan 1.3 GPU and graphics driver**. High resolutions
-and frame rates depend on your hardware;
-
-| Platform | Requirements |
-| --- | --- |
-| Linux x86-64 | glibc 2.39+, such as Ubuntu 24.04 or newer. |
-| Windows x86-64 | Windows 10 or 11. |
-| macOS Apple Silicon | macOS 15+. Experimental; gameplay and GPU validation pending. |
-| Android ARM64 / x86-64 | Android 13+ and compatible Vulkan 1.3 features. |
-
-## Features
-
-The [complete feature guide](docs/features.md) covers every feature, its settings,
-current limitations, and the full gameplay screenshot gallery.
+The tool saves each conversion log as `logs/sf2recomp-conversion-<timestamp>.log`.
+The game writes its latest launch log to `logs/shadow-fight-2.log` in the
+converted folder on desktop and the game's files directory on Android.
+If no release is available, use the source guide linked above.
 
 ## Settings and controls
 
@@ -89,6 +84,15 @@ controller mappings, save imports, and graphics settings.
 
 Settings apply at launch, so changing the INI does not require another conversion. <a href="docs/runtime-guide.md">More settings</a>.
 
+## Conversion tool
+
+The desktop launcher opens the converter window automatically. Browse for your
+game input and keys, choose where to save the result, then click **Convert**.
+The window shows measured progress and the full log. Click **Cancel** to stop
+a conversion. **Open output folder** becomes available when conversion succeeds.
+
+![SF2Recomp converter with game and key file pickers, target selection, a progress log, and conversion buttons](docs/screenshots/converter-ui.png)
+
 ## Android
 
 Open the desktop converter and select **Android phone (ARM64)** under **Convert for**.
@@ -102,7 +106,10 @@ reuse those downloads. Android Studio is not required.
 ## Command line
 
 The launcher also accepts command-line arguments. On Windows, replace
-`./sf2recomp` with `sf2recomp.cmd`.
+`./sf2recomp` with `sf2recomp.exe`. From an interactive Command Prompt, use
+`start "" /wait sf2recomp.exe --check` when you need the prompt to wait for completion.
+On Linux, run `./sf2recomp --install-desktop` to add the converter and its icon
+to your application menu.
 
 ```sh
 # Convert and launch the desktop game

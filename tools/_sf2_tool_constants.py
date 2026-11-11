@@ -1458,6 +1458,12 @@ class TEST_LAN_SPARRING:
 
 
 class VERSION:
+    S_0_9808 = '0'  # tools/version.py:34
+    S_EMPTY_08B5 = ','  # tools/version.py:34
+    S_R_D_D_D_8DC2 = '^(\\d+)\\.(\\d+)\\.(\\d+)'  # tools/version.py:33
+    S_PRINT_THE_FOUR_NUMERIC_PE_VE_06B6 = 'Print the four numeric PE version fields'  # tools/version.py:27
+    S_STORE_TRUE_430C = 'store_true'  # tools/version.py:27
+    S_WINDOWS_AF25 = '--windows'  # tools/version.py:27
     S_V_DEAF = 'v'  # tools/version.py:28
     S_STORE_TRUE_2C29 = 'store_true'  # tools/version.py:25
     S_JSON_5AD0 = '--json'  # tools/version.py:25
@@ -1494,6 +1500,12 @@ class WINDOWS_DLLS:
 
 
 class CI_RELEASE:
+    S_VERSION_99AD = '--version'  # tools/ci_release.py:43
+    S_SF2RECOMP_APP_CONTENTS_MACOS_0F0C = 'SF2Recomp.app/Contents/MacOS/sf2recomp'  # tools/ci_release.py:42
+    S_MACOS_F720 = 'macos'  # tools/ci_release.py:41
+    S_TARGET_AA96 = 'target'  # tools/ci_release.py:41
+    S_SF2RECOMP_50A6 = 'sf2recomp'  # tools/ci_release.py:34
+    S_SF2RECOMP_EXE_FA88 = 'sf2recomp.exe'  # tools/ci_release.py:35
     N_6_E7F6 = 6  # tools/ci_release.py:51
     S_MAIN_ACB5 = '__main__'  # tools/ci_release.py:82
     S_EXPECTED_EXACTLY_ONE_STAGED__85B7 = 'Expected exactly one staged release'  # tools/ci_release.py:78
@@ -1717,6 +1729,12 @@ class DOWNLOADS:
 
 
 class PACKAGE_RELEASE:
+    S_SF2RECOMP_50A6 = 'sf2recomp'  # tools/package_release.py:459
+    S_DESKTOP_LAUNCHER_CBAD = 'desktop-launcher'  # tools/package_release.py:456
+    S_SF2RECOMP_2D44 = 'SF2Recomp'  # tools/package_release.py:332
+    S_WINDOWS_LAUNCHER_46F8 = 'windows-launcher'  # tools/package_release.py:461
+    S_MWINDOWS_224D = '-mwindows'  # tools/package_release.py:432
+    S_SF2RECOMP_EXE_FA88 = 'sf2recomp.exe'  # tools/package_release.py:329
     S_ASSETS_SF2RECOMP_README_PNG_6BA4 = 'assets/sf2recomp-readme.png'  # tools/package_release.py:43
     S_BIN_FFMPEG_EXE_31C1 = 'bin/ffmpeg.exe'  # tools/package_release.py:309
     S_ASSETS_README_MD_E66D = 'assets/README.md'  # tools/package_release.py:43
@@ -1899,11 +1917,7 @@ class PACKAGE_RELEASE:
     S_NSZ_FBB4 = '.nsz'  # tools/package_release.py:214
     S_NSP_BD26 = '.nsp'  # tools/package_release.py:214
     N_493_560A = 493  # tools/package_release.py:210
-    S_SF2RECOMP_COMMAND_D317 = 'SF2Recomp.command'  # tools/package_release.py:207
     S_SF2RECOMP_14FD = 'sf2recomp'  # tools/package_release.py:207
-    S_BIN_SH_NCASE_0_IN_FOLDER_0_F_F136 = '#!/bin/sh\ncase "$0" in */*) folder=${0%/*};; *) folder=.;; esac\nroot=$(CDPATH= cd -- "$folder" && pwd)\nunset PYTHONHOME PYTHONPATH\nexec "$root/python/bin/python3" -I "$root/tools/release_entry.py" "$@"\n'  # tools/package_release.py:206
-    S_ECHO_OFF_R_NSETLOCAL_R_NSET__6F91 = '@echo off\r\nsetlocal\r\nset "PYTHONHOME="\r\nset "PYTHONPATH="\r\n"%~dp0python\\python.exe" -I "%~dp0tools\\release_entry.py" %*\r\nset "sf2_exit=%errorlevel%"\r\nif "%~1"=="" pause\r\nexit /b %sf2_exit%\r\n'  # tools/package_release.py:204
-    S_SF2RECOMP_CMD_6CF6 = 'sf2recomp.cmd'  # tools/package_release.py:204
     S_L_ROOT_NATIVE_TOOLCHAIN_LIB_AEFE = '-L{root}/native/toolchain/lib'  # tools/package_release.py:198
     S_B_ROOT_NATIVE_TOOLCHAIN_BIN_0898 = '-B{root}/native/toolchain/bin'  # tools/package_release.py:198
     S_RESOURCE_DIR_ROOT_NATIVE_TOO_443D = '-resource-dir={root}/native/toolchain/lib/clang/'  # tools/package_release.py:197
@@ -2178,6 +2192,25 @@ class BUILD_EXTRACTION_TOOLS:
 
 
 class CONVERT:
+    S_GAME_LOGS_ARE_IN_LOGS_SHADOW_04FE = 'Game logs are in logs/shadow-fight-2.log beside the executable.\n'  # tools/convert.py:264
+    S_VERSION_43CC = 'version'  # tools/convert.py:272
+    S_SHADOW_FIGHT_2_5A40 = 'Shadow Fight 2'  # tools/convert.py:272
+    S_ASSETS_SF2RECOMP_PNG_B232 = 'assets/sf2recomp.png'  # tools/convert.py:271
+    S_OPEN_SHADOW_FIGHT_2_APP_IN_F_98A0 = 'Open Shadow Fight 2.app in Finder or run ./sf2 from Terminal.\n'  # tools/convert.py:260
+    S_OPEN_SHADOW_FIGHT_2_APP_IN_F_DB7A = 'Open Shadow Fight 2.app in Finder or run ./sf2 from Terminal. Keep the converted folder together.\n'  # tools/convert.py:240
+    S_SF2_PENDING_FB91 = 'sf2.pending'  # tools/convert.py:114
+    S_UTF_8_D983 = 'utf-8'  # tools/convert.py:56
+    S_GAME_3173 = 'Game'  # tools/convert.py:56
+    S_SHADOW_FIGHT_2_SF2RECOMP_891C = 'Shadow Fight 2 (sf2recomp)'  # tools/convert.py:55
+    S_LINK_GAME_A897 = 'Link game'  # tools/convert.py:322
+    S_PACKAGE_GAME_69F7 = 'Package game'  # tools/convert.py:321
+    S_COMPILE_GAME_5C31 = 'Compile game'  # tools/convert.py:320
+    S_TRANSLATE_SDK_CODE_912B = 'Translate SDK code'  # tools/convert.py:318
+    S_TRANSLATE_GAME_CODE_80DD = 'Translate game code'  # tools/convert.py:318
+    S_PREPARE_SYMBOLS_683B = 'Prepare symbols'  # tools/convert.py:318
+    S_PREPARE_CONVERSION_936A = 'Prepare conversion'  # tools/convert.py:316
+    S_EXTRACT_GAME_AA35 = 'Extract game'  # tools/convert.py:315
+    S_VALIDATE_INPUT_2904 = 'Validate input'  # tools/convert.py:315
     S_MAIN_ACB5 = '__main__'  # tools/convert.py:365
     S_C_E03C = '*/*.c'  # tools/convert.py:354
     S_GAME_GEN_45C5 = 'game/gen'  # tools/convert.py:354
@@ -2367,6 +2400,30 @@ class CONVERT:
 
 
 class RELEASE:
+    S_SF2RECOMP_0F38 = 'Sf2recomp'  # tools/release.py:217
+    S_THE_MACOS_GAME_BUNDLE_DID_NO_C75E = 'The macOS game bundle did not write a log beside the app'  # tools/release.py:109
+    S_LOGS_SHADOW_FIGHT_2_LOG_B270 = 'logs/shadow-fight-2.log'  # tools/release.py:108
+    S_CONTENTS_MACOS_SF2_5E7B = 'Contents/MacOS/sf2'  # tools/release.py:105
+    S_SHADOW_FIGHT_2_5A40 = 'Shadow Fight 2'  # tools/release.py:103
+    S_EXTRACTED_3466 = 'extracted'  # tools/release.py:90
+    S_SF2_8A0A = 'sf2'  # tools/release.py:82
+    S_SF2RECOMP_2D44 = 'SF2Recomp'  # tools/release.py:205
+    S_UTILITY_2BDB = 'Utility'  # tools/release.py:204
+    S_VERSION_43CC = 'version'  # tools/release.py:204
+    S_ASSETS_SF2RECOMP_PNG_B232 = 'assets/sf2recomp.png'  # tools/release.py:203
+    S_SF2RECOMP_50A6 = 'sf2recomp'  # tools/release.py:203
+    S_INSTALL_DESKTOP_IS_AVAILABLE_1EE9 = '--install-desktop is available on Linux'  # tools/release.py:201
+    S_ADD_THE_CONVERTER_TO_THE_LIN_648B = 'Add the converter to the Linux application menu'  # tools/release.py:189
+    S_INSTALL_DESKTOP_337D = '--install-desktop'  # tools/release.py:189
+    S_1_3915 = '1'  # tools/release.py:244
+    S_RELEASE_ENTRY_PY_4DB7 = 'release_entry.py'  # tools/release.py:209
+    S_PACKAGE_APK_C775 = 'Package APK'  # tools/release.py:141
+    S_BUILD_ANDROID_APK_7619 = 'Build Android APK'  # tools/release.py:141
+    S_TRANSLATE_SDK_CODE_912B = 'Translate SDK code'  # tools/release.py:141
+    S_TRANSLATE_GAME_CODE_80DD = 'Translate game code'  # tools/release.py:140
+    S_PREPARE_SYMBOLS_683B = 'Prepare symbols'  # tools/release.py:140
+    S_EXTRACT_GAME_AA35 = 'Extract game'  # tools/release.py:139
+    S_PREPARE_ANDROID_TOOLS_E64F = 'Prepare Android tools'  # tools/release.py:137
     S_USE_INTERACTIVE_TERMINAL_PRO_EA78 = 'use interactive terminal prompts'  # tools/release.py:178
     S_CLI_30A2 = '--cli'  # tools/release.py:178
     S_OPEN_THE_CONVERSION_WINDOW_1417 = 'open the conversion window'  # tools/release.py:177
@@ -2586,6 +2643,18 @@ class RELEASE_SUPPORT:
 
 
 class CONVERTER_UI:
+    S_LINUX_F32A = 'linux'  # tools/converter_ui.py:97
+    S_SF2RECOMP_50A6 = 'sf2recomp'  # tools/converter_ui.py:327
+    S_SF2RECOMP_2D44 = 'SF2Recomp'  # tools/converter_ui.py:327
+    S_A_AC8D = 'a'  # tools/converter_ui.py:227
+    S_X_BA2D = 'x'  # tools/converter_ui.py:154
+    S_CANCELLING_CONVERSION_879B = 'Cancelling conversion…'  # tools/converter_ui.py:288
+    S_COULD_NOT_CANCEL_CONVERSION_E101 = 'Could not cancel conversion'  # tools/converter_ui.py:285
+    S_CONVERSION_CANCELLED_5DEF = 'Conversion cancelled.'  # tools/converter_ui.py:276
+    S_PROGRESS_74BE = 'progress'  # tools/converter_ui.py:224
+    S_CANCEL_C077 = 'Cancel'  # tools/converter_ui.py:160
+    S_DETERMINATE_9AEE = 'determinate'  # tools/converter_ui.py:150
+    S_SF2_GUI_PROGRESS_98F6 = 'SF2_GUI_PROGRESS'  # tools/converter_ui.py:68
     APP_NAME = 'SF2Recomp'
     S_MAIN_8B1C = '__main__'  # tools/converter_ui.py:291
     S_WAIT_FOR_CONVERSION_TO_FINIS_F367 = 'Wait for conversion to finish before closing this window.'  # tools/converter_ui.py:270
@@ -2675,7 +2744,6 @@ class CONVERTER_UI:
     N_700_99EE = 700  # tools/converter_ui.py:89
     N_8_2C62 = 8  # tools/converter_ui.py:88
     S_ASSETS_SF2RECOMP_PNG_B232 = 'assets/sf2recomp.png'  # tools/converter_ui.py:86
-    S_SF2RECOMP_CONVERTER_E815 = 'SF2Recomp Converter'  # tools/converter_ui.py:85
     S_REPLACE_197D = 'replace'  # tools/converter_ui.py:68
     S_W_7265 = 'w'  # tools/converter_ui.py:65
     S_NT_ABB5 = 'nt'  # tools/converter_ui.py:64
@@ -2762,3 +2830,99 @@ class CHECK_DOC_LINKS:
     S_README_MD_D82A = 'README.md'  # tools/check_doc_links.py:16
     S_R_N_S_IMG_S_SRC_7C82 = '!\\[[^\\]\\n]*\\]\\(([^)\\s]+)\\)|<img\\s+[^>]*src="([^"]+)"'  # tools/check_doc_links.py:12
     S_R_N_S_A_S_HREF_A_681D = '(?<!!)\\[([^\\]\\n]+)\\]\\(([^)\\s]+)\\)|<a\\s+href="([^"]+)"[^>]*>(.*?)</a>'  # tools/check_doc_links.py:11
+
+
+class CONVERSION_PROCESS:
+    S_1_3915 = '1'  # tools/conversion_process.py:91
+    S_REPLACE_197D = 'replace'  # tools/conversion_process.py:88
+    S_UTF_8_D983 = 'utf-8'  # tools/conversion_process.py:87
+    S_C_542D = '-c'  # tools/conversion_process.py:83
+    S_I_C4CD = '-I'  # tools/conversion_process.py:83
+    S_IMPORT_SUBPROCESS_SYS_SYS_EX_5FDB = "import subprocess, sys; sys.exit(subprocess.call(sys.argv[1:]) if sys.stdin.read(1) == '1' else 1)"  # tools/conversion_process.py:81
+    S_STDIN_EA20 = 'stdin'  # tools/conversion_process.py:79
+    S_CREATIONFLAGS_23A9 = 'creationflags'  # tools/conversion_process.py:78
+    S_STARTUPINFO_4AD7 = 'startupinfo'  # tools/conversion_process.py:78
+    S_WIN32_0211 = 'win32'  # tools/conversion_process.py:72
+    S_START_NEW_SESSION_A94C = 'start_new_session'  # tools/conversion_process.py:71
+    N_0X0100_1781 = 256  # tools/conversion_process.py:31
+    S_CLOSEHANDLE_416F = 'CloseHandle'  # tools/conversion_process.py:21
+    S_TERMINATEJOBOBJECT_7B29 = 'TerminateJobObject'  # tools/conversion_process.py:20
+    S_ASSIGNPROCESSTOJOBOBJECT_3F38 = 'AssignProcessToJobObject'  # tools/conversion_process.py:19
+    S_OPENPROCESS_C468 = 'OpenProcess'  # tools/conversion_process.py:18
+    S_CREATEJOBOBJECTW_C215 = 'CreateJobObjectW'  # tools/conversion_process.py:17
+    S_KERNEL32_5504 = 'kernel32'  # tools/conversion_process.py:14
+
+
+class CONVERSION_PROGRESS:
+    N_100_AD57 = 100  # tools/conversion_progress.py:33
+    S_EMPTY_12AE = ''  # tools/conversion_progress.py:27
+    S_1_3915 = '1'  # tools/conversion_progress.py:21
+    S_SF2_GUI_PROGRESS_98F6 = 'SF2_GUI_PROGRESS'  # tools/conversion_progress.py:21
+    S_R_BUILDING_GAME_D_D_FILES_RE_69CB = '^Building game: (\\d+)/(\\d+) files ready'  # tools/conversion_progress.py:10
+    S_COMPILE_GAME_5C31 = 'Compile game'  # tools/conversion_progress.py:10
+    S_R_SDK_PROGRESS_D_D_FILES_4C0C = '^sdk: progress (\\d+)/(\\d+) files '  # tools/conversion_progress.py:9
+    S_TRANSLATE_SDK_CODE_912B = 'Translate SDK code'  # tools/conversion_progress.py:9
+    S_R_MAIN_PROGRESS_D_D_FILES_8F39 = '^main: progress (\\d+)/(\\d+) files '  # tools/conversion_progress.py:8
+    S_TRANSLATE_GAME_CODE_80DD = 'Translate game code'  # tools/conversion_progress.py:8
+    S_SF2_PROGRESS_FA33 = 'SF2_PROGRESS '  # tools/conversion_progress.py:6
+
+
+class CONVERSION_LOG:
+    B_B_N_9579 = b'\n'  # tools/conversion_log.py:45
+    B_B_62D3 = b''  # tools/conversion_log.py:40
+    N_2_D473 = 2  # tools/conversion_log.py:47
+    N_65536_0F25 = 65536  # tools/conversion_log.py:30
+    S_XB_3EFC = 'xb'  # tools/conversion_log.py:27
+    S_1_3915 = '1'  # tools/conversion_log.py:26
+    S_I_C4CD = '-I'  # tools/conversion_log.py:24
+    S_UTF8_DEF4 = 'utf8'  # tools/conversion_log.py:22
+    S_X_2FB0 = '-X'  # tools/conversion_log.py:22
+    S_U_A2FD = '-u'  # tools/conversion_log.py:22
+    S_Y_M_D_H_M_S_F_25D5 = '%Y-%m-%d_%H-%M-%S-%f'  # tools/conversion_log.py:16
+    S_LOGS_A052 = 'logs'  # tools/conversion_log.py:14
+    S_SF2_CONVERSION_LOG_ACTIVE_F26F = 'SF2_CONVERSION_LOG_ACTIVE'  # tools/conversion_log.py:10
+
+
+class DESKTOP_INTEGRATION:
+    S_ASSETS_SF2RECOMP_README_PNG_6BA4 = 'assets/sf2recomp-readme.png'  # tools/desktop_integration.py:10
+    S_PENDING_276C = '.pending'  # tools/desktop_integration.py:29
+    S_UTF_8_D983 = 'utf-8'  # tools/desktop_integration.py:71
+    S_APPLICATIONS_2206 = 'applications'  # tools/desktop_integration.py:68
+    S_XDG_DATA_HOME_MUST_BE_AN_ABS_FF80 = 'XDG_DATA_HOME must be an absolute path'  # tools/desktop_integration.py:67
+    S_LOCAL_SHARE_5321 = '.local/share'  # tools/desktop_integration.py:65
+    S_XDG_DATA_HOME_76F9 = 'XDG_DATA_HOME'  # tools/desktop_integration.py:65
+    S_EMPTY_A21C = '%%'  # tools/desktop_integration.py:53
+    S_EMPTY_AAE8 = '%'  # tools/desktop_integration.py:53
+    S_EMPTY_3251 = '"'  # tools/desktop_integration.py:53
+    S_EMPTY_D3F3 = '\\`$"'  # tools/desktop_integration.py:52
+    S_EMPTY_12AE = ''  # tools/desktop_integration.py:52
+    S_DESKTOP_EXECUTABLE_PATHS_CAN_93FB = 'Desktop executable paths cannot contain ='  # tools/desktop_integration.py:51
+    S_EMPTY_90FB = '='  # tools/desktop_integration.py:50
+    S_T_DB1A = '\\t'  # tools/desktop_integration.py:45
+    S_T_729E = '\t'  # tools/desktop_integration.py:45
+    S_R_1074 = '\\r'  # tools/desktop_integration.py:45
+    S_R_8EB8 = '\r'  # tools/desktop_integration.py:45
+    S_N_6309 = '\\n'  # tools/desktop_integration.py:45
+    S_N_D7A5 = '\n'  # tools/desktop_integration.py:45
+    S_EMPTY_11C3 = '\\\\'  # tools/desktop_integration.py:45
+    S_EMPTY_687A = '\\'  # tools/desktop_integration.py:45
+    S_LIB_5EFF = '../../../lib'  # tools/desktop_integration.py:37
+    S_LIB_5A09 = 'lib'  # tools/desktop_integration.py:35
+    S_NSHIGHRESOLUTIONCAPABLE_3F5A = 'NSHighResolutionCapable'  # tools/desktop_integration.py:26
+    S_CFBUNDLEVERSION_9A09 = 'CFBundleVersion'  # tools/desktop_integration.py:26
+    S_CFBUNDLESHORTVERSIONSTRING_3461 = 'CFBundleShortVersionString'  # tools/desktop_integration.py:25
+    S_APPL_716E = 'APPL'  # tools/desktop_integration.py:25
+    S_CFBUNDLEPACKAGETYPE_461C = 'CFBundlePackageType'  # tools/desktop_integration.py:25
+    S_CFBUNDLEICONFILE_E7FF = 'CFBundleIconFile'  # tools/desktop_integration.py:24
+    S_CFBUNDLEEXECUTABLE_29D7 = 'CFBundleExecutable'  # tools/desktop_integration.py:24
+    S_CFBUNDLEDISPLAYNAME_05D2 = 'CFBundleDisplayName'  # tools/desktop_integration.py:23
+    S_CFBUNDLENAME_8066 = 'CFBundleName'  # tools/desktop_integration.py:23
+    S_CFBUNDLEIDENTIFIER_8DA2 = 'CFBundleIdentifier'  # tools/desktop_integration.py:23
+    S_INFO_PLIST_23A1 = 'Info.plist'  # tools/desktop_integration.py:22
+    S_R_D_D_D_38BC = '\\d+\\.\\d+\\.\\d+'  # tools/desktop_integration.py:21
+    S_APPICON_ICNS_44CB = 'AppIcon.icns'  # tools/desktop_integration.py:20
+    S_RGBA_6607 = 'RGBA'  # tools/desktop_integration.py:20
+    S_RESOURCES_9DEA = 'Resources'  # tools/desktop_integration.py:17
+    S_MACOS_61C2 = 'MacOS'  # tools/desktop_integration.py:15
+    S_CONTENTS_9785 = 'Contents'  # tools/desktop_integration.py:14
+    S_ORG_SF2RECOMP_CONVERTER_1D81 = 'org.sf2recomp.Converter'  # tools/desktop_integration.py:8

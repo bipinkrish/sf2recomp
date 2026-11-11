@@ -1,2 +1,41 @@
-// No proprietary icon is embedded. The original game icon is loaded at runtime.
+#include "../version.h"
+
+#ifdef SF2_CONVERTER
+#define SF2_DESCRIPTION "SF2Recomp"
+#define SF2_PRODUCT "SF2Recomp"
+#define SF2_FILENAME "sf2recomp.exe"
+#else
+#define SF2_DESCRIPTION "Shadow Fight 2 (SF2Recomp)"
+#define SF2_PRODUCT "Shadow Fight 2"
+#define SF2_FILENAME "sf2.exe"
+#endif
+
 1 24 "windows.manifest"
+1 ICON "sf2recomp.ico"
+
+1 VERSIONINFO
+FILEVERSION SF2_WINDOWS_VERSION
+PRODUCTVERSION SF2_WINDOWS_VERSION
+FILEFLAGSMASK 0x3fL
+FILEFLAGS 0
+FILEOS 0x40004L
+FILETYPE 0x1L
+FILESUBTYPE 0
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "FileDescription", SF2_DESCRIPTION
+            VALUE "FileVersion", SF2RECOMP_VERSION
+            VALUE "InternalName", SF2_FILENAME
+            VALUE "OriginalFilename", SF2_FILENAME
+            VALUE "ProductName", SF2_PRODUCT
+            VALUE "ProductVersion", SF2RECOMP_VERSION
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 1200
+    END
+END

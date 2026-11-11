@@ -78,14 +78,16 @@ def check():
         from analyze_il2cpp import BUILD_ID
         source.write_text(source.read_text().replace(K.S_MAIN_NSO_BUILD_ID_32_0_3E16,
                           K.S_MAIN_NSO_BUILD_ID_32_5C28 + K.S_EMPTY_EE1B.join(str(b) for b in BUILD_ID) + K.S_EMPTY_9AC4))
-        binary = compile_sources([source], stage / (K.S_PROBE_EXE_E8BB if os.name == K.S_NT_88F0 else K.S_PROBE_A3E2))
-        if sys.platform == K.S_DARWIN_5439:
+        macos = sys.platform == K.S_DARWIN_5439
+        executable = K.S_SF2_8A0A if macos else K.S_PROBE_EXE_E8BB if os.name == K.S_NT_88F0 else K.S_PROBE_A3E2
+        binary = compile_sources([source], stage / executable)
+        if macos:
             shutil.copytree(ROOT / K.S_NATIVE_LIB_601C, stage / K.S_LIB_427F)
         elif os.name == K.S_NT_88F0:
             # Match converted Windows folders: runtime DLLs sit beside the executable.
             for library in (ROOT / K.S_NATIVE_LIB_601C).glob(K.WINDOWS_RUNTIME_DLL_GLOB):
                 shutil.copy2(library, stage / library.name)
-        game = stage / K.S_SYNTHETIC_GAME_A790
+        game = stage / (K.S_EXTRACTED_3466 if macos else K.S_SYNTHETIC_GAME_A790)
         (game / K.S_EXEFS_00A0).mkdir(parents=True)
         for name in (K.S_MAIN_13FD, K.S_SDK_0065):
             header = bytearray(K.B_B_NSO0_4F90 + bytes(K.N_96_7B1A - K.N_4_4B22))
@@ -95,6 +97,16 @@ def check():
         native_version = subprocess.check_output([str(binary), K.S_VERSION_B4E3], env=environment(), text=True).strip()
         if native_version != K.S_SF2RECOMP_7368 + data[K.S_VERSION_25EB]:
             raise ValueError(K.S_THE_PREBUILT_RUNTIME_VERSION_E19F)
+        if macos:
+            from desktop_integration import write_macos_app
+            from game_metadata import APP_ID
+            app = write_macos_app(stage, binary, ROOT / K.S_ASSETS_SF2RECOMP_PNG_B232, title=K.S_SHADOW_FIGHT_2_5A40,
+                                  identifier=APP_ID, version=data[K.S_VERSION_25EB], hardlink=True)
+            bundled = app / K.S_CONTENTS_MACOS_SF2_5E7B
+            env = dict(environment(), SF2_GAME_LOG=K.S_1_3915)
+            subprocess.run([str(bundled), K.S_CHECK_GAME_D4C1], check=True, env=env, timeout=K.N_30_624B)
+            if not (stage / K.S_LOGS_SHADOW_FIGHT_2_LOG_B270).is_file():
+                raise ValueError(K.S_THE_MACOS_GAME_BUNDLE_DID_NO_C75E)
         # Force the Python native modules to load and execute, not just import.
         decoded = list(capstone.Cs(capstone.CS_ARCH_ARM64, capstone.CS_MODE_ARM).disasm_lite(bytes.fromhex(K.S_1F2003D5_D2B8), 0))
         if len(decoded) != 1 or decoded[0][K.N_2_D473] != K.S_NOP_E336:
@@ -132,26 +144,38 @@ def check_decoder(target):
 
 
 def android(args):
+    from conversion_progress import ConversionProgress
     from setup_android import ensure
+    steps = [K.S_PREPARE_ANDROID_TOOLS_E64F]
+    if args.nsp:
+        steps.append(K.S_EXTRACT_GAME_AA35)
+    progress = ConversionProgress([*steps, K.S_PREPARE_SYMBOLS_683B, K.S_TRANSLATE_GAME_CODE_80DD,
+                                   K.S_TRANSLATE_SDK_CODE_912B, K.S_BUILD_ANDROID_APK_7619, K.S_PACKAGE_APK_C775])
+    progress.advance()
     env = ensure(accept_licenses=args.accept_android_licenses)
     if args.nsp:
+        progress.advance()
         subprocess.run([sys.executable, str(ROOT / K.S_TOOLS_EXTRACT_PY_B0D4), str(args.nsp.resolve()),
                         str(args.keys.resolve())], check=True, env=env)
         game = ROOT / K.S_GAME_EXTRACTED_UPDATE_E969
     else:
         game = args.game.resolve()
     from convert import source_ids
+    progress.advance()
     source_ids(game)
     from analyze_il2cpp import prepare_symbols
     symbols = prepare_symbols(game)
     for name, base in ((K.S_MAIN_13FD, K.S_0X7000000000_2DF4), (K.S_SDK_0065, K.S_0X7004000000_DDC3)):
+        progress.advance()
         command = [sys.executable, str(ROOT / K.S_TOOLS_RECOMPR_GEN_PY_1453), name,
                    str(game / K.S_EXEFS_00A0 / name), base, str(ROOT / K.S_GAME_GEN_45C5 / name), K.S_SIMD_C_D046]
         if name == K.S_MAIN_13FD:
             command += [K.S_SYMBOLS_1344, str(symbols)]
         subprocess.run(command, check=True, env=env)
+    progress.advance()
     subprocess.run([sys.executable, str(ROOT / K.S_TOOLS_BUILD_ANDROID_PY_ACAD), K.S_GAME_1AB6, str(game),
                     K.S_ABI_BED3, args.abi], check=True, env=env)
+    progress.advance()
     args.output.mkdir(parents=True, exist_ok=True)
     apk = args.output / f"sf2-android-{args.abi}.apk"
     from build_android import publish_apk
@@ -174,6 +198,7 @@ def main(argv=None):
     parser.add_argument(K.S_JOBS_0E7C, type=int, default=min(os.cpu_count() or 1, K.N_8_2C62))
     parser.add_argument(K.S_CHECK_464A, action=K.S_STORE_TRUE_2C29, help=K.S_TEST_THE_RELEASE_WITHOUT_GAM_F65A)
     parser.add_argument(K.S_PLAY_7BC5, action=K.S_STORE_TRUE_2C29, help=K.S_START_THE_CONVERTED_DESKTOP__6F60)
+    parser.add_argument(K.S_INSTALL_DESKTOP_337D, action=K.S_STORE_TRUE_430C, help=K.S_ADD_THE_CONVERTER_TO_THE_LIN_648B)
     parser.add_argument(K.S_GUI_39FA, action=K.S_STORE_TRUE_430C, help=K.S_OPEN_THE_CONVERSION_WINDOW_1417)
     parser.add_argument(K.S_CLI_30A2, action=K.S_STORE_TRUE_430C, help=K.S_USE_INTERACTIVE_TERMINAL_PRO_EA78)
     args = parser.parse_args(argv)
@@ -183,6 +208,15 @@ def main(argv=None):
     from host_tools import host_target
     if data[K.S_TARGET_0B9D] != host_target():
         raise ValueError(K.S_DOWNLOAD_THE_SF2RECOMP_RELEA_B302)
+    if args.install_desktop:
+        if data[K.S_TARGET_0B9D] != K.S_LINUX_F32A:
+            parser.error(K.S_INSTALL_DESKTOP_IS_AVAILABLE_1EE9)
+        from desktop_integration import CONVERTER_ID, LINUX_CONVERTER_ICON, linux_desktop, register_linux_desktop
+        entry = linux_desktop(ROOT / K.S_SF2RECOMP_50A6, ROOT / LINUX_CONVERTER_ICON, title=K.S_SF2RECOMP_2D44,
+                              identifier=CONVERTER_ID, version=data[K.S_VERSION_43CC], category=K.S_UTILITY_2BDB,
+                              window_class=K.S_SF2RECOMP_0F38)
+        register_linux_desktop(CONVERTER_ID, entry)
+        return 0
     if args.gui or not (sys.argv[1:] if argv is None else argv):
         from converter_ui import main as gui_main
         return gui_main()
@@ -192,6 +226,9 @@ def main(argv=None):
         with conversion_lock():
             check()
         return 0
+    from conversion_log import LOG_ACTIVE, run_logged_cli
+    if argv is None and not os.environ.get(LOG_ACTIVE):
+        return run_logged_cli(Path(__file__).with_name(K.S_RELEASE_ENTRY_PY_4DB7), sys.argv[1:], isolated=True)
     if not args.nsp and not args.game:
         if not sys.stdin.isatty():
             parser.error(K.S_PROVIDE_NSP_AND_KEYS_OR_GAME_3901)
@@ -224,7 +261,9 @@ def main(argv=None):
             if convert.main(command):
                 return 1
     if args.play:
-        subprocess.run([str(args.output / (K.S_SF2_EXE_6245 if os.name == K.S_NT_88F0 else K.S_SF2_4CDA))], cwd=args.output, check=True)
+        windows = os.name == K.S_NT_88F0
+        executable = args.output / (K.S_SF2_EXE_6245 if windows else K.S_SF2_4CDA)
+        subprocess.run([str(executable)], cwd=args.output, check=True)
     return 0
 
 

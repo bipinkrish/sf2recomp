@@ -4881,3 +4881,7 @@
 #define SF2C_PLATFORM_PLAT_EXE_SUFFIX_12AE32CB ""
 
 #define SF2C_PLATFORM_PLAT_EXE_SUFFIX_8418E474 ".exe"
+// runtime/main.c:148
+#define SF2C_MAIN_S_SF2_GAME_LOG_74EB "SF2_GAME_LOG"
+// runtime/main.c:148
+#define SF2C_MAIN_S_1_3915 "1"

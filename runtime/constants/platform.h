@@ -141,7 +141,7 @@
 // runtime/platform/linux.c:378
 #define SF2C_LINUX_S_SF2_RECOMP_AA83 "SF2 Recomp"
 // runtime/platform/linux.c:379
-#define SF2C_LINUX_S_THE_GAME_STOPPED_DETAILS_ARE_7D74 "The game stopped. Details are in lasrecomp.log in the app's files directory."
+#define SF2C_LINUX_S_THE_GAME_STOPPED_DETAILS_ARE_7D74 "The game stopped. Details are in logs/shadow-fight-2.log in the app's files directory."
 // runtime/platform/linux.c:384
 #define SF2C_LINUX_S_NOTICE_S_N_83D0 "[notice] %s\n"
 // runtime/platform/linux.c:406
@@ -660,3 +660,45 @@
 #define SF2C_WINDOWS_CMDLINE_N_2_D473 2
 
 #define SF2C_POSIX_LOG_SESSION_LOG_BACKUPS 5
+// runtime/platform/windows.c:334
+#define SF2C_WINDOWS_S_SHADOW_FIGHT_2_BA56 "shadow-fight-2-"
+// runtime/platform/windows.c:337
+#define SF2C_WINDOWS_S_0123456789_EB5E "0123456789-_"
+// runtime/platform/windows.c:345
+#define SF2C_WINDOWS_S_SSHADOW_FIGHT_2_04D_02D_02D__4AB3 "%sshadow-fight-2-%04d-%02d-%02d_%02d-%02d-%02d-%03d-%lu.log"
+// runtime/platform/windows.c:364
+#define SF2C_WINDOWS_S_SSHADOW_FIGHT_2_LOG_18FE "%sshadow-fight-2-*.log"
+// runtime/platform/windows.c:436
+#define SF2C_WINDOWS_S_SF2_GAME_LOG_74EB "SF2_GAME_LOG"
+// runtime/platform/windows.c:444
+#define SF2C_WINDOWS_S_LOGS_EAE2 "logs\\"
+// runtime/platform/windows.c:446
+#define SF2C_WINDOWS_S_SSHADOW_FIGHT_2_LOG_6F9A "%sshadow-fight-2.log"
+// runtime/platform/windows.c:443
+#define SF2C_WINDOWS_S_LOGS_A052 "logs"
+// runtime/platform/linux.c:212
+#define SF2C_LINUX_S_SF2_GAME_LOG_74EB "SF2_GAME_LOG"
+// runtime/platform/macos.c:41
+#define SF2C_MACOS_S_SF2_GAME_LOG_74EB "SF2_GAME_LOG"
+// runtime/platform/macos.c:190
+#define SF2C_MACOS_S_APP_CONTENTS_MACOS_SF2_1C4A ".app/Contents/MacOS/sf2"
+// runtime/platform/macos.c:195
+#define SF2C_MACOS_S_SF2_ED26 "/sf2"
+// runtime/platform/posix_log.h:30
+#define SF2C_POSIX_LOG_S_S_SHADOW_FIGHT_2_S_D_LOG_8A4E "%s/shadow-fight-2-%s-%d.log"
+// runtime/platform/posix_log.h:32
+#define SF2C_POSIX_LOG_S_S_SHADOW_FIGHT_2_S_D_D_LOG_E67B "%s/shadow-fight-2-%s-%d-%d.log"
+// runtime/platform/posix_log.h:51
+#define SF2C_POSIX_LOG_S_SHADOW_FIGHT_2_BA56 "shadow-fight-2-"
+// runtime/platform/posix_log.h:77
+#define SF2C_POSIX_LOG_S_S_LOGS_59C6 "%s/logs"
+// runtime/platform/posix_log.h:78
+#define SF2C_POSIX_LOG_N_0755_64A5 0755
+// runtime/platform/posix_log.h:79
+#define SF2C_POSIX_LOG_S_S_SHADOW_FIGHT_2_LOG_4EF0 "%s/shadow-fight-2.log"
+// runtime/platform/posix_log.h:85
+#define SF2C_POSIX_LOG_S_SHADOW_FIGHT_2_LOG_6C33 "shadow-fight-2.log"
+// runtime/platform/posix_log.h:29
+#define SF2C_POSIX_LOG_S_Y_M_D_H_M_S_D21C "%Y-%m-%d_%H-%M-%S"
+// runtime/platform/posix_log.h:53
+#define SF2C_POSIX_LOG_S_0123456789_EB5E "0123456789-_"

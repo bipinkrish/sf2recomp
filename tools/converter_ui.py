@@ -6,9 +6,12 @@ from pathlib import Path
 import queue
 import subprocess
 import sys
-import tempfile
 import threading
 
+from conversion_log import LOG_ACTIVE, new_conversion_log
+from conversion_process import ConversionProcess
+from conversion_progress import PREFIX, ProgressDisplay
+from desktop_integration import LINUX_CONVERTER_ICON
 from host_tools import host_target
 from release_support import ROOT, environment, manifest
 
@@ -58,20 +61,24 @@ def conversion_command(source_kind, source, keys, output, target, accept_license
     return [*command, str(ROOT / K.S_TOOLS_FB82 / entry), *arguments], output_path
 
 
-def stream_conversion(command, log_path, on_line):
+def stream_conversion(command, log_path, on_line, process=None, on_progress=None):
     """Keep the full subprocess log on disk and forward output to the UI queue."""
     env = environment() if manifest() else os.environ.copy()
     env.update(PYTHONUNBUFFERED=K.S_1_3915, PYTHONIOENCODING=K.S_UTF_8_D983)
-    options = {K.S_CREATIONFLAGS_23A9: subprocess.CREATE_NO_WINDOW} if os.name == K.S_NT_ABB5 else {}
+    env[LOG_ACTIVE] = K.S_1_3915
+    if on_progress:
+        env[K.S_SF2_GUI_PROGRESS_98F6] = K.S_1_3915
+    progress = ProgressDisplay()
     with log_path.open(K.S_W_7265, encoding=K.S_UTF_8_D983) as log:
-        with subprocess.Popen(command, cwd=ROOT, env=env, stdout=subprocess.PIPE,
-                              stderr=subprocess.STDOUT, text=True, encoding=K.S_UTF_8_D983,
-                              errors=K.S_REPLACE_197D, **options) as process:
-            for line in process.stdout:
+        def receive(line):
+            if on_progress and (value := progress.update(line)):
+                on_progress(value)
+            if not line.startswith(PREFIX):
                 log.write(line)
                 log.flush()
                 on_line(line)
-            return process.wait()
+
+        return (process or ConversionProcess()).run(command, ROOT, env, receive)
 
 
 class ConverterWindow:
@@ -82,10 +89,13 @@ class ConverterWindow:
         self.window, self.filedialog, self.messagebox = window, filedialog, messagebox
         self.events = queue.Queue()
         self.running = False
+        self.close_when_done = False
         self.output_path = None
-        window.title(K.S_SF2RECOMP_CONVERTER_E815)
+        window.title(K.S_SF2RECOMP_2D44)
         self.icon = tk.PhotoImage(file=str(ROOT / K.S_ASSETS_SF2RECOMP_PNG_B232))
-        window.iconphoto(True, self.icon)
+        self.window_icon = (tk.PhotoImage(file=str(ROOT / LINUX_CONVERTER_ICON))
+                            if sys.platform == K.S_LINUX_F32A else self.icon)
+        window.iconphoto(True, self.window_icon)
         self.badge = self.icon.subsample(K.N_8_2C62, K.N_8_2C62)
         window.minsize(K.N_700_99EE, K.N_570_085B)
         window.columnconfigure(0, weight=1)
@@ -108,7 +118,7 @@ class ConverterWindow:
         self.target = tk.StringVar(value=TARGETS[0])
         self.accept = tk.BooleanVar()
         self.status = tk.StringVar(value=K.S_CHOOSE_YOUR_GAME_FILES_TO_BE_2FE6)
-        self.log_label = tk.StringVar()
+        self.process = None
         self.controls = []
         self.choices = []
 
@@ -142,18 +152,21 @@ class ConverterWindow:
         accept.pack(side=K.S_LEFT_6157, padx=K.N_12_6B51)
         self.controls.append(accept)
         self.android.grid_remove()
-        self.progress = ttk.Progressbar(panel, mode=K.S_INDETERMINATE_DC8D)
-        self.progress.grid(row=K.N_8_2C62, column=0, columnspan=K.N_3_4E07, sticky=K.S_EW_F64D, pady=(K.N_12_6B51, K.N_8_2C62))
+        progress_panel = ttk.Frame(panel)
+        progress_panel.grid(row=K.N_8_2C62, column=0, columnspan=K.N_3_4E07, sticky=K.S_EW_F64D, pady=(K.N_12_6B51, K.N_8_2C62))
+        ttk.Label(progress_panel, textvariable=self.status, wraplength=K.N_650_2099).pack(anchor=K.S_W_7265)
+        self.progress = ttk.Progressbar(progress_panel, mode=K.S_DETERMINATE_9AEE, maximum=K.N_100_AD57)
+        self.progress.pack(fill=K.S_X_BA2D, pady=(K.N_4_4B22, 0))
         self.log = ScrolledText(panel, height=K.N_10_4A44, width=K.N_80_4844, state=K.S_DISABLED_F693, wrap=K.S_WORD_3E29)
         self.log.grid(row=K.N_9_1958, column=0, columnspan=K.N_3_4E07, sticky=K.S_NSEW_C79F)
-        ttk.Label(panel, textvariable=self.status, wraplength=K.N_650_2099).grid(
-            row=K.N_10_4A44, column=0, columnspan=K.N_3_4E07, sticky=K.S_W_7265, pady=(K.N_10_4A44, 0))
-        ttk.Label(panel, textvariable=self.log_label, wraplength=K.N_650_2099).grid(
-            row=K.N_11_4FC8, column=0, columnspan=K.N_3_4E07, sticky=K.S_W_7265, pady=(K.N_4_4B22, K.N_12_6B51))
-        self.start_button = ttk.Button(panel, text=K.S_CONVERT_C44A, command=self.start)
-        self.start_button.grid(row=K.N_12_6B51, column=1, sticky=K.S_E_8C86)
-        self.open_button = ttk.Button(panel, text=K.S_OPEN_OUTPUT_FOLDER_43A5, command=self.open_output, state=K.S_DISABLED_F693)
-        self.open_button.grid(row=K.N_12_6B51, column=K.N_2_D473, padx=(K.N_8_2C62, 0))
+        actions = ttk.Frame(panel)
+        actions.grid(row=K.N_10_4A44, column=0, columnspan=K.N_3_4E07, sticky=K.S_E_8C86, pady=(K.N_12_6B51, 0))
+        self.start_button = ttk.Button(actions, text=K.S_CONVERT_C44A, command=self.start)
+        self.start_button.pack(side=K.S_LEFT_6157)
+        self.cancel_button = ttk.Button(actions, text=K.S_CANCEL_C077, command=self.cancel, state=K.S_DISABLED_F693)
+        self.cancel_button.pack(side=K.S_LEFT_6157, padx=K.N_8_2C62)
+        self.open_button = ttk.Button(actions, text=K.S_OPEN_OUTPUT_FOLDER_43A5, command=self.open_output, state=K.S_DISABLED_F693)
+        self.open_button.pack(side=K.S_LEFT_6157)
         window.protocol(K.S_WM_DELETE_WINDOW_20BA, self.close)
         window.after(K.N_100_AD57, self.poll)
 
@@ -191,10 +204,7 @@ class ConverterWindow:
         try:
             command, output = conversion_command(self.kind.get(), self.source.get(), self.keys.get(),
                                                  self.output.get(), self.target.get(), self.accept.get())
-            logs = ROOT / K.S_BUILD_LOGS_31AC
-            logs.mkdir(parents=True, exist_ok=True)
-            with tempfile.NamedTemporaryFile(prefix=K.S_CONVERSION_D39C, suffix=K.S_LOG_0386, dir=logs, delete=False) as log:
-                log_path = Path(log.name)
+            log_path = new_conversion_log()
         except (OSError, ValueError) as error:
             self.messagebox.showerror(K.S_CHECK_CONVERSION_INPUTS_FE61, str(error), parent=self.window)
             return
@@ -202,24 +212,36 @@ class ConverterWindow:
         self.output_path = output
         self.log.configure(state=K.S_NORMAL_82FB)
         self.log.delete(K.S_1_0_A511, K.S_END_2410)
+        self.log.insert(K.S_END_2410, f"Log file: {log_path}\n")
         self.log.configure(state=K.S_DISABLED_F693)
-        self.log_label.set(f"Full log: {log_path}")
         self.status.set(K.S_CONVERTING_THIS_CAN_TAKE_A_W_6E30)
         for control in [*self.controls, *self.choices, self.start_button, self.open_button]:
             control.configure(state=K.S_DISABLED_F693)
-        self.progress.start()
+        self.progress.configure(value=0)
+        self.cancel_button.configure(state=K.S_NORMAL_82FB)
+        self.process = process = ConversionProcess()
 
         def work():
             try:
-                code = stream_conversion(command, log_path, lambda line: self.events.put((K.S_LINE_42D2, line)))
+                code = stream_conversion(command, log_path, lambda line: self.events.put((K.S_LINE_42D2, line)),
+                                         process, lambda value: self.events.put((K.S_PROGRESS_74BE, value)))
             except Exception as error:
-                self.events.put((K.S_LINE_42D2, f"Conversion failed: {error}\n"))
+                line = f"Conversion failed: {error}\n"
+                try:
+                    with log_path.open(K.S_A_AC8D, encoding=K.S_UTF_8_D983) as log:
+                        log.write(line)
+                except OSError:
+                    pass
+                self.events.put((K.S_LINE_42D2, line))
                 code = 1
             self.events.put((K.S_DONE_58BF, code))
 
         threading.Thread(target=work, name=K.S_SF2_CONVERTER_070A).start()
 
     def poll(self):
+        lines = []
+        latest_progress = None
+        result = None
         # Bound each UI update so a busy compiler cannot starve window events.
         for _ in range(K.N_200_27BA):
             try:
@@ -227,31 +249,56 @@ class ConverterWindow:
             except queue.Empty:
                 break
             if kind == K.S_LINE_42D2:
-                self.log.configure(state=K.S_NORMAL_82FB)
-                self.log.insert(K.S_END_2410, value)
-                lines = int(self.log.index(K.S_END_1C_EA5D).split(K.S_EMPTY_7299)[0])
-                if lines > K.N_1000_4051:
-                    self.log.delete(K.S_1_0_A511, f"{lines - K.N_1000_4051}.0")
-                self.log.see(K.S_END_2410)
-                self.log.configure(state=K.S_DISABLED_F693)
-                if value.startswith((K.S_BUILDING_GAME_EAA9, K.S_LINKING_GAME_1BED, K.S_NATIVE_GAME_FOLDER_912C, K.S_INSTALL_THIS_APK_430C)):
-                    self.status.set(value.strip())
+                lines.append(value)
+            elif kind == K.S_PROGRESS_74BE:
+                latest_progress = value
             else:
-                self.running = False
-                self.progress.stop()
-                for control in [*self.controls, self.start_button]:
-                    control.configure(state=K.S_NORMAL_82FB)
-                for control in self.choices:
-                    control.configure(state=K.S_READONLY_C4A4)
-                if self.kind.get() != K.S_NSP_FILE_C79E:
-                    for control in self.controls[K.N_2_D473:K.N_4_4B22]:
-                        control.configure(state=K.S_DISABLED_F693)
-                if value == 0:
-                    self.open_button.configure(state=K.S_NORMAL_82FB)
-                    self.status.set(K.S_CONVERSION_COMPLETE_OPEN_THE_8DF6)
-                else:
-                    self.status.set(K.S_CONVERSION_FAILED_SEE_THE_LO_6278)
+                result = value
+                break
+        if lines:
+            at_end = self.log.yview()[1] >= 1
+            self.log.configure(state=K.S_NORMAL_82FB)
+            self.log.insert(K.S_END_2410, K.S_EMPTY_12AE.join(lines))
+            if at_end:
+                self.log.see(K.S_END_2410)
+            self.log.configure(state=K.S_DISABLED_F693)
+        if latest_progress:
+            percent, stage = latest_progress
+            self.progress.configure(value=percent)
+            if not self.process.cancelled:
+                self.status.set(f"{stage} · {int(percent)}%")
+        if result is not None:
+            self.running = False
+            self.cancel_button.configure(state=K.S_DISABLED_F693)
+            for control in [*self.controls, self.start_button]:
+                control.configure(state=K.S_NORMAL_82FB)
+            for control in self.choices:
+                control.configure(state=K.S_READONLY_C4A4)
+            if self.kind.get() != K.S_NSP_FILE_C79E:
+                for control in self.controls[K.N_2_D473:K.N_4_4B22]:
+                    control.configure(state=K.S_DISABLED_F693)
+            if result == 0:
+                self.progress.configure(value=K.N_100_AD57)
+                self.open_button.configure(state=K.S_NORMAL_82FB)
+                self.status.set(K.S_CONVERSION_COMPLETE_OPEN_THE_8DF6)
+            elif self.process.cancelled:
+                self.status.set(K.S_CONVERSION_CANCELLED_5DEF)
+            else:
+                self.status.set(K.S_CONVERSION_FAILED_SEE_THE_LO_6278)
+            if self.close_when_done:
+                self.window.destroy()
+                return
         self.window.after(K.N_100_AD57, self.poll)
+
+    def cancel(self):
+        try:
+            self.process.cancel()
+        except OSError as error:
+            self.messagebox.showerror(K.S_COULD_NOT_CANCEL_CONVERSION_E101, str(error), parent=self.window)
+            return False
+        self.cancel_button.configure(state=K.S_DISABLED_F693)
+        self.status.set(K.S_CANCELLING_CONVERSION_879B)
+        return True
 
     def open_output(self):
         try:
@@ -268,7 +315,7 @@ class ConverterWindow:
 
     def close(self):
         if self.running:
-            self.messagebox.showinfo(K.S_CONVERSION_IS_RUNNING_1D2F, K.S_WAIT_FOR_CONVERSION_TO_FINIS_F367, parent=self.window)
+            self.close_when_done = self.process.cancelled or self.cancel()
         else:
             self.window.destroy()
 
@@ -280,7 +327,7 @@ def main():
         print(f"Cannot open the converter UI: {error}. Use the command line, or install Python Tk support.", file=sys.stderr)
         return 1
     try:
-        window = tk.Tk()
+        window = tk.Tk(className=K.S_SF2RECOMP_50A6)
     except tk.TclError as error:
         print(f"Cannot open the converter UI: {error}. Use --cli for terminal prompts.", file=sys.stderr)
         return 1

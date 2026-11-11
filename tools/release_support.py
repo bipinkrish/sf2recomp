@@ -54,7 +54,7 @@ def environment():
     return env
 
 
-def compile_sources(sources, output, jobs=1, *, runtime=True):
+def compile_sources(sources, output, jobs=1, *, runtime=True, before_link=None):
     """Compile translated modules and link against the release's own runtime."""
     data = manifest()
     if not data:
@@ -92,14 +92,16 @@ def compile_sources(sources, output, jobs=1, *, runtime=True):
         objects = []
         try:
             for completed, future in enumerate(concurrent.futures.as_completed(pending_jobs), 1):
-                objects.append(future.result())
-                if completed == len(sources) or completed % K.N_25_B7A5 == 0:
-                    print(f"Building game: {completed}/{len(sources)} files ready", flush=True)
+                obj = future.result()
+                objects.append(obj)
+                print(f"Building game: {completed}/{len(sources)} files ready ({obj.name})", flush=True)
         except BaseException:
             for future in pending_jobs:
                 future.cancel()
             raise
     objects.sort()
+    if before_link:
+        before_link()
     print(K.S_LINKING_GAME_3235, flush=True)
     output.parent.mkdir(parents=True, exist_ok=True)
     pending = output.with_name(output.stem + K.S_PENDING_C62D + output.suffix)

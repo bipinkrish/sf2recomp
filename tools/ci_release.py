@@ -31,13 +31,18 @@ def verify_and_archive(folder):
     # Renaming catches baked-in prefixes; spaces exercise argument handling.
     moved = folder.parent / (K.S_PORTABLE_CHECK_92C3 + folder.name)
     folder.rename(moved)
-    python = moved / K.S_PYTHON_0529 / (K.S_PYTHON_EXE_82C7 if os.name == K.S_NT_88F0 else K.S_BIN_PYTHON3_0540)
+    command = [str(moved / (K.S_SF2RECOMP_EXE_FA88 if os.name == K.S_NT_88F0 else K.S_SF2RECOMP_50A6))]
     env = os.environ.copy()
     for key in (K.S_PYTHONPATH_D57E, K.S_PYTHONHOME_E7F0, K.S_DOTNET_ROOT_BF5B, K.S_SDKROOT_3AA0, K.S_CPATH_DFA1, K.S_LIBRARY_PATH_5BFF, K.S_LD_LIBRARY_PATH_A0EE, K.S_DYLD_LIBRARY_PATH_984F, K.S_MSYSTEM_844D, K.S_MINGW_PREFIX_49B8):
         env.pop(key, None)
     env[K.S_PATH_B629] = str(moved / K.S_NATIVE_LIB_601C)
     try:
-        subprocess.run([str(python), K.S_I_C6C0, str(moved / K.S_TOOLS_RELEASE_ENTRY_PY_A933), K.S_CHECK_464A], cwd=moved.parent, env=env, check=True)
+        subprocess.run([*command, K.S_CHECK_464A], cwd=moved.parent, env=env, check=True)
+        if data.get(K.S_TARGET_AA96) == K.S_MACOS_F720:
+            app = moved / K.S_SF2RECOMP_APP_CONTENTS_MACOS_0F0C
+            version = subprocess.check_output([str(app), K.S_VERSION_99AD], cwd=moved.parent, env=env, text=True).strip()
+            if version != f"SF2Recomp {data[K.S_VERSION_25EB]}":
+                raise ValueError(f"Unexpected converter app version: {version}")
     finally:
         # --check creates private writable caches. None may enter the archive.
         for name in (K.S_BUILD_0BA9, K.S_CACHE_5BBF, K.S_GAME_CF8E, K.S_OUT_FB65):

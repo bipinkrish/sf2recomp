@@ -54,7 +54,7 @@ Snapshot formatting and file I/O add overhead, which can itself expose timing
 sensitivity. Each case has its own shader/cache data; loading stalls can differ.
 
 Each case produces `sf2recomp.ini`, `environment.json`, `trace.jsonl`, and game logs.
-On Linux the runtime normally redirects diagnostics to `lasrecomp.log` in the
+On Linux the runtime normally redirects diagnostics to `logs/shadow-fight-2.log` in the
 case's data directory; `runtime.log` also captures inherited process output.
 The top-level `report.json` records the executable/input hashes, fixture hashes,
 exit status, renderer execution mode, state comparisons, and first differing

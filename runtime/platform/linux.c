@@ -205,12 +205,11 @@ void plat_thread_realtime(uint64_t period_ns) {
 int plat_thread_realtime_check(uint64_t period_ns) { (void)period_ns; return -1; }
 
 // ---- process
-// Started from a desktop (the AppImage) there is no terminal: stdout / stderr go to lasrecomp.log in the data folder
-// (runtime/paths.h; rt_paths_init runs later, so the same rule is applied here), with five backups (posix_log.h).
+// Desktop and Android launches save diagnostics in the game's writable data directory.
 static char g_log_path[SF2C_LINUX_N_1024_E39E];
 
 static void log_to_file_without_terminal(void) {
-    if (isatty(STDERR_FILENO)) return;
+    if (isatty(STDERR_FILENO) && !getenv(SF2C_LINUX_S_SF2_GAME_LOG_74EB)) return;
     char dir[SF2C_LINUX_N_900_BDC5];
     if (!rt_data_root_early(dir, sizeof dir)) return;  // dev mode: wherever stderr goes already
     for (char *c = dir + 1; *c; c++)
