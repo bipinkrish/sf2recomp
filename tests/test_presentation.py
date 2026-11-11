@@ -89,6 +89,17 @@ uint32_t g_window_resize_request;
 static uint64_t now=1000000000ull, presented_at;
 static unsigned presents, sleeps, resizes;
 static int window_w,window_h;
+static bool fullscreen, reject_fullscreen;
+bool SDL_SetWindowFullscreen(SDL_Window *window, bool enabled) {
+    assert(window==(SDL_Window *)1);
+    if (!reject_fullscreen) fullscreen=enabled;
+    return true; // the WM may decline an accepted request
+}
+bool SDL_SyncWindow(SDL_Window *window) { assert(window==(SDL_Window *)1); return true; }
+SDL_WindowFlags SDL_GetWindowFlags(SDL_Window *window) {
+    assert(window==(SDL_Window *)1);
+    return fullscreen ? SDL_WINDOW_FULLSCREEN : 0;
+}
 void lan_menu_update_capture(void) {}
 void developer_update_text_input(void *window) { assert(window == (void *)1); }
 uint64_t plat_now_ns(void) { return now; }
@@ -138,6 +149,17 @@ int main(void) {
     menu_apply_window_requests((void *)1);
     assert(resizes==1 && window_w==2560 && window_h==1440 && !g_window_resize_request);
     menu_apply_window_requests((void *)1); assert(resizes==1);
+
+    bool applied;
+    menu_request_fullscreen(true);
+    assert(!fullscreen && !menu_fullscreen_result(&applied));
+    menu_apply_window_requests((void *)1);
+    assert(fullscreen && menu_fullscreen_result(&applied) && applied);
+    assert(!menu_fullscreen_result(&applied));
+    reject_fullscreen = true;
+    menu_request_fullscreen(false);
+    menu_apply_window_requests((void *)1);
+    assert(fullscreen && menu_fullscreen_result(&applied) && !applied);
 
     OutScale out;
     output_scale(2560,1440,false,1,-1,-1,&out);

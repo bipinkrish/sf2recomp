@@ -20,7 +20,7 @@ typedef struct Node {
     int count;
     bool active;
 } Node;
-static Node main_section, settings, content, story, exit_item, extra;
+static Node main_section, settings, content, story, exit_item, extra, recomp_item;
 static Node *current_root;
 static int activations;
 uint64_t renderer_present_count(void) { return 1; }
@@ -35,7 +35,29 @@ static void named(Node *node, const char *name) {
 void guest_call(Cpu *c, uint64_t pc) {
     Node *node = (Node *)(uintptr_t)c->x[0];
     switch (pc) {
-    case 0x700121e6b0ull: c->x[0] = (uintptr_t)current_root; break;
+    case 0x700121e6b0ull:
+        if (node != &recomp_item) c->x[0] = (uintptr_t)current_root;
+        break;
+    case GUEST_STRING_ALLOC:
+        c->x[0] = (uintptr_t)calloc(1, 0x16 + c->x[1] * 2);
+        break;
+    case 0x70008ea5c0ull: c->x[0] = 1; break;  // MenuItemButton type
+    case 0x700121e790ull: assert(node == &exit_item); break;
+    case 0x70012333a0ull:
+        assert(c->x[1] == (uintptr_t)&exit_item && c->x[2] == (uintptr_t)&content);
+        content.children[content.count++] = &recomp_item;
+        c->x[0] = (uintptr_t)&recomp_item;
+        ST64(c->x[0] + 0x28, 1); // label
+        break;
+    case 0x70015d9f50ull:
+        assert(node == &recomp_item && c->x[1] == 2);
+        content.children[2] = &recomp_item;
+        content.children[3] = &exit_item;
+        break;
+    case 0x7000e73b90ull: assert(c->x[0] == 1 && c->x[1] == 1); break;
+    case 0x7000e71230ull:
+        assert(c->x[0] == 1 && LD32(c->x[1] + 0x10) == strlen("Recomp Settings"));
+        break;
     case 0x700122e460ull: c->x[0] = (uintptr_t)node->name; break;
     case 0x70015d9e00ull: c->x[0] = node->count; break;
     case 0x70015da1f0ull:
@@ -43,7 +65,7 @@ void guest_call(Cpu *c, uint64_t pc) {
         c->x[0] = (uintptr_t)node->children[c->x[1]]; break;
     case 0x700121e720ull: break;  // transform -> GameObject
     case 0x7001226480ull:
-        assert(node == &exit_item && c->x[1] == 1);
+        assert((node == &exit_item || node == &recomp_item) && c->x[1] == 1);
         node->active = true;
         ++activations;
         break;
@@ -75,9 +97,28 @@ int main(void) {
     assert(!memcmp(&cpu, &saved, sizeof cpu));
     current_root = &main_section;
     assert(rt_hook(&cpu, 0x7000e6b820ull) == 0);
-    assert(exit_item.active && activations == 1);
-    assert(story.active && !extra.active && content.count == 3);
+    assert(exit_item.active && recomp_item.active && activations == 2);
+    assert(story.active && !extra.active && content.count == 4);
+    assert(content.children[2] == &recomp_item && content.children[3] == &exit_item);
+    assert(rt_hook(&cpu, 0x7000e6b820ull) == 0);
+    assert(content.count == 4);
     assert(!memcmp(&cpu, &saved, sizeof cpu));
+    cpu.x[0] = (uintptr_t)&recomp_item;
+    cpu.x[1] = 1;
+    assert(rt_hook(&cpu, 0x7000e6fdd0ull) == 1 && !settings_menu.pending_open);
+    cpu.x[1] = 0;
+    assert(rt_hook(&cpu, 0x7000e6fdd0ull) == 1 && settings_menu.pending_open);
+    settings_menu.pending_open = false;
+    unsigned char event[0x130] = {0};
+    cpu.x[1] = (uintptr_t)event;
+    assert(rt_hook(&cpu, 0x7000e6fca0ull) == 1 && settings_menu.pending_open);
+    lan_primary_button = (uintptr_t)&extra;
+    cpu.x[0] = lan_primary_button;
+    assert(rt_hook(&cpu, 0x70011cc660ull) == 1 && lan_action == LAN_CHOICE_PRIMARY);
+    lan_primary_button = 0;
+    lan_action = 0;
+    assert(rt_hook(&cpu, 0x70011cc660ull) == 0 && lan_action == 0);
+    cpu = saved;
     assert(!menu_quit_requested());
     assert(rt_hook(&cpu, 0x7000e6ef20ull) == 1);
     assert(menu_quit_requested());

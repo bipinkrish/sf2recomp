@@ -1,7 +1,7 @@
 #include "../constants/nvn.h"
 // Output resolution, shared by the Metal and Vulkan backends (each calls output_scale() once per presented frame).
 // Screen targets (selected native aspect at 1080 lines) are allocated at (sx, sy) times their size; the
-// image is then drawn into (vx, vy, vw, vh) of the window. Video tab "Internal resolution" (g_settings.res_mode):
+// image is then drawn into (vx, vy, vw, vh) of the window. Video tab "Internal resolution" (settings_resolution()):
 //   Match display  render at the window's own pixel size (default)
 //   1x .. 4x       N times the Switch's docked image: 1080 lines x N (wide windows keep their shape: 32:9 at 2x =
 //                  7680 x 2160); capped to the GPU's 16384-pixel texture limit. 1x on an integrated GPU: 720 lines,
@@ -441,7 +441,15 @@ void output_scale(double dw, double dh, bool reshape_allowed, double now, double
     if (!reshape) shape = 1.0;
     // render height in units of the Switch's 1080 lines
     double h, dyn = 1.0;
-    int mode = g_settings.res_mode;
+    int mode = settings_resolution();
+    static bool was_dynamic;
+    if (mode == RES_DYNAMIC && !was_dynamic) {
+        // Measurements collected at a fixed resolution cannot guide Dynamic.
+        g_last_t = g_dyn_gpu_sum = g_dyn_win_sum = g_sum_ms = 0;
+        g_dyn_n = g_dyn_gpu_n = g_sum_n = g_split_n = 0;
+        g_split = (DynSplit){0};
+    }
+    was_dynamic = mode == RES_DYNAMIC;
     if (forced > 0) h = forced;
     else if (mode >= 1 && mode <= SF2C_OUTPUT_SCALE_N_8_2C62) h = mode == 1 && g_gpu_integrated ? SF2C_OUTPUT_SCALE_N_720_D829 / SF2C_OUTPUT_SCALE_N_1080_0_AF38 : mode;
     else {

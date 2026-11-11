@@ -4885,3 +4885,95 @@
 #define SF2C_MAIN_S_SF2_GAME_LOG_74EB "SF2_GAME_LOG"
 // runtime/main.c:148
 #define SF2C_MAIN_S_1_3915 "1"
+// runtime/settings.c:189
+#define SF2C_SETTINGS_S_LANGUAGE_1FA2 "Language"
+// runtime/settings.c:190
+#define SF2C_SETTINGS_S_GAME_NETWORKING_2326 "Game networking"
+// runtime/settings.c:191
+#define SF2C_SETTINGS_S_UNLOCK_SPARRING_ROSTER_AFE6 "Unlock sparring roster"
+// runtime/settings.c:192
+#define SF2C_SETTINGS_S_SHADOW_IN_SPARRING_C18A "Shadow in sparring"
+// runtime/settings.c:193
+#define SF2C_SETTINGS_S_TITAN_IN_SPARRING_4D29 "Titan in sparring"
+// runtime/settings.c:194
+#define SF2C_SETTINGS_S_LAN_SPARRING_MENU_79CA "LAN sparring menu"
+// runtime/settings.c:195
+#define SF2C_SETTINGS_S_UNLOCK_MOVIES_76A6 "Unlock movies"
+// runtime/settings.c:196
+#define SF2C_SETTINGS_S_OPENING_VIDEO_9F3B "Opening video"
+// runtime/settings.c:197
+#define SF2C_SETTINGS_S_FIGHT_AI_ACD7 "Fight AI"
+// runtime/settings.c:198
+#define SF2C_SETTINGS_S_SHOW_TIME_RESULTS_8415 "Show time results"
+// runtime/settings.c:199
+#define SF2C_SETTINGS_S_DEVELOPER_CONSOLE_6911 "Developer console"
+// runtime/settings.c:200
+#define SF2C_SETTINGS_S_FIGHT_TRAINER_06D5 "Fight trainer"
+// runtime/settings.c:201
+#define SF2C_SETTINGS_S_SHOP_CHEATS_4822 "Shop cheats"
+// runtime/settings.c:202
+#define SF2C_SETTINGS_S_DEBUG_OVERLAYS_1F44 "Debug overlays"
+// runtime/settings.c:203
+#define SF2C_SETTINGS_S_SHOW_OVERLAYS_ON_START_E5F3 "Show overlays on start"
+// runtime/settings.c:204
+#define SF2C_SETTINGS_S_FPS_OVERLAY_6772 "FPS overlay"
+// runtime/settings.c:205
+#define SF2C_SETTINGS_S_MEMORY_OVERLAY_839B "Memory overlay"
+// runtime/settings.c:206
+#define SF2C_SETTINGS_S_BUILD_INFO_OVERLAY_60BF "Build info overlay"
+// runtime/settings.c:207
+#define SF2C_SETTINGS_S_MODEL_INFO_OVERLAY_9869 "Model info overlay"
+// runtime/settings.c:208
+#define SF2C_SETTINGS_S_MASTER_VOLUME_93E3 "Master volume"
+// runtime/settings.c:209
+#define SF2C_SETTINGS_S_REVERB_16C6 "Reverb"
+// runtime/settings.c:210
+#define SF2C_SETTINGS_S_FULLSCREEN_7FDF "Fullscreen"
+// runtime/settings.c:211
+#define SF2C_SETTINGS_S_ASPECT_RATIO_D248 "Aspect ratio"
+// runtime/settings.c:212
+#define SF2C_SETTINGS_S_TARGET_FPS_4DF1 "Target FPS"
+// runtime/settings.c:213
+#define SF2C_SETTINGS_S_INTERNAL_RESOLUTION_DF76 "Internal resolution"
+// runtime/settings.c:214
+#define SF2C_SETTINGS_S_UPSCALER_EF37 "Upscaler"
+// runtime/settings.c:215
+#define SF2C_SETTINGS_S_ANTI_ALIASING_D042 "Anti-aliasing"
+// runtime/settings.c:216
+#define SF2C_SETTINGS_S_BUTTON_PROMPTS_B9C9 "Button prompts"
+// runtime/settings.c:217
+#define SF2C_SETTINGS_S_PLAYER_SETUP_3C5A "Player setup"
+// runtime/settings.c:218
+#define SF2C_SETTINGS_S_USE_COMPLETED_SAVE_C4BB "Use completed save"
+// runtime/settings.c:219
+#define SF2C_SETTINGS_S_SAVE_DIRECTORY_8AE8 "Save directory"
+// runtime/settings.c:440
+#define SF2C_SETTINGS_S_EMPTY_8BAC "\"\""
+// runtime/settings.c:504
+#define SF2C_SETTINGS_S_G_324A "%.*g"
+// runtime/settings.c:510
+#define SF2C_SETTINGS_S_EMPTY_12AE ""
+// runtime/settings.c:524
+#define SF2C_SETTINGS_S_D_42B3 "%d"
+// runtime/settings.c:541
+#define SF2C_SETTINGS_S_EMPTY_0C92 "\""
+// runtime/settings.c:541
+#define SF2C_SETTINGS_S_EMPTY_53BD "'"
+// runtime/settings.c:544
+#define SF2C_SETTINGS_S_S_S_S_DA90 "%s%s%s"
+// runtime/settings.c:546
+#define SF2C_SETTINGS_S_X_S_COMMENT_23AA "x=%s ; comment"
+// runtime/settings.c:574
+#define SF2C_SETTINGS_N_0_05F_D41A 0.05f
+// runtime/settings.c:622
+#define SF2C_SETTINGS_S_S_S_S_D539 "%.*s%s%s"
+// runtime/settings.c:637
+#define SF2C_SETTINGS_S_N_S_N_324E "\n[%s]\n"
+// runtime/settings.c:641
+#define SF2C_SETTINGS_S_S_S_N_C2E5 "%s = %s\n"
+// runtime/settings.c:664
+#define SF2C_SETTINGS_S_RB_46CA "rb"
+// runtime/settings.c:666
+#define SF2C_SETTINGS_S_S_TMP_XXXXXX_B30E "%s.tmp.XXXXXX"
+// runtime/settings.c:675
+#define SF2C_SETTINGS_S_WB_3D6A "wb"

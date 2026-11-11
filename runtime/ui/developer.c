@@ -3,6 +3,7 @@
 // its own update thread. Never invoke Unity/game methods from the window thread.
 #include "../developer.h"
 #include "../settings.h"
+#include "settings_input.h"
 #include <SDL3/SDL.h>
 #include <stdatomic.h>
 #include <string.h>
@@ -105,7 +106,7 @@ bool developer_handle_event(const SDL_Event *event) {
 }
 
 void developer_update_text_input(void *window) {
-    bool wanted = developer_console_open();
+    bool wanted = developer_console_open() || settings_input_text_active();
     if (wanted == text_input_started) return;
     extern void input_reset(void);
     input_reset();

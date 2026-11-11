@@ -15,15 +15,12 @@ class MouseMenuTests(unittest.TestCase):
 #include <SDL3/SDL.h>
 #include "hle/input.c"
 #include "hle/hooks.c"
+#include "ui/menu_stubs.c"
 
-bool menu_is_open(void) { return developer_console_open(); }
-bool menu_input_captured(void) { return developer_console_open(); }
 static bool movie_visible;
 static unsigned movie_skips;
 bool movie_overlay_active(void) { return movie_visible; }
 void movie_request_skip(void) { movie_skips++; }
-void menu_request_quit(void) {}
-bool menu_quit_requested(void) { return false; }
 uint64_t plat_now_ns(void) { return 1000000; }
 uint64_t renderer_present_count(void) { return 1; }
 volatile int g_inject_plus;

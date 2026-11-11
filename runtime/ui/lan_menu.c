@@ -3,6 +3,7 @@
 // callbacks are applied on the guest thread, never from SDL's window thread.
 #include "lan_menu.h"
 #include "mouse.h"
+#include "settings_input.h"
 #include "../input_bind.h"
 #include <SDL3/SDL.h>
 #include <stdatomic.h>
@@ -35,6 +36,7 @@ bool lan_menu_handle_event(const SDL_Event *e) {
         return true;
     }
     if(!lan_menu_capture())return false;
+    if(settings_input_handle_event(e))return true;
     if(e->type==SDL_EVENT_KEY_DOWN || e->type==SDL_EVENT_GAMEPAD_BUTTON_DOWN || e->type==SDL_EVENT_GAMEPAD_AXIS_MOTION)
         menu_mouse_event(e); // keyboard/pad focus clears pointer hover like other menus
     if(e->type==SDL_EVENT_KEY_DOWN || e->type==SDL_EVENT_KEY_UP) {

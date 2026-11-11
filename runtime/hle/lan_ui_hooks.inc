@@ -6,10 +6,10 @@
 #include "../ui/lan_menu.h"
 #include <inttypes.h>
 
-enum { LAN_UI_NONE, LAN_UI_MODE, LAN_UI_ROLE, LAN_UI_BROWSER, LAN_UI_WAIT, LAN_UI_ERROR };
+enum { LAN_UI_NONE, LAN_UI_MODE, LAN_UI_ROLE, LAN_UI_BROWSER, LAN_UI_WAIT, LAN_UI_ERROR, LAN_UI_SETTINGS };
 enum { LAN_CHOICE_NORMAL=1, LAN_CHOICE_LAN, LAN_CHOICE_HOST, LAN_CHOICE_JOIN,
-       LAN_CHOICE_REFRESH, LAN_CHOICE_LEAVE, LAN_CHOICE_BACK, LAN_CHOICE_HOST_BASE=SF2C_LAN_UI_HOOKS_N_100_AD57 };
-static uint64_t lan_dialog,lan_menu_scene,lan_pvp_scene,lan_active_module,lan_end_screen;
+       LAN_CHOICE_REFRESH, LAN_CHOICE_LEAVE, LAN_CHOICE_BACK, LAN_CHOICE_PRIMARY, LAN_CHOICE_HOST_BASE=SF2C_LAN_UI_HOOKS_N_100_AD57 };
+static uint64_t lan_dialog,lan_primary_button,lan_menu_scene,lan_pvp_scene,lan_active_module,lan_end_screen;
 static unsigned lan_phase,lan_module_kind,lan_action;
 static bool lan_allow_entry,lan_native_call,lan_dialog_closing,lan_ui_pumping;
 static bool lan_match_starting,lan_entered;
@@ -30,7 +30,7 @@ static void reset_lan_ui(void) {
     memset(lan_menu_buttons,0,sizeof lan_menu_buttons);sparring_pressed=-1;
     lan_menu_root=lan_main_root=0;
     input_menu_navigation(true);
-    lan_dialog=lan_menu_scene=lan_pvp_scene=lan_active_module=lan_end_screen=0;
+    lan_dialog=lan_primary_button=lan_menu_scene=lan_pvp_scene=lan_active_module=lan_end_screen=0;
     lan_phase=lan_module_kind=lan_action=lan_visible_count=0;
     lan_allow_entry=lan_native_call=lan_dialog_closing=lan_ui_pumping=lan_match_starting=lan_entered=false;
 }
@@ -105,7 +105,7 @@ static void lan_menu_row(Cpu *c,unsigned index,uint64_t row,const char *text,int
     uint64_t object=guest_invoke2(c,SF2C_LAN_UI_HOOKS_N_0X700121E720ULL_0F0E,item,0);
     guest_invoke2(c,SF2C_LAN_UI_HOOKS_N_0X7001226480ULL_8D5A,object,1);
 }
-static uint64_t lan_line(Cpu *c,const char *label,unsigned command) {
+static uint64_t lan_line(Cpu *c,const char *label,unsigned command,bool compact) {
     uint64_t line=lan_new(c,SF2C_LAN_UI_HOOKS_S_NEKKI_SF2_CORE_UTILS_STORYDI_FA81);
     if(!line)return 0;
     uint64_t empty=guest_string(c,SF2C_LAN_UI_HOOKS_S_EMPTY_12AE);
@@ -113,15 +113,17 @@ static uint64_t lan_line(Cpu *c,const char *label,unsigned command) {
     ST64(line+SF2C_LAN_UI_HOOKS_N_0X18_D47C,command?guest_string(c,label):empty);
     char url[SF2C_LAN_UI_HOOKS_N_48_9801];snprintf(url,sizeof url,SF2C_LAN_UI_HOOKS_S_SF2LAN_U_99D7,command);
     ST64(line+SF2C_LAN_UI_HOOKS_N_0X20_A766,guest_string(c,url));
-    ST32(line+SF2C_LAN_UI_HOOKS_N_0X30_8BAD,SF2C_LAN_UI_HOOKS_N_0X43160000_BAF0); // 150 authored UI units
-    ST32(line+SF2C_LAN_UI_HOOKS_N_0X34_806E,SF2C_LAN_UI_HOOKS_N_80_4844);ST32(line+SF2C_LAN_UI_HOOKS_N_0X48_0EF0,UINT32_MAX);
+    ST32(line+SF2C_LAN_UI_HOOKS_N_0X30_8BAD,compact?SETTINGS_DIALOG_ROW_HEIGHT_BITS:SF2C_LAN_UI_HOOKS_N_0X43160000_BAF0); // 72 or 150 UI units
+    ST32(line+SF2C_LAN_UI_HOOKS_N_0X34_806E,compact?SETTINGS_DIALOG_FONT_SIZE:SF2C_LAN_UI_HOOKS_N_80_4844);
+    ST32(line+SF2C_LAN_UI_HOOKS_N_0X48_0EF0,UINT32_MAX);
     ST32(line+SF2C_LAN_UI_HOOKS_N_0X78_756D,command?SF2C_LAN_UI_HOOKS_N_2_D473:0);
     for(unsigned i=0;i<SF2C_LAN_UI_HOOKS_N_3_4E07;++i)ST32(line+SF2C_LAN_UI_HOOKS_N_0X7C_3CC4+i*SF2C_LAN_UI_HOOKS_N_4_4B22,SF2C_LAN_UI_HOOKS_N_0X3E4CCCCD_89DE);
     ST32(line+SF2C_LAN_UI_HOOKS_N_0X88_AC70,SF2C_LAN_UI_HOOKS_N_0X3F800000_67F1);
     return line;
 }
-static void lan_close_dialog(Cpu *c) {
-    uint64_t dialog=lan_dialog;lan_dialog=0;lan_menu_publish(false);
+static void lan_close_dialog(Cpu *c, bool keep_capture) {
+    uint64_t dialog=lan_dialog;lan_dialog=lan_primary_button=0;
+    if(!keep_capture)lan_menu_publish(false);
     if(lan_menu_root) {
         uint64_t root=lan_menu_root;lan_menu_root=0;
         guest_invoke2(c,SF2C_LAN_UI_HOOKS_N_0X7001226480ULL_8D5A,root,0);
@@ -135,23 +137,27 @@ static void lan_close_dialog(Cpu *c) {
     }
 }
 static void lan_focus_choice(Cpu *c);
-static bool lan_show(Cpu *c,unsigned phase,const char *title,const char *const labels[],const unsigned commands[],unsigned count) {
-    lan_close_dialog(c);
+static bool lan_show(Cpu *c,unsigned phase,const char *title,const char *const labels[],const unsigned commands[],unsigned count,const char *primary) {
+    lan_close_dialog(c,phase==LAN_UI_SETTINGS && lan_phase==LAN_UI_SETTINGS);
     uint64_t info=lan_new(c,SF2C_LAN_UI_HOOKS_S_NEKKI_SF2_GUI_DIALOGS_MULTIL_D71F);
     uint64_t list=lan_new(c,SF2C_LAN_UI_HOOKS_S_SYSTEM_COLLECTIONS_GENERIC_L_D29A);
     uint64_t element=lan_type(c,SF2C_LAN_UI_HOOKS_S_NEKKI_SF2_CORE_UTILS_STORYDI_FA81);
     uint64_t array=element?guest_invoke4(c,SF2C_LAN_UI_HOOKS_N_0X70006E6740ULL_63EE,0,element,count,0):0;
     if(!info || !list || !array) { LOG(SF2C_LAN_UI_HOOKS_S_LAN_UI_CANNOT_ALLOCATE_NATIV_D5C0);return false; }
     for(unsigned i=0;i<count;++i) {
-        uint64_t line=lan_line(c,labels[i],commands[i]);
+        uint64_t line=lan_line(c,labels[i],commands[i],phase==LAN_UI_SETTINGS);
         if(!line)return false;
         ST64(array+SF2C_LAN_UI_HOOKS_N_0X20_A766+i*SF2C_LAN_UI_HOOKS_N_8_2C62,line);
     }
     ST64(list+SF2C_LAN_UI_HOOKS_N_0X10_BF9C,array);ST32(list+SF2C_LAN_UI_HOOKS_N_0X18_D47C,count);ST32(list+SF2C_LAN_UI_HOOKS_N_0X1C_7BDE,1);
     ST64(info+SF2C_LAN_UI_HOOKS_N_0X10_BF9C,list);ST64(info+SF2C_LAN_UI_HOOKS_N_0X18_D47C,guest_string(c,title));
-    ST32(info+SF2C_LAN_UI_HOOKS_N_0X24_EB21,SF2C_LAN_UI_HOOKS_N_2_D473); // native Cancel/back footer, independent of row actions
-    ST64(info+SF2C_LAN_UI_HOOKS_N_0X28_EAB9,guest_string(c,SF2C_LAN_UI_HOOKS_S_OK_98C4));ST64(info+SF2C_LAN_UI_HOOKS_N_0X38_AE4F,guest_string(c,SF2C_LAN_UI_HOOKS_S_BACK_E053));
+    // BaseDialog.FooterButtons: Cancel alone, or both OK and Cancel.
+    ST32(info+SF2C_LAN_UI_HOOKS_N_0X24_EB21,primary?SF2C_LAN_UI_HOOKS_N_3_4E07:SF2C_LAN_UI_HOOKS_N_2_D473);
+    ST64(info+SF2C_LAN_UI_HOOKS_N_0X28_EAB9,guest_string(c,primary?primary:SF2C_LAN_UI_HOOKS_S_OK_98C4));
+    ST64(info+SF2C_LAN_UI_HOOKS_N_0X38_AE4F,guest_string(c,SF2C_LAN_UI_HOOKS_S_BACK_E053));
     lan_dialog=guest_invoke4(c,SF2C_LAN_UI_HOOKS_N_0X7000CF1360ULL_B396,0,SF2C_LAN_UI_HOOKS_N_15_E629,info,0);
+    lan_primary_button=lan_dialog && primary?LD64(lan_dialog+SF2C_LAN_UI_HOOKS_N_0X58_08FB):0;
+    if(lan_primary_button)guest_invoke2(c,SF2C_LAN_UI_HOOKS_N_0X70005D8310ULL_7E78,lan_primary_button,1); // Selectable.interactable
     lan_phase=phase;
     lan_choice_count=count;memcpy(lan_commands,commands,count*sizeof commands[0]);lan_choice=0;
     while(lan_choice<count && !lan_commands[lan_choice])++lan_choice;
@@ -183,13 +189,16 @@ static bool lan_show(Cpu *c,unsigned phase,const char *title,const char *const l
         unsigned n=rows?LD32(rows+SF2C_LAN_UI_HOOKS_N_0X18_D47C):0;
         for(unsigned i=0;items && i<n && i<count;++i) {
             uint64_t row=LD64(items+SF2C_LAN_UI_HOOKS_N_0X20_A766+i*SF2C_LAN_UI_HOOKS_N_8_2C62),label=row?LD64(row+SF2C_LAN_UI_HOOKS_N_0X18_D47C):0;
+            int size=phase==LAN_UI_SETTINGS?SETTINGS_DIALOG_FONT_SIZE:
+                commands[i]>=LAN_CHOICE_HOST_BASE?SF2C_LAN_UI_HOOKS_N_48_9801:
+                commands[i]?SF2C_LAN_UI_HOOKS_N_80_4844:SF2C_LAN_UI_HOOKS_N_55_02D2;
             if(commands[i] && lan_menu_template) {
-                lan_menu_row(c,i,row,labels[i],commands[i]>=LAN_CHOICE_HOST_BASE?SF2C_LAN_UI_HOOKS_N_48_9801:SF2C_LAN_UI_HOOKS_N_80_4844);
+                lan_menu_row(c,i,row,labels[i],size);
             } else if(label) {
                 // ScrollDialog rows normally treat Text as a localization key.
                 // These dynamic host names and choices are literal UI strings.
                 guest_invoke2(c,SF2C_LAN_UI_HOOKS_N_0X7000E73B90ULL_3B3B,label,1);
-                guest_invoke2(c,SF2C_LAN_UI_HOOKS_N_0X7000E72180ULL_A6E0,label,commands[i]>=LAN_CHOICE_HOST_BASE?SF2C_LAN_UI_HOOKS_N_48_9801:commands[i]?SF2C_LAN_UI_HOOKS_N_80_4844:SF2C_LAN_UI_HOOKS_N_55_02D2);
+                guest_invoke2(c,SF2C_LAN_UI_HOOKS_N_0X7000E72180ULL_A6E0,label,size);
             }
         }
     }
@@ -205,7 +214,7 @@ static bool lan_show(Cpu *c,unsigned phase,const char *title,const char *const l
 // kunai artwork. Only its choices change; the scene and background stay put.
 static bool lan_submenu(Cpu *c,unsigned phase,const char *first,const char *second,
                         unsigned first_command,unsigned second_command) {
-    lan_close_dialog(c);
+    lan_close_dialog(c,false);
     uint64_t lists=lan_menu_scene?LD64(lan_menu_scene+SF2C_LAN_UI_HOOKS_N_0X88_AC70):0;
     uint64_t array=lists?LD64(lists+SF2C_LAN_UI_HOOKS_N_0X10_BF9C):0;
     uint64_t main=array && LD32(lists+SF2C_LAN_UI_HOOKS_N_0X18_D47C)?LD64(array+SF2C_LAN_UI_HOOKS_N_0X20_A766):0;
@@ -217,7 +226,7 @@ static bool lan_submenu(Cpu *c,unsigned phase,const char *first,const char *seco
     lan_menu_root=guest_invoke2(c,SF2C_LAN_UI_HOOKS_N_0X700121E720ULL_0F0E,clone,0);
     uint64_t buttons=LD64(clone+SF2C_LAN_UI_HOOKS_N_0X18_D47C),items=buttons?LD64(buttons+SF2C_LAN_UI_HOOKS_N_0X10_BF9C):0;
     unsigned count=buttons?LD32(buttons+SF2C_LAN_UI_HOOKS_N_0X18_D47C):0;
-    if(!lan_menu_root || !items || count<SF2C_LAN_UI_HOOKS_N_3_4E07) { lan_close_dialog(c);return false; }
+    if(!lan_menu_root || !items || count<SF2C_LAN_UI_HOOKS_N_3_4E07) { lan_close_dialog(c,false);return false; }
     const char *labels[]={first,second,SF2C_LAN_UI_HOOKS_S_BACK_E053};
     unsigned commands[]={first_command,second_command,LAN_CHOICE_BACK};
     for(unsigned i=0;i<count;++i) {
@@ -242,12 +251,12 @@ static void lan_mode_dialog(Cpu *c) {
     lan_keep_menu_template(c);
     if(lan_submenu(c,LAN_UI_MODE,SF2C_LAN_UI_HOOKS_S_NORMAL_5E7A,SF2C_LAN_UI_HOOKS_S_LAN_MULTIPLAYER_1520,LAN_CHOICE_NORMAL,LAN_CHOICE_LAN))return;
     const char *labels[]={SF2C_LAN_UI_HOOKS_S_NORMAL_5E7A,SF2C_LAN_UI_HOOKS_S_LAN_MULTIPLAYER_1520};unsigned cmds[]={LAN_CHOICE_NORMAL,LAN_CHOICE_LAN};
-    lan_show(c,LAN_UI_MODE,SF2C_LAN_UI_HOOKS_S_SPARRING_357C,labels,cmds,SF2C_LAN_UI_HOOKS_N_2_D473);
+    lan_show(c,LAN_UI_MODE,SF2C_LAN_UI_HOOKS_S_SPARRING_357C,labels,cmds,SF2C_LAN_UI_HOOKS_N_2_D473,NULL);
 }
 static void lan_role_dialog(Cpu *c) {
     if(lan_submenu(c,LAN_UI_ROLE,SF2C_LAN_UI_HOOKS_S_HOST_046A,SF2C_LAN_UI_HOOKS_S_JOIN_3D8A,LAN_CHOICE_HOST,LAN_CHOICE_JOIN))return;
     const char *labels[]={SF2C_LAN_UI_HOOKS_S_HOST_046A,SF2C_LAN_UI_HOOKS_S_JOIN_3D8A};unsigned cmds[]={LAN_CHOICE_HOST,LAN_CHOICE_JOIN};
-    lan_show(c,LAN_UI_ROLE,SF2C_LAN_UI_HOOKS_S_LAN_MULTIPLAYER_1520,labels,cmds,SF2C_LAN_UI_HOOKS_N_2_D473);
+    lan_show(c,LAN_UI_ROLE,SF2C_LAN_UI_HOOKS_S_LAN_MULTIPLAYER_1520,labels,cmds,SF2C_LAN_UI_HOOKS_N_2_D473,NULL);
 }
 static void lan_browser(Cpu *c) {
     const char *labels[SF2C_LAN_UI_HOOKS_N_14_8527];unsigned cmds[SF2C_LAN_UI_HOOKS_N_14_8527],count=0;char names[SF2C_LAN_UI_HOOKS_N_12_6B51][SF2C_LAN_UI_HOOKS_N_128_2747];
@@ -258,11 +267,11 @@ static void lan_browser(Cpu *c) {
         labels[count]=names[i];cmds[count++]=LAN_CHOICE_HOST_BASE+i;
     }
     labels[count]=SF2C_LAN_UI_HOOKS_S_REFRESH_E71E;cmds[count++]=LAN_CHOICE_REFRESH;
-    lan_show(c,LAN_UI_BROWSER,SF2C_LAN_UI_HOOKS_S_JOIN_LAN_GAME_5569,labels,cmds,count);
+    lan_show(c,LAN_UI_BROWSER,SF2C_LAN_UI_HOOKS_S_JOIN_LAN_GAME_5569,labels,cmds,count,NULL);
 }
 static void lan_wait_dialog(Cpu *c,const char *message) {
     const char *labels[]={message};unsigned cmds[]={0};
-    lan_show(c,LAN_UI_WAIT,SF2C_LAN_UI_HOOKS_S_LAN_MULTIPLAYER_1520,labels,cmds,1);
+    lan_show(c,LAN_UI_WAIT,SF2C_LAN_UI_HOOKS_S_LAN_MULTIPLAYER_1520,labels,cmds,1,NULL);
 }
 static void lan_host_wait_dialog(Cpu *c) {
     char addresses[SF2C_LAN_UI_HOOKS_N_8_2C62][SF2C_LAN_UI_HOOKS_N_16_B17E],message[SF2C_LAN_UI_HOOKS_N_320_8882];unsigned count=lan_local_addresses(addresses);
@@ -274,7 +283,7 @@ static void lan_host_wait_dialog(Cpu *c) {
 }
 static void lan_error_dialog(Cpu *c) {
     const char *labels[]={lan_gui_error(),SF2C_LAN_UI_HOOKS_S_RETURN_TO_MENU_BB57};unsigned cmds[]={0,LAN_CHOICE_LEAVE};
-    lan_show(c,LAN_UI_ERROR,SF2C_LAN_UI_HOOKS_S_LAN_CONNECTION_ABEC,labels,cmds,SF2C_LAN_UI_HOOKS_N_2_D473);
+    lan_show(c,LAN_UI_ERROR,SF2C_LAN_UI_HOOKS_S_LAN_CONNECTION_ABEC,labels,cmds,SF2C_LAN_UI_HOOKS_N_2_D473,NULL);
 }
 static void lan_go(Cpu *c,unsigned screen) {
     uint64_t module=guest_invoke2(c,SF2C_LAN_UI_HOOKS_N_0X7000F48CF0ULL_AC69,0,0);
@@ -282,11 +291,11 @@ static void lan_go(Cpu *c,unsigned screen) {
     guest_call(c,SF2C_LAN_UI_HOOKS_N_0X7000F48EF0ULL_6134);*c=saved;
 }
 static void lan_enter_pvp(Cpu *c) {
-    lan_close_dialog(c);lan_phase=LAN_UI_NONE;lan_allow_entry=true;lan_entered=true;
+    lan_close_dialog(c,false);lan_phase=LAN_UI_NONE;lan_allow_entry=true;lan_entered=true;
     guest_invoke2(c,SF2C_LAN_UI_HOOKS_N_0X7000E6ED90ULL_74FD,lan_menu_scene,0);lan_allow_entry=false;
 }
 static void lan_leave_ui(Cpu *c,bool go_main) {
-    lan_close_dialog(c);replay_gui_stop();lan_gui_leave();
+    lan_close_dialog(c,false);replay_gui_stop();lan_gui_leave();
     rt_hook_features&=~RT_HOOK_REPLAY;
     lan_pvp_scene=lan_active_module=lan_end_screen=0;lan_entered=false;lan_phase=LAN_UI_NONE;
     LOG(SF2C_LAN_UI_HOOKS_S_LAN_UI_LEFT_SPARRING_CONNECT_34B3);
@@ -331,7 +340,7 @@ static bool lan_host_match(Cpu *c) {
 }
 static void lan_begin_native_match(Cpu *c) {
     if(!lan_pvp_scene)return;
-    lan_close_dialog(c);lan_phase=LAN_UI_NONE;
+    lan_close_dialog(c,false);lan_phase=LAN_UI_NONE;
     lan_gui_begin_match();replay_gui_start();rt_hook_features|=RT_HOOK_REPLAY;
     lan_match_starting=lan_native_call=true;
     guest_invoke2(c,SF2C_LAN_UI_HOOKS_N_0X7000D961F0ULL_34E0,lan_pvp_scene,0);
@@ -343,7 +352,10 @@ static void lan_focus_choice(Cpu *c) {
         guest_invoke2(c,SF2C_LAN_UI_HOOKS_N_0X7000E6C080ULL_BAEA,lan_menu_buttons[i],i==lan_choice);
     if(lan_choice<lan_choice_count && lan_menu_buttons[lan_choice])return;
     uint64_t button=0;
-    if(lan_choice==lan_choice_count)button=LD64(lan_dialog+SF2C_LAN_UI_HOOKS_N_0X50_4171);
+    if(lan_choice>=lan_choice_count) {
+        button=lan_choice==lan_choice_count && lan_primary_button?
+            lan_primary_button:LD64(lan_dialog+SF2C_LAN_UI_HOOKS_N_0X50_4171);
+    }
     else {
         uint64_t rows=LD64(lan_dialog+SF2C_LAN_UI_HOOKS_N_0XE8_7494),items=rows?LD64(rows+SF2C_LAN_UI_HOOKS_N_0X10_BF9C):0;
         if(items && lan_choice<LD32(rows+SF2C_LAN_UI_HOOKS_N_0X18_D47C)) {
@@ -357,12 +369,15 @@ static void lan_dialog_input(Cpu *c) {
     if(requests&LAN_MENU_BACK) { lan_action=LAN_CHOICE_BACK;return; }
     if(requests&(LAN_MENU_UP|LAN_MENU_DOWN)) {
         int direction=(requests&LAN_MENU_UP)?-1:1;
-        unsigned slots=lan_choice_count+(lan_menu_root?0:1);
+        unsigned slots=lan_choice_count+(lan_menu_root?0:1)+(lan_primary_button!=0);
         do { lan_choice=(lan_choice+slots+direction)%slots; }
         while(lan_choice<lan_choice_count && !lan_commands[lan_choice]);
         lan_focus_choice(c);
     }
-    if(requests&LAN_MENU_CONFIRM)lan_action=lan_choice<lan_choice_count?lan_commands[lan_choice]:LAN_CHOICE_BACK;
+    if(requests&LAN_MENU_CONFIRM) {
+        if(lan_choice<lan_choice_count)lan_action=lan_commands[lan_choice];
+        else lan_action=lan_choice==lan_choice_count && lan_primary_button?LAN_CHOICE_PRIMARY:LAN_CHOICE_BACK;
+    }
 }
 // Native table geometry (not hard-coded screen coordinates) maps a click to
 // the same selection/confirmation methods used by the controller. LAN queues
@@ -432,6 +447,8 @@ static void sparring_mouse_frame(Cpu *c,const MenuMouse *mouse) {
         }
     }
 }
+static void settings_menu_action(Cpu *c, unsigned action);
+
 static void lan_ui_pump(Cpu *c) {
     if(lan_ui_pumping)return;
     lan_ui_pumping=true;
@@ -447,7 +464,8 @@ static void lan_ui_pump(Cpu *c) {
     lan_dialog_input(c);
     unsigned action=lan_action;lan_action=0;
     if(action) {
-        if(action==LAN_CHOICE_NORMAL) { LOG(SF2C_LAN_UI_HOOKS_S_LAN_UI_ORIGINAL_LOCAL_SPARRI_AA3A);lan_enter_pvp(c); }
+        if(lan_phase==LAN_UI_SETTINGS)settings_menu_action(c,action);
+        else if(action==LAN_CHOICE_NORMAL) { LOG(SF2C_LAN_UI_HOOKS_S_LAN_UI_ORIGINAL_LOCAL_SPARRI_AA3A);lan_enter_pvp(c); }
         else if(action==LAN_CHOICE_LAN)lan_role_dialog(c);
         else if(action==LAN_CHOICE_HOST) {
             if(lan_gui_host(SF2C_LAN_UI_HOOKS_N_34250_67EB)) {
@@ -463,7 +481,7 @@ static void lan_ui_pump(Cpu *c) {
             if(lan_gui_join(&host))lan_wait_dialog(c,SF2C_LAN_UI_HOOKS_S_CONNECTING_TO_HOST_029C);else lan_error_dialog(c);
         } else if(action==LAN_CHOICE_LEAVE)lan_leave_ui(c,lan_entered);
         else if(action==LAN_CHOICE_BACK) {
-            unsigned phase=lan_phase;lan_close_dialog(c);
+            unsigned phase=lan_phase;lan_close_dialog(c,false);
             if(phase==LAN_UI_MODE)lan_phase=LAN_UI_NONE;
             else if(phase==LAN_UI_ROLE)lan_mode_dialog(c);
             else if(phase==LAN_UI_BROWSER) { lan_gui_leave();lan_role_dialog(c); }
@@ -475,7 +493,7 @@ static void lan_ui_pump(Cpu *c) {
         if(status==LAN_GUI_ERROR && lan_phase!=LAN_UI_ERROR) {
             replay_gui_stop();lan_error_dialog(c);
         } else if(status==LAN_GUI_CONNECTED && before!=status) {
-            if(lan_player())lan_enter_pvp(c);else { lan_close_dialog(c);lan_phase=LAN_UI_NONE; }
+            if(lan_player())lan_enter_pvp(c);else { lan_close_dialog(c,false);lan_phase=LAN_UI_NONE; }
         }
         if(status==LAN_GUI_SEARCHING && lan_phase==LAN_UI_BROWSER) {
             LanHost hosts[SF2C_LAN_UI_HOOKS_N_12_6B51];unsigned n=lan_gui_hosts(hosts);bool changed=n!=lan_visible_count;
@@ -537,15 +555,17 @@ static int lan_ui_hook(Cpu *c,uint64_t site) {
         if(!g_settings.allow_sparring_lan_multiplayer || lan_allow_entry || (replay_enabled() && !lan_gui_active()))return -1;
         lan_menu_scene=c->x[0];lan_mode_dialog(c);return 1;
     }
-    if(site==SF2C_LAN_UI_HOOKS_N_0X7000DC7550ULL_FD24) {
+    if(site==SF2C_LAN_UI_HOOKS_N_0X7000DC7550ULL_FD24 && lan_dialog) {
         uint64_t url=LD64(c->x[0]+SF2C_LAN_UI_HOOKS_N_0X30_8BAD);char text[SF2C_LAN_UI_HOOKS_N_64_A68B];
         if(!dev_read_string(url,text,sizeof text) || strncmp(text,SF2C_LAN_UI_HOOKS_S_SF2LAN_63CA,SF2C_LAN_UI_HOOKS_N_7_7902))return -1;
         char *end;unsigned long choice=strtoul(text+SF2C_LAN_UI_HOOKS_N_7_7902,&end,SF2C_LAN_UI_HOOKS_N_10_4A44);
         if(*end || choice>UINT32_MAX)return 1;
         lan_action=(unsigned)choice;return 1;
     }
-    if(site==SF2C_LAN_UI_HOOKS_N_0X7000CEE2D0ULL_BE68 && c->x[0]==lan_dialog && !lan_dialog_closing) {
-        lan_dialog=0;lan_menu_publish(false);lan_action=LAN_CHOICE_BACK;return -1;
+    if(site==SF2C_LAN_UI_HOOKS_N_0X7000CEE2D0ULL_BE68 && lan_dialog && c->x[0]==lan_dialog && !lan_dialog_closing) {
+        lan_dialog=lan_primary_button=0;
+        if(lan_phase!=LAN_UI_SETTINGS)lan_menu_publish(false);
+        lan_action=LAN_CHOICE_BACK;return -1;
     }
     if(!lan_gui_active())return -1;
     // ConfirmItem inlines ControlCount instead of using HaveSecondPlayer.

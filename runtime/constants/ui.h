@@ -50,3 +50,13 @@
 #define SF2C_MOUSE_N_2_D473 2
 // runtime/ui/mouse.c:29
 #define SF2C_MOUSE_N_4_4B22 4
+// runtime/ui/settings_input.c:16
+#define SF2C_SETTINGS_INPUT_S_S_0030 "%s"
+// runtime/ui/settings_input.c:47
+#define SF2C_SETTINGS_INPUT_S_R_N_645E "\r\n"
+// runtime/ui/settings_input.c:77
+#define SF2C_SETTINGS_INPUT_N_0XC0_4E7B 0xc0
+// runtime/ui/settings_input.c:77
+#define SF2C_SETTINGS_INPUT_N_0X80_D41C 0x80
+// runtime/ui/settings_input.c:99
+#define SF2C_SETTINGS_INPUT_N_16000_2570 16000

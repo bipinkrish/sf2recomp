@@ -38,7 +38,7 @@ def compile_harness(source, output):
                     str(ROOT / "runtime/hle/bindings.c"),
                     str(ROOT / "runtime/ui/developer.c"),
                     str(ROOT / "runtime/ui/mouse.c"), str(ROOT / "runtime/ui/touch.c"),
-                    str(ROOT / "runtime/ui/lan_menu.c"),
+                    str(ROOT / "runtime/ui/lan_menu.c"), str(ROOT / "runtime/ui/settings_input.c"),
                     str(source), "-Wl,--gc-sections", *libs,
                     "-lm", "-ldl", "-pthread", "-o", str(output)], check=True)
 
@@ -89,6 +89,125 @@ int main(int argc, char **argv) {
             (path / "test.c").write_text(harness)
             compile_harness(path / "test.c", path / "test")
             subprocess.run([str(path / "test"), str(valid), str(invalid)], check=True)
+
+    def test_menu_draft_round_trips_into_active_ini(self):
+        harness = r'''
+#include <assert.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include "settings_config.h"
+#include <SDL3/SDL.h>
+
+static unsigned field(SettingsGroup group, const char *name) {
+    for (unsigned i = 0; i < settings_config_count(); ++i)
+        if (settings_config_group(i) == group && !strcmp(settings_config_label(i), name))
+            return i;
+    abort();
+}
+
+int main(int argc, char **argv) {
+    assert(argc == 4);
+    setenv("SF2_CONFIG", argv[1], 1);
+    setenv("LARECOMP_VOLUME", "0.8", 1);
+    settings_load();
+    settings_resolve_defaults(false);
+    SettingsConfig draft;
+    SettingsSaveResult result;
+    settings_config_begin(&draft);
+    unsigned volume = field(SETTINGS_GROUP_AUDIO, "Master volume");
+    unsigned reverb = field(SETTINGS_GROUP_AUDIO, "Reverb");
+    unsigned resolution = field(SETTINGS_GROUP_VIDEO, "Internal resolution");
+    unsigned upscaler = field(SETTINGS_GROUP_VIDEO, "Upscaler");
+    unsigned antialias = field(SETTINGS_GROUP_VIDEO, "Anti-aliasing");
+    unsigned fullscreen = field(SETTINGS_GROUP_VIDEO, "Fullscreen");
+    unsigned fps = field(SETTINGS_GROUP_VIDEO, "Target FPS");
+    unsigned save = field(SETTINGS_GROUP_STORAGE, "Save directory");
+    unsigned key = field(SETTINGS_GROUP_KEYBOARD, "A");
+    unsigned pad = field(SETTINGS_GROUP_GAMEPAD, "B");
+    assert(draft.settings.volume == 0.25f && g_settings.volume == 0.8f);
+    assert(!strcmp(settings_config_override(volume), "LARECOMP_VOLUME"));
+    assert(!settings_config_requires_restart(volume) && !settings_config_requires_restart(fullscreen));
+    assert(settings_config_requires_restart(fps) && settings_config_requires_restart(key));
+    assert(!settings_config_set(&draft, volume, "nan"));
+    assert(!settings_config_set(&draft, fps, "361"));
+    assert(!settings_config_set(&draft, key, "unknown key"));
+    assert(settings_config_set(&draft, volume, "0.35"));
+    assert(settings_config_set(&draft, resolution, "0.5x"));
+    assert(settings_config_set(&draft, upscaler, "bilinear"));
+    assert(settings_config_set(&draft, antialias, "smaa"));
+    assert(settings_upscaler() == UPSCALE_FSR1 && settings_antialias() == AA_OFF);
+    assert(settings_config_set(&draft, fps, "144"));
+    assert(settings_config_set(&draft, save, "my saves/it's #1; good"));
+    assert(settings_config_set(&draft, key, ";"));
+    assert(settings_config_set(&draft, pad, "rtrigger"));
+    settings_config_step(&draft, fullscreen, 1);
+    settings_config_step(&draft, reverb, 1);
+    assert(settings_reverb() && settings_resolution() == RES_MATCH);
+    assert(settings_config_save(&draft, &result));
+    assert(settings_volume() == 0.8f && !settings_reverb() && settings_resolution() == RES_Q50);
+    assert(settings_upscaler() == UPSCALE_BILINEAR && settings_antialias() == AA_SMAA);
+    assert(result.applied == 4 && result.overridden == 1 && result.restart_pending == 4);
+    assert(result.request_fullscreen && !g_settings.fullscreen);
+    assert(g_settings.target_fps == 60 && g_bind_key[BIND_A] == SDL_SCANCODE_K);
+    g_settings.fullscreen = true; // the window thread's successful result
+    settings_config_begin(&draft);
+    assert(draft.settings.volume == 0.35f && draft.settings.res_mode == RES_Q50 && !draft.settings.res_auto);
+    assert(settings_config_set(&draft, fps, "120"));
+    assert(settings_config_set(&draft, upscaler, "auto"));
+    assert(settings_config_save(&draft, &result));
+    assert(settings_upscaler() == UPSCALE_FSR1 && result.applied == 1);
+    assert(settings_config_save(&draft, &result));
+    assert(result.applied == 0 && result.overridden == 0 && result.restart_pending == 4);
+    assert(!result.request_fullscreen);
+    unsetenv("LARECOMP_VOLUME");
+    assert(settings_load_file(argv[1]));
+    assert(g_settings.volume == 0.35f && g_settings.fullscreen && g_settings.target_fps == 120);
+    assert(!strcmp(g_settings.save_directory, "my saves/it's #1; good"));
+    assert(g_bind_key[BIND_A] == SDL_SCANCODE_SEMICOLON && g_bind_pad[BIND_B] == PADB_RTRIGGER);
+
+    setenv("SF2_CONFIG", argv[2], 1);
+    settings_load();
+    settings_config_begin(&draft);
+    assert(settings_config_set(&draft, fps, "75"));
+    assert(settings_config_set(&draft, volume, "0.4"));
+    assert(!settings_config_save(&draft, &result)); // parent directory is missing
+    assert(settings_volume() == 0.35f && result.applied == 0);
+    SettingsConfig current;
+    settings_config_begin(&current);
+    assert(current.settings.target_fps == 120);
+    assert(mkdir(argv[3], 0700) == 0);
+    assert(settings_config_save(&draft, &result));
+    assert(settings_volume() == 0.4f && g_settings.target_fps == 120);
+    assert(result.applied == 1 && result.restart_pending == 1);
+    assert(settings_load_file(argv[2]) && g_settings.target_fps == 75);
+}
+'''
+        with tempfile.TemporaryDirectory(prefix="sf2-config-save-") as directory:
+            path = pathlib.Path(directory)
+            config = path / "custom settings.ini"
+            config.write_bytes(
+                b"# Keep this comment\r\n[Audio]\r\nvolume  = 0.5  # old value\r\n"
+                b"[audio]\r\nvolume = 0.25 ; effective value\r\nreverb = yes\r\n"
+                b"[video]\r\ninternal_resolution=auto\r\n"
+                b"[controls.keyboard]\r\na = K\r\nb = J\r\n"
+                b"[future]\r\nfullscreen = quoted; unchanged"
+            )
+            (path / "test.c").write_text(harness)
+            compile_harness(path / "test.c", path / "test")
+            new_directory = path / "new"
+            new_config = new_directory / "new.ini"
+            subprocess.run([str(path / "test"), str(config), str(new_config), str(new_directory)], check=True)
+            self.assertEqual(new_config.read_text().strip(), "[audio]\nvolume = 0.4\n\n[video]\ntarget_fps = 75")
+            saved = config.read_bytes()
+            self.assertIn(b"# Keep this comment\r\n[Audio]\r\nvolume  = 0.35  # old value\r\n", saved)
+            self.assertIn(b"volume = 0.35 ; effective value\r\nreverb = false\r\n", saved)
+            self.assertIn(b'internal_resolution=0.50x\r\n', saved)
+            self.assertIn(b'a = ";"\r\nb = J\r\n', saved)
+            self.assertIn(b"[future]\r\nfullscreen = quoted; unchanged\n", saved)
+            self.assertEqual(saved.count(b"target_fps = 120"), 1)
+            self.assertIn(b"b = rtrigger", saved)
+            self.assertEqual(list(path.glob("*.tmp.*")), [])
 
     def test_runtime_control_remapping(self):
         harness = r'''

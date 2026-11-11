@@ -25,12 +25,11 @@ class HookGroupTests(unittest.TestCase):
         harness = r'''
 #include <assert.h>
 #include "hle/hooks.c"
+#include "ui/menu_stubs.c"
 void guest_call(Cpu *c, uint64_t pc) { assert(!"unexpected guest call"); }
 void *hle_alloc(size_t size) { assert(!"unexpected allocation"); return NULL; }
 uint64_t plat_now_ns(void) { return 1; }
 uint64_t renderer_present_count(void) { return 1; }
-void menu_request_quit(void) { assert(!"unexpected quit"); }
-bool menu_quit_requested(void) { return false; }
 int main(void) {
     Cpu cpu;
     memset(&cpu, 0x5a, sizeof cpu);
@@ -38,7 +37,7 @@ int main(void) {
     rt_hook_features = ~0u;
     const uint64_t sites[] = {SITES};
     for (unsigned i = 0; i < sizeof sites / sizeof sites[0]; ++i) {
-        assert(rt_hook(&cpu, sites[i]) == 0);
+        assert(rt_hook(&cpu, sites[i]) == 0 && !menu_quit_requested());
         assert(!memcmp(&cpu, &saved, sizeof cpu));
     }
 }

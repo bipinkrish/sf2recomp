@@ -216,32 +216,43 @@ bool bind_capture_event(const SDL_Event *e) {
 }
 
 // ------------------------------------------------------------------ runtime INI
+const char *bind_config_key(int slot) { return k_ini[slot]; }
+
+const char *bind_config_value(int dev, int host) {
+    if (dev == BIND_DEV_PAD)
+        return host >= 0 && host < PADB_HOST_COUNT ? k_pad_ini[host] : SF2C_BINDINGS_S_NONE_30A0;
+    return host == SDL_SCANCODE_UNKNOWN ? SF2C_BINDINGS_S_NONE_30A0 : SDL_GetScancodeName((SDL_Scancode)host);
+}
+
+bool bind_config_parse(int dev, const char *value, int16_t *host) {
+    bool pad = dev == BIND_DEV_PAD;
+    if (!strcasecmp(value, SF2C_BINDINGS_S_NONE_30A0)) {
+        *host = pad ? -1 : SDL_SCANCODE_UNKNOWN;
+        return true;
+    }
+    int parsed = pad ? bind_pad_from_name(value) : (int)SDL_GetScancodeFromName(value);
+    if (parsed < 0 || (!pad && parsed == SDL_SCANCODE_UNKNOWN)) return false;
+    *host = (int16_t)parsed;
+    return true;
+}
+
 BindConfigResult bind_config_set(int dev, const char *action, const char *value) {
     if (dev != BIND_DEV_KEY && dev != BIND_DEV_PAD) return BIND_CONFIG_UNKNOWN;
     int slot = bind_slot_from_name(action);
     bool pad = dev == BIND_DEV_PAD;
     if (slot < 0 || slot >= (pad ? BIND_PAD_COUNT : BIND_KEY_COUNT)) return BIND_CONFIG_UNKNOWN;
-    if (!strcasecmp(value, SF2C_BINDINGS_S_NONE_30A0)) {
-        if (pad) g_bind_pad[slot] = -1;
-        else g_bind_key[slot] = SDL_SCANCODE_UNKNOWN;
-        return BIND_CONFIG_APPLIED;
-    }
-    int host = pad ? bind_pad_from_name(value) : (int)SDL_GetScancodeFromName(value);
-    if (host < 0 || (!pad && host == SDL_SCANCODE_UNKNOWN)) return BIND_CONFIG_INVALID;
-    // Config mappings are independent: duplicates intentionally let one host
-    // button drive several game inputs. Interactive capture retains its swap UI.
-    if (pad) g_bind_pad[slot] = (int16_t)host;
-    else g_bind_key[slot] = (int16_t)host;
-    return BIND_CONFIG_APPLIED;
+    // INI bindings are independent. One host input can drive several actions.
+    int16_t *binding = pad ? &g_bind_pad[slot] : &g_bind_key[slot];
+    return bind_config_parse(dev, value, binding) ? BIND_CONFIG_APPLIED : BIND_CONFIG_INVALID;
 }
 
 void bind_config_save(FILE *f) {
     fprintf(f, SF2C_BINDINGS_S_N_CONTROLS_GAMEPAD_N_B389);
     for (int i = 0; i < BIND_PAD_COUNT; i++)
         if (g_bind_pad[i] != k_def_pad[i])
-            fprintf(f, SF2C_BINDINGS_S_S_S_N_C2E5, k_ini[i], g_bind_pad[i] >= 0 && g_bind_pad[i] < PADB_HOST_COUNT ? k_pad_ini[g_bind_pad[i]] : SF2C_BINDINGS_S_NONE_30A0);
+            fprintf(f, SF2C_BINDINGS_S_S_S_N_C2E5, k_ini[i], bind_config_value(BIND_DEV_PAD, g_bind_pad[i]));
     fprintf(f, SF2C_BINDINGS_S_N_CONTROLS_KEYBOARD_N_5ABB);
     for (int i = 0; i < BIND_KEY_COUNT; i++)
         if (g_bind_key[i] != k_def_key[i])
-            fprintf(f, SF2C_BINDINGS_S_S_S_N_A1C0, k_ini[i], g_bind_key[i] ? SDL_GetScancodeName((SDL_Scancode)g_bind_key[i]) : SF2C_BINDINGS_S_NONE_30A0);
+            fprintf(f, SF2C_BINDINGS_S_S_S_N_A1C0, k_ini[i], bind_config_value(BIND_DEV_KEY, g_bind_key[i]));
 }

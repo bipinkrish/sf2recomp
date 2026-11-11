@@ -228,6 +228,11 @@ static void dev_pump(Cpu *c) {
     dev_pumping = false;
 }
 
+static void dev_apply_fight_settings(Cpu *c) {
+    guest_invoke2(c, SF2C_DEVELOPER_HOOKS_N_0X7000E19D30ULL_36DB, 0, g_settings.ai_enabled);
+    guest_invoke2(c, SF2C_DEVELOPER_HOOKS_N_0X7000E1A450ULL_EB9A, 0, g_settings.show_time_results);
+}
+
 static int dev_return_bool(Cpu *c, bool value) { c->x[0] = value; return 1; }
 
 static int developer_hook(Cpu *c, uint64_t site) {
@@ -280,8 +285,7 @@ static int developer_hook(Cpu *c, uint64_t site) {
     case SF2C_DEVELOPER_HOOKS_N_0X7000E1A760ULL_ECDD: return dev_return_bool(c, g_settings.ai_enabled);
     case SF2C_DEVELOPER_HOOKS_N_0X7000E19ADCULL_5BB4: // AssemblyController.Parse completed; apply INI after the original config
         guest_invoke2(c, SF2C_DEVELOPER_HOOKS_N_0X7000E19C10ULL_45F0, 0, g_settings.show_intro);
-        guest_invoke2(c, SF2C_DEVELOPER_HOOKS_N_0X7000E19D30ULL_36DB, 0, g_settings.ai_enabled);
-        guest_invoke2(c, SF2C_DEVELOPER_HOOKS_N_0X7000E1A450ULL_EB9A, 0, g_settings.show_time_results);
+        dev_apply_fight_settings(c);
         return 0;
     case SF2C_DEVELOPER_HOOKS_N_0X7000FC5060ULL_B103: // Gallery only; retain normal watched-video save behavior elsewhere
         if (g_settings.unlock_all_videos && c->x[SF2C_DEVELOPER_HOOKS_N_30_624B] >= SF2C_DEVELOPER_HOOKS_N_0X7000E71070ULL_A591 && c->x[SF2C_DEVELOPER_HOOKS_N_30_624B] < SF2C_DEVELOPER_HOOKS_N_0X7000E71390ULL_06A2)

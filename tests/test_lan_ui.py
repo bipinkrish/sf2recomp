@@ -6,12 +6,10 @@ HARNESS=r"""
 #include <assert.h>
 #include <SDL3/SDL.h>
 #include "hle/hooks.c"
-bool menu_is_open(void) { return false; }
+#include "ui/menu_stubs.c"
 bool input_any_gamepad_connected(void) { return false; }
 int input_pad_family(void) { return 1; }
 int input_family_of_type(int type) { return 1; }
-bool menu_quit_requested(void) { return false; }
-void menu_request_quit(void) {}
 uint64_t plat_now_ns(void) { return 1000000; }
 uint64_t renderer_present_count(void) { return 1; }
 bool rt_probe_u64(uint64_t a,uint64_t *v) { return false; }
@@ -164,7 +162,7 @@ int main(void) {
     uint64_t pointer=(uintptr_t)calloc(1,336);cpu.x[1]=pointer;ST32(pointer+0x12c,1);
     assert(lan_ui_hook(&cpu,0x7000e6fca0ull)==1 && !lan_action);
     ST32(pointer+0x12c,0);assert(lan_ui_hook(&cpu,0x7000e6fca0ull)==1 && lan_action==LAN_CHOICE_LAN);
-    lan_action=0;lan_close_dialog(&cpu);lan_menu_prototype=0;
+    lan_action=0;lan_close_dialog(&cpu, false);lan_menu_prototype=0;
     // A click uses native movement + Confirm for only the owning player.
     uint64_t module=(uintptr_t)calloc(1,256),items=(uintptr_t)calloc(1,64);
     selection_table=(uintptr_t)calloc(1,64);ST64(module+0x20,selection_table);ST64(module+0x98,items);

@@ -2714,3 +2714,129 @@
 #define SF2C_MOVIE_MOVIE_AUDIO_CHANNELS 2
 
 #define SF2C_MOVIE_MOVIE_AUDIO_BYTES_PER_SAMPLE 2
+// runtime/hle/lan_ui_hooks.inc:116
+#define SETTINGS_DIALOG_ROW_HEIGHT_BITS 0x42900000 /* 72 authored UI units */
+#define SETTINGS_DIALOG_FONT_SIZE 64
+// runtime/hle/settings_menu_hooks.inc:11
+#define SF2C_SETTINGS_MENU_HOOKS_N_200_27BA 200
+// runtime/hle/settings_menu_hooks.inc:11
+#define SF2C_SETTINGS_MENU_HOOKS_N_220_3679 220
+// runtime/hle/settings_menu_hooks.inc:12
+#define SF2C_SETTINGS_MENU_HOOKS_N_240_6AF1 240
+// runtime/hle/settings_menu_hooks.inc:15
+#define SF2C_SETTINGS_MENU_HOOKS_N_5_EF2D 5
+// runtime/hle/settings_menu_hooks.inc:15
+#define SF2C_SETTINGS_MENU_HOOKS_N_4_4B22 4
+// runtime/hle/settings_menu_hooks.inc:18
+#define SF2C_SETTINGS_MENU_HOOKS_S_GENERAL_468D "General"
+// runtime/hle/settings_menu_hooks.inc:19
+#define SF2C_SETTINGS_MENU_HOOKS_S_NETWORK_23E1 "Network"
+// runtime/hle/settings_menu_hooks.inc:20
+#define SF2C_SETTINGS_MENU_HOOKS_S_GAMEPLAY_73FF "Gameplay"
+// runtime/hle/settings_menu_hooks.inc:21
+#define SF2C_SETTINGS_MENU_HOOKS_S_DEVELOPER_581A "Developer"
+// runtime/hle/settings_menu_hooks.inc:22
+#define SF2C_SETTINGS_MENU_HOOKS_S_AUDIO_7454 "Audio"
+// runtime/hle/settings_menu_hooks.inc:23
+#define SF2C_SETTINGS_MENU_HOOKS_S_VIDEO_72BC "Video"
+// runtime/hle/settings_menu_hooks.inc:24
+#define SF2C_SETTINGS_MENU_HOOKS_S_INPUT_16F5 "Input"
+// runtime/hle/settings_menu_hooks.inc:25
+#define SF2C_SETTINGS_MENU_HOOKS_S_STORAGE_D159 "Storage"
+// runtime/hle/settings_menu_hooks.inc:26
+#define SF2C_SETTINGS_MENU_HOOKS_S_KEYBOARD_BINDINGS_63A1 "Keyboard bindings"
+// runtime/hle/settings_menu_hooks.inc:27
+#define SF2C_SETTINGS_MENU_HOOKS_S_CONTROLLER_BINDINGS_3485 "Controller bindings"
+// runtime/hle/settings_menu_hooks.inc:57
+#define SF2C_SETTINGS_MENU_HOOKS_N_0X70015D9F50ULL_5450 0x70015d9f50ull
+// runtime/hle/settings_menu_hooks.inc:61
+#define SF2C_SETTINGS_MENU_HOOKS_S_RECOMP_SETTINGS_3138 "Recomp Settings"
+#define SETTINGS_MAIN_MENU_LABEL "RECOMP SETTINGS"
+// runtime/hle/settings_menu_hooks.inc:68
+#define SF2C_SETTINGS_MENU_HOOKS_N_0X7000E6FDD0ULL_702F 0x7000e6fdd0ull
+// runtime/hle/settings_menu_hooks.inc:89
+#define SF2C_SETTINGS_MENU_HOOKS_N_2_D473 2
+// runtime/hle/settings_menu_hooks.inc:91
+#define SF2C_SETTINGS_MENU_HOOKS_N_128_2747 128
+// runtime/hle/settings_menu_hooks.inc:99
+#define SF2C_SETTINGS_MENU_HOOKS_S_PREVIOUS_CATEGORIES_5BC7 "Previous categories"
+// runtime/hle/settings_menu_hooks.inc:99
+#define SF2C_SETTINGS_MENU_HOOKS_S_MORE_CATEGORIES_4C5A "More categories"
+// runtime/hle/settings_menu_hooks.inc:100
+#define SF2C_SETTINGS_MENU_HOOKS_S_SAVE_TO_INI_597C "Save to INI"
+// runtime/hle/settings_menu_hooks.inc:111
+#define SF2C_SETTINGS_MENU_HOOKS_S_S_50S_85FD "%s  |  %.50s"
+// runtime/hle/settings_menu_hooks.inc:115
+#define SF2C_SETTINGS_MENU_HOOKS_S_NEXT_PAGE_360B "Next page"
+// runtime/hle/settings_menu_hooks.inc:116
+#define SF2C_SETTINGS_MENU_HOOKS_S_PREVIOUS_PAGE_AC1D "Previous page"
+// runtime/hle/settings_menu_hooks.inc:123
+#define SETTINGS_MENU_VALUE_FORMAT "Value: %.96s"
+// runtime/hle/settings_menu_hooks.inc:127
+#define SF2C_SETTINGS_MENU_HOOKS_S_ENVIRONMENT_OVERRIDE_S_5BD8 "Environment override: %s"
+// runtime/hle/settings_menu_hooks.inc:132
+#define SF2C_SETTINGS_MENU_HOOKS_S_NEXT_VALUE_C67A "Next value"
+// runtime/hle/settings_menu_hooks.inc:132
+#define SF2C_SETTINGS_MENU_HOOKS_S_INCREASE_9F03 "Increase"
+// runtime/hle/settings_menu_hooks.inc:133
+#define SF2C_SETTINGS_MENU_HOOKS_S_PREVIOUS_VALUE_099D "Previous value"
+// runtime/hle/settings_menu_hooks.inc:133
+#define SF2C_SETTINGS_MENU_HOOKS_S_DECREASE_8532 "Decrease"
+// runtime/hle/settings_menu_hooks.inc:136
+#define SF2C_SETTINGS_MENU_HOOKS_S_PRESS_A_KEY_D5FA "Press a key"
+// runtime/hle/settings_menu_hooks.inc:136
+#define SF2C_SETTINGS_MENU_HOOKS_S_PRESS_A_CONTROLLER_BUTTON_D6BE "Press a controller button"
+// runtime/hle/settings_menu_hooks.inc:137
+#define SF2C_SETTINGS_MENU_HOOKS_S_UNBIND_F766 "Unbind"
+// runtime/hle/settings_menu_hooks.inc:139
+#define SF2C_SETTINGS_MENU_HOOKS_S_ENTER_VALUE_E3A6 "Enter value"
+// runtime/hle/settings_menu_hooks.inc:147
+#define SETTINGS_CAPTURE_CANCEL_LABEL "Click Back or press Esc to cancel"
+// runtime/hle/settings_menu_hooks.inc:151
+#define SF2C_SETTINGS_MENU_HOOKS_S_96S_D145 "%.96s"
+// runtime/hle/settings_menu_hooks.inc:151
+#define SF2C_SETTINGS_MENU_HOOKS_S_TYPE_A_VALUE_6D97 "Type a value"
+// runtime/hle/settings_menu_hooks.inc:153
+#define SF2C_SETTINGS_MENU_HOOKS_S_APPLY_VALUE_A90E "Apply value"
+// runtime/hle/settings_menu_hooks.inc:158
+#define SF2C_SETTINGS_MENU_HOOKS_S_SAVE_CHANGES_2CB0 "Save changes?"
+// runtime/hle/settings_menu_hooks.inc:160
+#define SF2C_SETTINGS_MENU_HOOKS_S_DISCARD_CHANGES_07F6 "Discard changes"
+// runtime/hle/settings_menu_hooks.inc:161
+#define SF2C_SETTINGS_MENU_HOOKS_S_KEEP_EDITING_DF57 "Keep editing"
+// runtime/hle/settings_menu_hooks.inc:164
+#define SF2C_SETTINGS_MENU_HOOKS_S_SETTINGS_SAVED_1FBE "Settings saved"
+// runtime/hle/settings_menu_hooks.inc:165
+#define SF2C_SETTINGS_MENU_HOOKS_S_RESTART_THE_GAME_TO_APPLY_CH_4672 "Restart the game to apply changes"
+// runtime/hle/settings_menu_hooks.inc:166
+#define SF2C_SETTINGS_MENU_HOOKS_S_DONE_1655 "Done"
+// runtime/hle/settings_menu_hooks.inc:178
+#define SF2C_SETTINGS_MENU_HOOKS_S_INVALID_VALUE_13D1 "Invalid value"
+// runtime/hle/settings_menu_hooks.inc:211
+#define SF2C_SETTINGS_MENU_HOOKS_S_COULD_NOT_SAVE_INI_55AA "Could not save INI"
+// runtime/hle/settings_menu_hooks.inc:237
+#define SF2C_SETTINGS_MENU_HOOKS_S_NONE_30A0 "none"
+// runtime/hle/settings_menu_hooks.inc:66
+#define SF2C_SETTINGS_MENU_HOOKS_N_0X70011CC660ULL_0510 0x70011cc660ull
+// runtime/hle/lan_ui_hooks.inc:160
+#define SF2C_LAN_UI_HOOKS_N_0X70005D8310ULL_7E78 0x70005d8310ull
+// runtime/hle/settings_menu_hooks.inc:67
+#define SF2C_SETTINGS_MENU_HOOKS_N_0X7000CB31D0ULL_8E7B 0x7000cb31d0ull
+// runtime/hle/settings_menu_hooks.inc:114
+#define SF2C_SETTINGS_MENU_HOOKS_S_S_24S_OVERRIDE_7030 "%s | %.24s [override]"
+// runtime/hle/settings_menu_hooks.inc:116
+#define SF2C_SETTINGS_MENU_HOOKS_S_S_24S_RESTART_D09E "%s | %.24s [restart]"
+// runtime/hle/settings_menu_hooks.inc:137
+#define SF2C_SETTINGS_MENU_HOOKS_S_RESTART_REQUIRED_9AFD "Restart required"
+// runtime/hle/settings_menu_hooks.inc:137
+#define SF2C_SETTINGS_MENU_HOOKS_S_APPLIES_ON_SAVE_DF60 "Applies on save"
+// runtime/hle/settings_menu_hooks.inc:174
+#define SF2C_SETTINGS_MENU_HOOKS_S_APPLYING_FULLSCREEN_SETTING_E10E "Applying fullscreen setting"
+// runtime/hle/settings_menu_hooks.inc:177
+#define SF2C_SETTINGS_MENU_HOOKS_S_LIVE_CHANGES_APPLIED_1096 "Live changes applied"
+// runtime/hle/settings_menu_hooks.inc:178
+#define SF2C_SETTINGS_MENU_HOOKS_S_RESTART_REQUIRED_FOR_MARKED__E6BE "Restart required for marked settings"
+// runtime/hle/settings_menu_hooks.inc:179
+#define SF2C_SETTINGS_MENU_HOOKS_S_ENVIRONMENT_OVERRIDES_STILL__83DB "Environment overrides still active"
+// runtime/hle/settings_menu_hooks.inc:180
+#define SF2C_SETTINGS_MENU_HOOKS_S_COULD_NOT_SWITCH_FULLSCREEN_7D53 "Could not switch fullscreen"

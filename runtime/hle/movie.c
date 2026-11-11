@@ -690,7 +690,7 @@ static bool movie_start(const char *guest_path) {
             SDL_AudioSpec spec = {SDL_AUDIO_S16LE, MOVIE_AUDIO_CHANNELS, MOVIE_AUDIO_RATE};
             g_movie.audio_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, NULL, NULL);
             if (g_movie.audio_stream) {
-                double gain = g_settings.volume;
+                double gain = settings_volume();
                 const char *env_gain = getenv(SF2C_MOVIE_S_LARECOMP_AUDIO_GAIN_1F0B);
                 if (env_gain) gain *= atof(env_gain);
                 SDL_SetAudioStreamGain(g_movie.audio_stream, (float)gain);

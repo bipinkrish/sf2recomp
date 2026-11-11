@@ -418,6 +418,14 @@ class NSO:
 
 
 class PATCHES:
+    S_KEEP_THE_RECOMP_SETTINGS_SAV_0C73 = 'Keep the Recomp Settings save button active'  # tools/recompr/patches.py:175
+    N_0X7000CB31D0_421D = 481049653712  # tools/recompr/patches.py:175
+    S_HANDLE_THE_RECOMP_SETTINGS_F_3308 = 'Handle the Recomp Settings footer button'  # tools/recompr/patches.py:175
+    N_0XA9BF7BFD_CD67 = 2847898621  # tools/recompr/patches.py:175
+    N_0X70011CC660_C7D7 = 481055000160  # tools/recompr/patches.py:175
+    S_CONFIRM_THE_RECOMP_SETTINGS__5470 = 'Confirm the Recomp Settings main menu item'  # tools/recompr/patches.py:175
+    N_0XA9BD57F6_6B30 = 2847758326  # tools/recompr/patches.py:175
+    N_0X7000E6FDD0_95CA = 481051475408  # tools/recompr/patches.py:175
     N_2_D473 = 2  # tools/recompr/patches.py:195
     S_OFFLINE_POLICY_AD1C = 'offline policy: '  # tools/recompr/patches.py:205
     N_481103446016_A612 = 481103446016  # tools/recompr/patches.py:202

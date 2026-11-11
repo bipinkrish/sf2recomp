@@ -149,7 +149,7 @@ static void replay_header(void) {
             SF2C_REPLAY_S_RNG_POLICY_S_SEED_U_INITIALI_55BA
             SF2C_REPLAY_S_COMBAT_GEOMETRY_PVP_FRAMING__D175,
             limit, playback ? SF2C_REPLAY_S_TRUE_18D1 : SF2C_REPLAY_S_FALSE_076D, event_count, g_settings.target_fps, g_settings.aspect,
-            g_settings.res_mode, g_settings.upscaler, g_settings.antialias, g_settings.ai_enabled ? SF2C_REPLAY_S_TRUE_18D1 : SF2C_REPLAY_S_FALSE_076D,
+            settings_resolution(), settings_upscaler(), settings_antialias(), g_settings.ai_enabled ? SF2C_REPLAY_S_TRUE_18D1 : SF2C_REPLAY_S_FALSE_076D,
             controlled ? SF2C_REPLAY_S_SCOPED_CALLSITE_LCG_V2_14CF : SF2C_REPLAY_S_ORIGINAL_UNMODIFIED_952E, seed,
             lan_enabled()?SF2C_REPLAY_S_LAN_TWO_HUMAN_NATIVE_STANCE__5D80:controlled ? SF2C_REPLAY_S_NATIVE_ROUND_STANCE_240_STEP_C958 : SF2C_REPLAY_S_ORIGINAL_4D60, fixed_match ? SF2C_REPLAY_S_TRUE_18D1 : SF2C_REPLAY_S_FALSE_076D,lan_enabled()?SF2C_REPLAY_S_TRUE_18D1:SF2C_REPLAY_S_FALSE_076D);
     fflush(trace);

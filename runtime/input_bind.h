@@ -63,6 +63,9 @@ int bind_last_result(int *dev, int *slot, int *other, int *serial);
 // ignored for forward compatibility; an invalid value leaves its binding intact.
 typedef enum { BIND_CONFIG_UNKNOWN, BIND_CONFIG_APPLIED, BIND_CONFIG_INVALID } BindConfigResult;
 BindConfigResult bind_config_set(int dev, const char *action, const char *value);
+const char *bind_config_key(int slot);
+const char *bind_config_value(int dev, int host);
+bool bind_config_parse(int dev, const char *value, int16_t *host);
 void bind_config_save(FILE *f);  // changed bindings, in the same named sections
 
 // Switch input "a", "zl", "ls_up"... -> slot; controller position "south"... -> PADB value

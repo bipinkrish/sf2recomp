@@ -70,6 +70,18 @@ typedef struct Settings {
 
 extern Settings g_settings;
 
+// These fields can change on the guest thread while the audio and render
+// threads consume them. Keep their access atomic after startup.
+static inline float settings_volume(void) {
+    float value;
+    __atomic_load(&g_settings.volume, &value, __ATOMIC_RELAXED);
+    return value;
+}
+static inline bool settings_reverb(void) { return __atomic_load_n(&g_settings.reverb, __ATOMIC_RELAXED); }
+static inline int settings_resolution(void) { return __atomic_load_n(&g_settings.res_mode, __ATOMIC_RELAXED); }
+static inline int settings_upscaler(void) { return __atomic_load_n(&g_settings.upscaler, __ATOMIC_RELAXED); }
+static inline int settings_antialias(void) { return __atomic_load_n(&g_settings.antialias, __ATOMIC_RELAXED); }
+
 // Native screen dimensions must agree across guest modes, buffers and presentation.
 // All supported ratios have exact integer widths at both 720 and 1080 lines.
 static inline unsigned settings_screen_width(unsigned height) {

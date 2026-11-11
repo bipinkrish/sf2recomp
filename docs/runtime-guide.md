@@ -2,6 +2,20 @@
 
 [Back to the README](../README.md#settings-and-controls).
 
+## Change settings in the game
+
+Open **Recomp Settings** from the main menu. Choose a category and edit the
+values. Select **Save to INI** beside **Back**. The game applies supported
+changes immediately and labels startup-bound settings **Restart required**.
+
+Master volume, reverb, fullscreen, internal resolution, upscaler, and
+anti-aliasing apply on save. Fight AI, time results, movie unlocks, the fight
+trainer, and shop cheats use the new values when you next use them. Language,
+aspect ratio, target FPS, bindings, and save profile settings require a restart.
+
+The menu writes to the same INI the game loaded. If you set `SF2_CONFIG`, the
+menu saves to that file. Environment overrides still take precedence at launch.
+
 ## Configuration file
 
 Use **`sf2recomp.ini` beside `sf2.exe` or `sf2`** in your converted game folder.
@@ -422,7 +436,7 @@ scale from `0.25x` through `4x`. `auto` follows the window's fitted resolution;
 `dynamic` lowers render scale when GPU work cannot hold `target_fps`. `upscaler` accepts
 `auto`, `bilinear`, or `fsr1`; auto selects bilinear on integrated GPUs and FSR 1
 on discrete GPUs. FSR 1 is used only when upscaling. `antialiasing` accepts
-`off` or `smaa`. These renderer options take effect on launch. The maximum internal
+`off` or `smaa`. You can apply these renderer options from **Recomp Settings**. The maximum internal
 scale can be limited by the GPU's texture-size cap.
 
 `[video] target_fps` accepts an integer from 30 to 360. It sets Unity's target

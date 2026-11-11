@@ -6550,12 +6550,12 @@ static void post_pass_ex(VkCommandBuffer cb, const char *fs, const VkImageView *
 // size in the window (its crop is drawn into the viewport).
 static VkImageView post_process(VkCommandBuffer cb, TexBackend *b, float fx, float fy, double ow_d, double oh_d, bool *upscaled) {
     VkImageView v = raw_view(b);
-    bool smaa = g_settings.antialias == AA_SMAA;
+    bool smaa = settings_antialias() == AA_SMAA;
     uint32_t ow = (uint32_t)lround(ow_d), oh = (uint32_t)lround(oh_d);
     if (ow > SF2C_EXEC_N_16384_CA90) ow = SF2C_EXEC_N_16384_CA90;
     if (oh > SF2C_EXEC_N_16384_CA90) oh = SF2C_EXEC_N_16384_CA90;
     uint32_t cw = (uint32_t)lroundf(b->width * fx), ch = (uint32_t)lroundf(b->height * fy);  // (the contents' size)
-    bool fsr = g_settings.upscaler == UPSCALE_FSR1 && (ow > cw + 1 || oh > ch + 1);  // (an upscale only)
+    bool fsr = settings_upscaler() == UPSCALE_FSR1 && (ow > cw + 1 || oh > ch + 1);  // (an upscale only)
     *upscaled = fsr;
     if (!smaa && !fsr) return v;
     extern void vk_frame_suspend(void);

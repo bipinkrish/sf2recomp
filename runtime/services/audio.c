@@ -472,7 +472,7 @@ static void apply_effects(Renderer *r, int32_t mix_id, Mix *m) {
             if (no_reverb < 0) no_reverb = getenv(SF2C_AUDIO_S_LARECOMP_NO_REVERB_0417) ? 1 : 0;
             static int toggle = -1;
             if (toggle < 0) toggle = getenv(SF2C_AUDIO_S_LARECOMP_REVERB_TOGGLE_C8DB) ? atoi(getenv(SF2C_AUDIO_S_LARECOMP_REVERB_TOGGLE_C8DB)) : 0;
-            int off = no_reverb || !g_settings.reverb || (toggle && (r->elapsed_frames / toggle) % SF2C_AUDIO_N_2_D473);
+            int off = no_reverb || !settings_reverb() || (toggle && (r->elapsed_frames / toggle) % SF2C_AUDIO_N_2_D473);
             if (fx->enabled && !off) reverb_process(&fx->rv, in, out, N);
             else
                 for (int c = 0; c < ch; c++) if (in[c] != out[c]) memcpy(out[c], in[c], N * sizeof(float));
@@ -617,7 +617,7 @@ static void render_frame(Renderer *r, float *stereo) {
 static void apply_gain(SDL_AudioStream *st) {
     static double env = -1;
     if (env < 0) env = getenv(SF2C_AUDIO_S_LARECOMP_AUDIO_GAIN_1F0B) ? atof(getenv(SF2C_AUDIO_S_LARECOMP_AUDIO_GAIN_1F0B)) : 1.0;
-    float g = (float)(env * g_settings.volume);
+    float g = (float)(env * settings_volume());
     if (atomic_load(&movie_audio_active)) g = SF2C_AUDIO_N_0_0F_6895;
     if (st && SDL_GetAudioStreamGain(st) != g) SDL_SetAudioStreamGain(st, g);
 }

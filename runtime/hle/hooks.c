@@ -110,11 +110,13 @@ static uint64_t guest_string(Cpu *caller, const char *utf8) {
 // experiments require a restart; guest UI objects are never hot-unhooked.
 static void reset_developer_state(void);
 static void reset_lan_ui(void);
+static void reset_settings_menu(void);
 static void reset_campaign_replay(void);
 void rt_hooks_configure(void) {
     LOG(SF2C_HOOKS_S_NETWORK_S_N_E20C, g_settings.network_enabled ? SF2C_HOOKS_S_ORIGINAL_NETWORK_PATHS_ENABL_BF61 : SF2C_HOOKS_S_DISABLED_OFFLINE_POLICY_6663);
     reset_developer_state();
     reset_lan_ui();
+    reset_settings_menu();
     reset_campaign_replay();
     replay_init();
     rt_hook_features =
@@ -162,12 +164,13 @@ static bool guest_object_named(Cpu *c, uint64_t object, const char *expected) {
 #include "developer_hooks.inc"
 #include "sparring_roster_hooks.inc"
 #include "lan_ui_hooks.inc"
+#include "settings_menu_hooks.inc"
 #include "platform_ui_hooks.inc"
 #include "campaign_replay_hooks.inc"
 
-// The shipped MainSection has a fully wired, localized Exit item. Reveal it
-// before GeneralMenuList.Awake collects active buttons and installs navigation.
-static void enable_desktop_exit(Cpu *c, uint64_t list) {
+// Reveal the localized Exit item and add Recomp Settings before Awake
+// collects the active buttons and installs native navigation.
+static void extend_main_menu(Cpu *c, uint64_t list) {
     uint64_t root = guest_invoke2(c, SF2C_HOOKS_N_0X700121E6B0ULL_59E6, list, 0);
     if (!guest_object_named(c, root, SF2C_HOOKS_S_MAINSECTION_7138)) return;
     int children = guest_invoke2(c, SF2C_HOOKS_N_0X70015D9E00ULL_574A, root, 0);
@@ -181,6 +184,7 @@ static void enable_desktop_exit(Cpu *c, uint64_t list) {
             uint64_t object = guest_invoke2(c, SF2C_HOOKS_N_0X700121E720ULL_0F0E, item, 0);
             if (object) {
                 lan_capture_menu_item(c,item);
+                settings_add_main_item(c, list, content, item, j);
                 guest_invoke2(c, SF2C_HOOKS_N_0X7001226480ULL_8D5A, object, 1);
                 LOG(SF2C_HOOKS_S_MENU_ENABLED_DESKTOP_EXIT_IT_DF45);
             }
@@ -200,6 +204,7 @@ RT_ON_RESET(reset_menu_mouse_frame) { memset(&menu_mouse, 0, sizeof menu_mouse);
 static int menu_mouse_hook(Cpu *c, uint64_t site) {
     switch (site) {
     case SF2C_HOOKS_N_0X70000FD740ULL_A3F5: {  // current EventSystem.Update, before TickModules
+        settings_menu_pump(c);
         lan_ui_pump(c);
         unsigned width = guest_invoke2(c, SF2C_HOOKS_N_0X70015CCB90ULL_4971, 0, 0);
         unsigned height = guest_invoke2(c, SF2C_HOOKS_N_0X70015CCC00ULL_3E02, 0, 0);
@@ -267,6 +272,8 @@ int rt_hook(Cpu *c, uint64_t site) {
     if (campaign_result >= 0) return campaign_result;
     int platform_result = platform_ui_hook(c, site);
     if (platform_result >= 0) return platform_result;
+    int settings_result = settings_menu_hook(c, site);
+    if (settings_result >= 0) return settings_result;
     int lan_result = lan_ui_hook(c,site);
     if(lan_result>=0)return lan_result;
     int mouse_result = menu_mouse_hook(c, site);
@@ -309,7 +316,7 @@ int rt_hook(Cpu *c, uint64_t site) {
     case SF2C_HOOKS_N_0X7000FC9230ULL_1EA3:  // PvpSettings.UpdateCharactersLock
         return unlock_sparring_characters(c);
     case SF2C_HOOKS_N_0X7000E6B820ULL_6DB6:
-        enable_desktop_exit(c, c->x[0]);
+        extend_main_menu(c, c->x[0]);
         dev_ensure_ui(c);
         return 0;
     case SF2C_HOOKS_N_0X7000E6EF20ULL_AD65:  // GeneralMenuScene.ShowExit
