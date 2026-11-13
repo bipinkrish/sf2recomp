@@ -3,7 +3,7 @@
 // SF2Recomp's version is independent of the original game's display version.
 // Release tags must be v<SF2RECOMP_VERSION>.
 #ifndef SF2RECOMP_VERSION
-#define SF2RECOMP_VERSION "0.2.0"
+#define SF2RECOMP_VERSION "0.3.0"
 #endif
 #ifndef RC_INVOKED
 #include "lan_protocol.h"
