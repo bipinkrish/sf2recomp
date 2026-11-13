@@ -25,6 +25,9 @@ and graphics options for high resolutions, high frame rates, and ultrawide displ
 
 **Bring your own game files. No game code, game assets, or keys are included.**
 
+> [!NOTE]
+> This project was developed with AI assistance.
+
 ## Status
 
 You need a compatible **Vulkan 1.3 GPU and graphics driver**. High resolutions
