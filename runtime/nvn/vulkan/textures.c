@@ -22,11 +22,11 @@ typedef struct { VkFormat vf; uint8_t expand_rgb, alpha_one; } VkFmt;
 
 // DEPTH24_STENCIL8 as itself where the GPU has it for everything the game does with depth (NVIDIA, Intel): half the
 // bytes of D32_SFLOAT_S8_UINT (4 instead of 8 per pixel) for every depth test, clear and copy - the game copies its
-// full-size depth twice a frame. AMD has no D24S8 attachments: D32S8 there (and on Metal). LARECOMP_VK_D24=0: D32S8.
+// full-size depth twice a frame. AMD has no D24S8 attachments: D32S8 there (and on Metal). SF2RECOMP_VK_D24=0: D32S8.
 static VkFormat depth24_stencil8(void) {
     static VkFormat f;
     if (!f) {
-        const char *e = getenv(SF2C_TEXTURES_S_LARECOMP_VK_D24_4C0A);
+        const char *e = getenv(SF2C_TEXTURES_S_SF2RECOMP_VK_D24_4C0A);
         VkFormatProperties p;
         vkGetPhysicalDeviceFormatProperties(g_vk.phys, VK_FORMAT_D24_UNORM_S8_UINT, &p);
         VkFormatFeatureFlags want = VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |
@@ -103,10 +103,10 @@ static VkFmt fmt_of(uint32_t f) {
     case SF2C_TEXTURES_N_0X49_823D: return (VkFmt){VK_FORMAT_BC4_UNORM_BLOCK};
     case SF2C_TEXTURES_N_0X4A_E097: return (VkFmt){VK_FORMAT_BC4_SNORM_BLOCK};
     case SF2C_TEXTURES_N_0X4B_6716: return (VkFmt){VK_FORMAT_BC5_UNORM_BLOCK};
-    // 0x4C = signed RGTC2; LARECOMP_BC5_UNORM=1 decodes it unsigned (see metal.m / notes/PLAN.md)
+    // 0x4C = signed RGTC2; SF2RECOMP_BC5_UNORM=1 decodes it unsigned (see metal.m / notes/PLAN.md)
     case SF2C_TEXTURES_N_0X4C_CEDB: {
         static int unorm = -1;  // (per texture lookup: getenv scans the environment, notably on Windows)
-        if (unorm < 0) unorm = getenv(SF2C_TEXTURES_S_LARECOMP_BC5_UNORM_5171) != NULL;
+        if (unorm < 0) unorm = getenv(SF2C_TEXTURES_S_SF2RECOMP_BC5_UNORM_5171) != NULL;
         return (VkFmt){unorm ? VK_FORMAT_BC5_UNORM_BLOCK : VK_FORMAT_BC5_SNORM_BLOCK};
     }
     case SF2C_TEXTURES_N_0X4D_844B: return (VkFmt){VK_FORMAT_BC7_UNORM_BLOCK};
@@ -198,7 +198,7 @@ uint64_t renderer_present_count(void);
 
 static bool tex_scalable(const NvnTexture *t) {
     static int off = -1;  // (per texture lookup: cached)
-    if (off < 0) off = getenv(SF2C_TEXTURES_S_LARECOMP_NO_SCALE_224E) != NULL;
+    if (off < 0) off = getenv(SF2C_TEXTURES_S_SF2RECOMP_NO_SCALE_224E) != NULL;
     if (off) return false;
     if (t->target != 1 || t->samples > 1 || !(t->flags & SF2C_TEXTURES_N_8_2C62) || t->width < SF2C_TEXTURES_N_32_E29C || t->height < SF2C_TEXTURES_N_16_B17E) return false;
     // Screen buffers have an exact native size in every aspect mode. Artwork
@@ -221,7 +221,7 @@ bool renderer_texture_frame_fresh(NvnTexture *t) {
     extern uint64_t renderer_exec_frame(void);
     uint64_t total_frames = renderer_exec_frame();  // (the frame being translated)
     if (!b || !b->scalable || b->frame_cleared == total_frames + 1) return false;
-    // LARECOMP_NO_FRAME_CLEAR skips the clear only while the contents cover the whole target: below 1x a frame draws
+    // SF2RECOMP_NO_FRAME_CLEAR skips the clear only while the contents cover the whole target: below 1x a frame draws
     // into part of it, and the rest would show what an earlier frame left there (issue #205: the upper part flickered)
     // (Dynamic: the contents cover the whole target only at the factor 1 - its render scale is the allocation's)
     if (g_vk.no_frame_clear && b->sx >= SF2C_TEXTURES_N_1_0F_CA71 && b->sy >= SF2C_TEXTURES_N_1_0F_CA71 && b->sx >= b->ax && b->sy >= b->ay) return false;
@@ -407,7 +407,7 @@ static void create_image(NvnTexture *t, TexBackend *b) {
         VK_CHECK(vmaCreateImage(g_vk.vma, &ci, &ai, &b->image, &b->mem, NULL));
         depthfmt = false;
     }
-    if (getenv(SF2C_TEXTURES_S_LARECOMP_VK_DEVLOST_TRACE_28EE) && tw <= SF2C_TEXTURES_N_16_B17E && th <= SF2C_TEXTURES_N_16_B17E)
+    if (getenv(SF2C_TEXTURES_S_SF2RECOMP_VK_DEVLOST_TRACE_28EE) && tw <= SF2C_TEXTURES_N_16_B17E && th <= SF2C_TEXTURES_N_16_B17E)
         LOG(SF2C_TEXTURES_S_VK_SMALL_IMAGE_P_UX_UX_U_TYP_6090,
             (void *)b->image, tw, th, depth, type, layers, samples, vf, ai.flags);
     b->format = vf;
@@ -426,7 +426,7 @@ static void create_image(NvnTexture *t, TexBackend *b) {
     // part only, and the game's blurs sample a few texels past it, where a new image holds whatever its memory held -
     // NaN / infinity in a float target among it, which the bloom chain spreads and keeps (a pure green band down the
     // right edge, issue #205; every window resize reallocates these images). Copies into them write only the contents'
-    // part, and with LARECOMP_NO_FRAME_CLEAR the per-frame clear is skipped. LARECOMP_NEW_TARGET_FILL=<r>,<g>,<b>,<a>
+    // part, and with SF2RECOMP_NO_FRAME_CLEAR the per-frame clear is skipped. SF2RECOMP_NEW_TARGET_FILL=<r>,<g>,<b>,<a>
     // (test): that colour instead of zeros.
     bool clear_color = !depthfmt && b->scalable && (ci.usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     if (depthfmt || clear_color) {
@@ -439,7 +439,7 @@ static void create_image(NvnTexture *t, TexBackend *b) {
             static int fill = -1;
             static VkClearColorValue fc;
             if (fill < 0) {
-                const char *e = getenv(SF2C_TEXTURES_S_LARECOMP_NEW_TARGET_FILL_112D);
+                const char *e = getenv(SF2C_TEXTURES_S_SF2RECOMP_NEW_TARGET_FILL_112D);
                 float *c = fc.float32;
                 fill = e && sscanf(e, SF2C_TEXTURES_S_F_F_F_F_60DF, &c[0], &c[1], &c[SF2C_TEXTURES_N_2_D473], &c[SF2C_TEXTURES_N_3_4E07]) == SF2C_TEXTURES_N_4_4B22;
             }
@@ -607,15 +607,15 @@ static void upload_texture(NvnTexture *t, TexBackend *b) {
     if (full_hash_budget_frame != frame) { full_hash_budget_frame = frame; full_hash_budget = SF2C_TEXTURES_N_4_4B22 << SF2C_TEXTURES_N_20_F5CA; }
     const uint8_t *mem = (const uint8_t *)(uintptr_t)t->addr;
     static int always_full = -1;
-    if (always_full < 0) always_full = getenv(SF2C_TEXTURES_S_LARECOMP_TEX_FULLHASH_DEFD) ? 1 : 0;
+    if (always_full < 0) always_full = getenv(SF2C_TEXTURES_S_SF2RECOMP_TEX_FULLHASH_DEFD) ? 1 : 0;
     bool full = b->dynamic || !b->uploaded || always_full;
     bool periodic = frame - b->full_frame >= SF2C_TEXTURES_N_120_2ABA && full_hash_budget >= total;  // (safety net: a full hash now and then)
     if (!full && periodic) { full = true; full_hash_budget -= total; }
     // The OS's page write tracking (exec.c vk_pages_changed, shared with the vertex cache): texture memory the CPU
     // hasn't written since the last check is not hashed at all (dynamic textures were fully hashed every frame,
-    // ~2.4 MB a frame in the overworld). The periodic full hash stays as a safety net. LARECOMP_VK_TEX_WATCH=0: off.
+    // ~2.4 MB a frame in the overworld). The periodic full hash stays as a safety net. SF2RECOMP_VK_TEX_WATCH=0: off.
     static int watch = -1;
-    if (watch < 0) { const char *e = getenv(SF2C_TEXTURES_S_LARECOMP_VK_TEX_WATCH_599C); watch = !e || atoi(e) != 0; }
+    if (watch < 0) { const char *e = getenv(SF2C_TEXTURES_S_SF2RECOMP_VK_TEX_WATCH_599C); watch = !e || atoi(e) != 0; }
     if (watch && !always_full) {
         extern int vk_pages_changed(uint64_t addr, uint64_t size, uint32_t since, uint32_t *now);
         uint32_t now = 0;
@@ -628,7 +628,7 @@ static void upload_texture(NvnTexture *t, TexBackend *b) {
             }
         }
     }
-    bool fast = tex_fast_hash();  // (runtime/nvn/tex_hash.h; LARECOMP_TEX_FASTHASH=0: the previous hashes)
+    bool fast = tex_fast_hash();  // (runtime/nvn/tex_hash.h; SF2RECOMP_TEX_FASTHASH=0: the previous hashes)
     if (!full) {
         prof_tex_samples++;
         uint64_t sh = fast ? tex_hash_sample(mem, total) : fnv_sample(mem, total);
@@ -1139,7 +1139,7 @@ VkImageView vk_dummy_depth_view(int textype) {
 // destroyed once the submissions that may use it are done), so changing render scales don't pile up images. Only the
 // image is kept: its view comes from the view table on each use, like a game target's (a cached handle could be
 // evicted from that table and destroyed under us). Called by the translating thread only (the render thread, or the
-// game's GPU thread with LARECOMP_RENDER_THREAD=0), as vk_dummy_view and the view table are.
+// game's GPU thread with SF2RECOMP_RENDER_THREAD=0), as vk_dummy_view and the view table are.
 VkImageView vk_dummy_color_view(uint32_t w, uint32_t h, uint32_t samples) {
     static TexBackend imgs[SF2C_TEXTURES_N_5_EF2D];  // samples 1, 2, 4, 8, 16
     int k = 0;
@@ -1207,14 +1207,14 @@ VkSampler vk_sampler(NvnSamplerDesc *d) {
     si.mipLodBias = d->lod_bias;
     if (d->max_aniso > 1) { si.anisotropyEnable = VK_TRUE; si.maxAnisotropy = fminf(d->max_aniso, SF2C_TEXTURES_N_16_B17E); }
     static float lodmin = -1;
-    if (lodmin < 0) lodmin = getenv(SF2C_TEXTURES_S_LARECOMP_LOD_MIN_4349) ? (float)atof(getenv(SF2C_TEXTURES_S_LARECOMP_LOD_MIN_4349)) : 0;
+    if (lodmin < 0) lodmin = getenv(SF2C_TEXTURES_S_SF2RECOMP_LOD_MIN_4349) ? (float)atof(getenv(SF2C_TEXTURES_S_SF2RECOMP_LOD_MIN_4349)) : 0;
     if (lodmin > 0 && mf > 1) si.minLod = fmaxf(si.minLod, lodmin);
     static int stest = -1;
-    if (stest < 0) stest = getenv(SF2C_TEXTURES_S_LARECOMP_SAMPLER_TEST_F5E0) != NULL;
+    if (stest < 0) stest = getenv(SF2C_TEXTURES_S_SF2RECOMP_SAMPLER_TEST_F5E0) != NULL;
     if (stest && mf > 1) { si.minLod = 0; si.maxLod = VK_LOD_CLAMP_NONE; si.anisotropyEnable = VK_TRUE; si.maxAnisotropy = SF2C_TEXTURES_N_16_B17E; }
     if (d->compare_mode) {
         si.compareEnable = VK_TRUE;
-        si.compareOp = getenv(SF2C_TEXTURES_S_LARECOMP_NO_SHADOW_1863) ? VK_COMPARE_OP_ALWAYS : compare_op(d->compare_func);
+        si.compareOp = getenv(SF2C_TEXTURES_S_SF2RECOMP_NO_SHADOW_1863) ? VK_COMPARE_OP_ALWAYS : compare_op(d->compare_func);
     }
     VkSamplerCustomBorderColorCreateInfoEXT cb = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CUSTOM_BORDER_COLOR_CREATE_INFO_EXT};
     if (border) {

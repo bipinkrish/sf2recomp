@@ -53,7 +53,7 @@ typedef struct ShaderFp {
 // Takes the fingerprint on first use, compares it after that. stage: "vs", "fs", "cs" (for the log)
 void shader_fp_check(ShaderFp *fp, const struct NvnShaderStage *s, const char *stage);
 
-// (LARECOMP_RECORD_KEYS, the player's own list) note a variant the game builds; cheap when recording is off
+// (SF2RECOMP_RECORD_KEYS, the player's own list) note a variant the game builds; cheap when recording is off
 bool shader_rec_recording(void);
 void shader_rec_note(const ShaderRec *r);
 

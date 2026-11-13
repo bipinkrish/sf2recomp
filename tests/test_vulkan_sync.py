@@ -89,7 +89,7 @@ static uint32_t settings_screen_width(uint32_t height) { assert(height == 1080);
         harness += function(textures, "static bool tex_scalable(")
         harness += r'''
 int main(void) {
-    unsetenv("LARECOMP_NO_SCALE");
+    unsetenv("SF2RECOMP_NO_SCALE");
     NvnTexture t = {.target=1, .samples=1, .flags=8, .width=1920, .height=1080};
     assert(tex_scalable(&t));
     // These CPU-uploaded 16:9 images used to shrink to a quarter of their

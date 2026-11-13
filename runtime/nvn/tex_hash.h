@@ -1,6 +1,6 @@
 #include "../constants/nvn.h"
 // Texture upload checks' hashes (vulkan/textures.c and metal.m upload_texture), written for this project.
-// LARECOMP_TEX_FASTHASH=0: each backend's previous hashes instead (A/B tests).
+// SF2RECOMP_TEX_FASTHASH=0: each backend's previous hashes instead (A/B tests).
 //
 // tex_hash_full: eight independent lanes, each a chain of bijective steps (xor the next word, multiply by an odd
 // constant, xor-shift), folded in order at the end. A change of any one 64-bit word always changes its lane, so it
@@ -68,9 +68,9 @@ static inline uint64_t tex_hash_sample(const uint8_t *p, uint64_t n) {
     return r ^ (r >> SF2C_TEX_HASH_N_31_EB1E);
 }
 
-// LARECOMP_TEX_FASTHASH (default on)
+// SF2RECOMP_TEX_FASTHASH (default on)
 static inline int tex_fast_hash(void) {
     static int on = -1;
-    if (on < 0) { const char *e = getenv(SF2C_TEX_HASH_S_LARECOMP_TEX_FASTHASH_365E); on = !e || atoi(e) != 0; }
+    if (on < 0) { const char *e = getenv(SF2C_TEX_HASH_S_SF2RECOMP_TEX_FASTHASH_365E); on = !e || atoi(e) != 0; }
     return on;
 }

@@ -33,7 +33,7 @@ bool plat_reset_guest(uint64_t lo, uint64_t hi);
 // Page size: *page.
 int plat_written_pages(uint64_t addr, uint64_t size, uint64_t *pages, int max, uint64_t *page);
 #ifdef __linux__
-void plat_write_tracking_off(const char *why);  // tracking off from now on (unless LARECOMP_WRITE_TRACKING=1)
+void plat_write_tracking_off(const char *why);  // tracking off from now on (unless SF2RECOMP_WRITE_TRACKING=1)
 #endif
 enum { PLAT_PROT_NONE = 0, PLAT_PROT_READ = 1, PLAT_PROT_RW = SF2C_PLATFORM_N_3_4E07 };
 int plat_protect(uint64_t addr, uint64_t size, int prot);  // 0 on success
@@ -49,7 +49,7 @@ int plat_cpu_count(void);  // logical cores this process may run on (its affinit
 void plat_thread_guest(int prio);  // a guest thread's host scheduling class from its Switch priority (lower = more urgent)
 uint64_t plat_thread_cpu_ns(void);  // the calling thread's CPU time so far (user + system; diagnostics)
 // The calling thread is one of the frame's critical threads: on Windows, no power throttling (EcoQoS) for it and, on a
-// hybrid CPU, a preference for the performance cores (selected CPU sets; LARECOMP_PCORE=0: off). Elsewhere a no-op.
+// hybrid CPU, a preference for the performance cores (selected CPU sets; SF2RECOMP_PCORE=0: off). Elsewhere a no-op.
 enum { PLAT_PERF_GAME, PLAT_PERF_RENDER, PLAT_PERF_VSYNC };
 #ifdef _WIN32
 void plat_thread_perf_core(int role);

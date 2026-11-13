@@ -74,7 +74,7 @@ void menu_mouse_event(const SDL_Event *e) {
     SDL_LockSpinlock(&mouse_lock);
     pending.x = x; pending.y = y;
     pending.width = width; pending.height = height;
-    if (ENV(SF2C_MOUSE_S_LARECOMP_MOUSE_TRACE_86DC) && e->type != SDL_EVENT_WINDOW_RESIZED)
+    if (ENV(SF2C_MOUSE_S_SF2RECOMP_MOUSE_TRACE_86DC) && e->type != SDL_EVENT_WINDOW_RESIZED)
         LOG(SF2C_MOUSE_S_MOUSE_SDL_EVENT_X_POSITION_1_B53F, e->type, x, y, width, height);
     if (e->type != SDL_EVENT_WINDOW_RESIZED) pending.active = true;
     if (e->type == SDL_EVENT_MOUSE_BUTTON_DOWN) {

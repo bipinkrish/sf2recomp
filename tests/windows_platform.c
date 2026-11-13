@@ -84,7 +84,7 @@ int main(int argc, char **argv) {
     char previous[4096], data[4096];
     assert(getcwd(previous, sizeof previous));
     snprintf(data, sizeof data, "%s/nested/Unicode-\xc3\xa9", file);
-    assert(!setenv("LARECOMP_DATA_ROOT", data, 1));
+    assert(!setenv("SF2RECOMP_DATA_ROOT", data, 1));
     assert(!setenv("SF2_CONFIG", "relative.ini", 1));
     rt_paths_init();
     assert(!strchr(rt_data_root(), '\\') && strstr(rt_data_root(), "Unicode-\xc3\xa9"));

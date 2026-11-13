@@ -77,7 +77,7 @@
 // runtime/services/am.c:63
 #define SF2C_AM_N_60_39FA 60
 // runtime/services/am.c:64
-#define SF2C_AM_S_LARECOMP_DISPLAY_W_2E79 "LARECOMP_DISPLAY_W"
+#define SF2C_AM_S_SF2RECOMP_DISPLAY_W_2E79 "SF2RECOMP_DISPLAY_W"
 // runtime/services/am.c:64
 #define SF2C_AM_N_1920_6B5F 1920
 // runtime/services/am.c:65
@@ -371,17 +371,17 @@
 // runtime/services/audio.c:436
 #define SF2C_AUDIO_N_12_6B51 12
 // runtime/services/audio.c:443
-#define SF2C_AUDIO_S_LARECOMP_AUDIO_LOG_866C "LARECOMP_AUDIO_LOG"
+#define SF2C_AUDIO_S_SF2RECOMP_AUDIO_LOG_866C "SF2RECOMP_AUDIO_LOG"
 // runtime/services/audio.c:444
 #define SF2C_AUDIO_S_AUDREN_REVERB_INIT_CH_U_RATE_307A "[audren] reverb init: ch %u rate %d early %d/%d pre %d late %d/%d decay %d hf %d col %d gains %d/%d/%d\n"
 // runtime/services/audio.c:449
 #define SF2C_AUDIO_N_0X40_1AF3 0x40
 // runtime/services/audio.c:472
-#define SF2C_AUDIO_S_LARECOMP_NO_REVERB_0417 "LARECOMP_NO_REVERB"
+#define SF2C_AUDIO_S_SF2RECOMP_NO_REVERB_0417 "SF2RECOMP_NO_REVERB"
 // runtime/services/audio.c:474
-#define SF2C_AUDIO_S_LARECOMP_REVERB_TOGGLE_C8DB "LARECOMP_REVERB_TOGGLE"
+#define SF2C_AUDIO_S_SF2RECOMP_REVERB_TOGGLE_C8DB "SF2RECOMP_REVERB_TOGGLE"
 // runtime/services/audio.c:487
-#define SF2C_AUDIO_S_LARECOMP_AUDIO_HF_BDB2 "LARECOMP_AUDIO_HF"
+#define SF2C_AUDIO_S_SF2RECOMP_AUDIO_HF_BDB2 "SF2RECOMP_AUDIO_HF"
 // runtime/services/audio.c:491
 #define SF2C_AUDIO_N_4096_8B92 4096
 // runtime/services/audio.c:519
@@ -391,7 +391,7 @@
 // runtime/services/audio.c:539
 #define SF2C_AUDIO_N_19582_0_2495 19582.0
 // runtime/services/audio.c:546
-#define SF2C_AUDIO_S_LARECOMP_AUDIO_SOLO_74D4 "LARECOMP_AUDIO_SOLO"
+#define SF2C_AUDIO_S_SF2RECOMP_AUDIO_SOLO_74D4 "SF2RECOMP_AUDIO_SOLO"
 // runtime/services/audio.c:562
 #define SF2C_AUDIO_N_200_27BA 200
 // runtime/services/audio.c:563
@@ -407,7 +407,7 @@
 // runtime/services/audio.c:608
 #define SF2C_AUDIO_N_0_251F_84A9 0.251f
 // runtime/services/audio.c:619
-#define SF2C_AUDIO_S_LARECOMP_AUDIO_GAIN_1F0B "LARECOMP_AUDIO_GAIN"
+#define SF2C_AUDIO_S_SF2RECOMP_AUDIO_GAIN_1F0B "SF2RECOMP_AUDIO_GAIN"
 // runtime/services/audio.c:626
 #define SF2C_AUDIO_N_0X46464952_D2A4 0x46464952
 // runtime/services/audio.c:626
@@ -471,7 +471,7 @@
 // runtime/services/audio.c:752
 #define SF2C_AUDIO_CH_0_59A9 '0'
 // runtime/services/audio.c:758
-#define SF2C_AUDIO_S_LARECOMP_AUDIO_DUMPWB_5E0C "LARECOMP_AUDIO_DUMPWB"
+#define SF2C_AUDIO_S_SF2RECOMP_AUDIO_DUMPWB_5E0C "SF2RECOMP_AUDIO_DUMPWB"
 // runtime/services/audio.c:758
 #define SF2C_AUDIO_N_0X100000_0A2A 0x100000
 // runtime/services/audio.c:760
@@ -503,7 +503,7 @@
 // runtime/services/audio.c:813
 #define SF2C_AUDIO_S_D_D_3F_C146 " %d>%d=%.3f"
 // runtime/services/audio.c:829
-#define SF2C_AUDIO_S_LARECOMP_AUDIO_DUMP_E9E4 "LARECOMP_AUDIO_DUMP"
+#define SF2C_AUDIO_S_SF2RECOMP_AUDIO_DUMP_E9E4 "SF2RECOMP_AUDIO_DUMP"
 // runtime/services/audio.c:831
 #define SF2C_AUDIO_N_300_983B 300
 // runtime/services/audio.c:831
@@ -553,9 +553,9 @@
 // runtime/services/audio.c:931
 #define SF2C_AUDIO_N_0XB0_497E 0xB0
 // runtime/services/audio.c:941
-#define SF2C_AUDIO_S_LARECOMP_AUDIO_WAV_F745 "LARECOMP_AUDIO_WAV"
+#define SF2C_AUDIO_S_SF2RECOMP_AUDIO_WAV_F745 "SF2RECOMP_AUDIO_WAV"
 // runtime/services/audio.c:945
-#define SF2C_AUDIO_S_LARECOMP_NO_AUDIO_8230 "LARECOMP_NO_AUDIO"
+#define SF2C_AUDIO_S_SF2RECOMP_NO_AUDIO_8230 "SF2RECOMP_NO_AUDIO"
 // runtime/services/audio.c:945
 #define SF2C_AUDIO_S_0_9808 "0"
 // runtime/services/audio.c:946
@@ -601,7 +601,7 @@
 // runtime/services/audio.c:1239
 #define SF2C_AUDIO_S_DEVICEOUT_BC5C "DeviceOut"
 // runtime/services/audio.c:1252
-#define SF2C_AUDIO_S_LARECOMP_AUDOUT_WAV_7222 "LARECOMP_AUDOUT_WAV"
+#define SF2C_AUDIO_S_SF2RECOMP_AUDOUT_WAV_7222 "SF2RECOMP_AUDOUT_WAV"
 // runtime/services/audio.c:1270
 #define SF2C_AUDIO_S_IAUDIOOUT_AA39 "IAudioOut"
 // runtime/services/audio.c:1273
@@ -659,7 +659,7 @@
 // runtime/services/fs.c:230
 #define SF2C_FS_S_FS_STORAGE_READ_FAILED_AT_LL_A2A4 "[fs] storage read failed at %llx: %s\n"
 // runtime/services/fs.c:236
-#define SF2C_FS_S_LARECOMP_LOG_FILES_4421 "LARECOMP_LOG_FILES"
+#define SF2C_FS_S_SF2RECOMP_LOG_FILES_4421 "SF2RECOMP_LOG_FILES"
 // runtime/services/fs.c:236
 #define SF2C_FS_S_FS_READ_S_N_E4E9 "[fs] read %s\n"
 // runtime/services/fs.c:242

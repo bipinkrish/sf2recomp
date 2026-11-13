@@ -100,7 +100,7 @@ int main(void) {
     g_vk.managed_heap = true; vk_guest_heap_preload(); g_vk.managed_heap = false;
     g_vk.host_import = false; vk_guest_heap_preload(); g_vk.host_import = true;
     gc_lazy = true; vk_guest_heap_preload(); gc_lazy = false;
-    setenv("LARECOMP_VK_NO_GMEM", "1", 1); vk_guest_heap_preload(); unsetenv("LARECOMP_VK_NO_GMEM");
+    setenv("SF2RECOMP_VK_NO_GMEM", "1", 1); vk_guest_heap_preload(); unsetenv("SF2RECOMP_VK_NO_GMEM");
     heap_size = 0; vk_guest_heap_preload(); heap_size = 4096;
     gmem_buf = 1; vk_guest_heap_preload(); gmem_buf = 0;
     assert(imports == before && !gmem_preload.started);

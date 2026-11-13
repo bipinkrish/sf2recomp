@@ -128,7 +128,7 @@ separate.
 `[storage] save_directory` is read on each launch. It accepts an absolute path
 or a path relative to the writable data root (normally the converted game folder).
 Quote spaces; `~` and environment-variable expressions are literal, not expanded.
-`LARECOMP_SAVE_DIR` overrides it for a session. The chosen folder contains
+`SF2RECOMP_SAVE_DIR` overrides it for a session. The chosen folder contains
 `save_0/userdata/users.xml`, settings and any other mounted slots. To import an
 existing `userdata/` backup, copy it under `<save_directory>/save_0/`; keep your
 original backup untouched. The SD-card mount, when used, is separate under
@@ -326,8 +326,8 @@ also accept a left-click to select and confirm the active player's choice.
 In LAN, each computer's clicks control only its own player and are synchronized
 with the peer. Equipment confirmation continues through the native controls.
 
-For input diagnostics, `LARECOMP_MOUSE_TRACE=1` logs SDL pointer events and their
-mapped Unity coordinates. Scripted runs can use `LARECOMP_HOST_INPUT` entries such
+For input diagnostics, `SF2RECOMP_MOUSE_TRACE=1` logs SDL pointer events and their
+mapped Unity coordinates. Scripted runs can use `SF2RECOMP_HOST_INPUT` entries such
 as `180:mouse:at/640/415,220:mouse:click`; coordinates are window points. `down` and
 `up` can replace `click` to test dragging.
 
@@ -335,9 +335,10 @@ as `180:mouse:at/640/415,220:mouse:click`; coordinates are window points. `down`
 
 `language = auto` follows the system locale. `SF2_CONFIG=/path/to/custom.ini`
 selects another INI; relative overrides are resolved against the launch directory.
-Precedence is built-in defaults, then INI, then existing `LARECOMP_*` session
-overrides. Saves/caches/logs live beside the executable by default;
-`LARECOMP_DATA_ROOT` or `LARECOMP_DATA_HOME` selects another writable state folder.
+Precedence is built-in defaults, then INI, then `SF2RECOMP_*` session
+overrides. Update existing launch options and scripts to use this prefix after
+rebuilding. Saves, caches, and logs live beside the executable by default.
+`SF2RECOMP_DATA_ROOT` or `SF2RECOMP_DATA_HOME` selects another writable state folder.
 These overrides do not move the default executable-side INI.
 
 ## Controller prompts and intro playback
@@ -454,12 +455,12 @@ allocation and reports that lower memory budget to the game.
 To try the staged path on Steam Deck, set this in the game's Steam launch options:
 
 ```text
-LARECOMP_VK_GUEST_HEAP=staged %command%
+SF2RECOMP_VK_GUEST_HEAP=staged %command%
 ```
 
 Staging keeps the original guest memory budget and uploads the data needed for
 each draw. It checks for shaders that require direct access to guest memory.
-If the log reports such a shader, use `LARECOMP_VK_GUEST_HEAP=managed %command%`
+If the log reports such a shader, use `SF2RECOMP_VK_GUEST_HEAP=managed %command%`
 to select the 2,560 MiB compatibility mode on Linux.
 
 ## Software Vulkan fallback
@@ -467,7 +468,7 @@ to select the 2,560 MiB compatibility mode on Linux.
 From the converted output folder:
 
 ```sh
-SDL_VIDEODRIVER=x11 LARECOMP_VK_NO_GMEM=1 \
+SDL_VIDEODRIVER=x11 SF2RECOMP_VK_NO_GMEM=1 \
   VK_DRIVER_FILES=/usr/share/vulkan/icd.d/lvp_icd.json ./sf2
 ```
 

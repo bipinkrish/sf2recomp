@@ -52,7 +52,7 @@ static void *notify(void *arg) {
     return NULL;
 }
 int main(void) {
-    unsetenv("LARECOMP_DEBUG_CV_LATE_WAIT");ktrace_on=0;
+    unsetenv("SF2RECOMP_DEBUG_CV_LATE_WAIT");ktrace_on=0;
     KThread waiter={.handle=0x101,.id=1},notifier={.handle=0x102,.id=2};
     pthread_cond_init(&waiter.cond,NULL);pthread_cond_init(&notifier.cond,NULL);
     for(int i=0;i<1000;++i) {

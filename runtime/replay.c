@@ -596,7 +596,7 @@ void replay_gui_start(void) {
     memcpy(match_indices,cfg->match,sizeof match_indices);
     hash_file=tmpfile();if(!hash_file)fail(SF2C_REPLAY_S_CANNOT_CREATE_COMBAT_CHECKPO_7D0D);
     trace=hash_file;
-    const char *directory=getenv(SF2C_REPLAY_S_LARECOMP_LAN_TRACE_DIR_236B);
+    const char *directory=getenv(SF2C_REPLAY_S_SF2RECOMP_LAN_TRACE_DIR_236B);
     if(directory && *directory) {
         static unsigned serial;
         char path[SF2C_REPLAY_N_1024_E39E];if(snprintf(path,sizeof path,SF2C_REPLAY_S_S_MATCH_U_JSONL_F685,directory,serial++)>=(int)sizeof path)fail(SF2C_REPLAY_S_TRACE_PATH_IS_TOO_LONG_DCE0);

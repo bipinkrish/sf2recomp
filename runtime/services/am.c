@@ -62,7 +62,7 @@ static void common_state_getter(Service *s, IpcReq *req, IpcResp *resp) {
     case SF2C_AM_N_9_1958: OUT(uint8_t, 0) = 1; resp_size(resp, 1); break;   // GetCurrentFocusState: in focus
     case SF2C_AM_N_13_3FDB: case SF2C_AM_N_61_D029: resp->copy_handles[resp->ncopy++] = new_event(); break;
     case SF2C_AM_N_60_39FA: {  // GetDefaultDisplayResolution
-        int w = getenv(SF2C_AM_S_LARECOMP_DISPLAY_W_2E79) ? atoi(getenv(SF2C_AM_S_LARECOMP_DISPLAY_W_2E79)) : SF2C_AM_N_1920_6B5F;
+        int w = getenv(SF2C_AM_S_SF2RECOMP_DISPLAY_W_2E79) ? atoi(getenv(SF2C_AM_S_SF2RECOMP_DISPLAY_W_2E79)) : SF2C_AM_N_1920_6B5F;
         LOG(SF2C_AM_S_AM_GETDEFAULTDISPLAYRESOLUTI_50D3, w);
         OUT(int32_t, 0) = w; OUT(int32_t, SF2C_AM_N_4_4B22) = SF2C_AM_N_1080_32EB; resp_size(resp, SF2C_AM_N_8_2C62); break;
     }

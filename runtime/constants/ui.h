@@ -17,7 +17,7 @@
 // runtime/ui/mouse.c:56
 #define SF2C_MOUSE_N_0X7E57U_3EAD 0x7E57u
 // runtime/ui/mouse.c:76
-#define SF2C_MOUSE_S_LARECOMP_MOUSE_TRACE_86DC "LARECOMP_MOUSE_TRACE"
+#define SF2C_MOUSE_S_SF2RECOMP_MOUSE_TRACE_86DC "SF2RECOMP_MOUSE_TRACE"
 // runtime/ui/mouse.c:77
 #define SF2C_MOUSE_S_MOUSE_SDL_EVENT_X_POSITION_1_B53F "[mouse] SDL event %x position %.1f/%.1f window %dx%d\n"
 // runtime/ui/mouse.c:96

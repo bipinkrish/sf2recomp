@@ -143,10 +143,10 @@ RT_ON_RESET(input_rumble_reset) {
     input_rumble_permit(true);
 }
 
-// Host keys / buttons held by a test script (LARECOMP_HOST_INPUT, input_frame): they go through the bindings
+// Host keys / buttons held by a test script (SF2RECOMP_HOST_INPUT, input_frame): they go through the bindings
 static uint8_t test_keys[SDL_SCANCODE_COUNT];
 static _Atomic uint32_t test_pad;
-static _Atomic int32_t test_lx, test_ly;  // (a resting stick's drift: "lstick" in LARECOMP_HOST_INPUT)
+static _Atomic int32_t test_lx, test_ly;  // (a resting stick's drift: "lstick" in SF2RECOMP_HOST_INPUT)
 
 static int held_key(int sc) { return sc > 0 && sc < SDL_SCANCODE_COUNT && (keys_down[sc] || test_keys[sc]); }
 
@@ -247,7 +247,7 @@ void input_reset(void) {
 
 volatile int g_debug_frame_request;  // F9: dump the next frame's passes (build/pass_*.png) + draw log
 
-// Events a test pushes (LARECOMP_HOST_INPUT type: / sdlkey: / sdlpad: / mouse:) carry this device id: they go the whole way, menu first.
+// Events a test pushes (SF2RECOMP_HOST_INPUT type: / sdlkey: / sdlpad: / mouse:) carry this device id: they go the whole way, menu first.
 #define TEST_DEVICE SF2C_INPUT_TEST_DEVICE
 static bool test_event(const SDL_Event *e) {
     switch (e->type) {
@@ -261,18 +261,18 @@ static bool test_event(const SDL_Event *e) {
 }
 
 // Scripted test runs ignore the user's own input (a key or stick touched while a test drives the game spoils it):
-// LARECOMP_NO_USER_INPUT=1, on by default whenever LARECOMP_INPUT / LARECOMP_DOORJUMP_TEST / LARECOMP_PLACE is set
-// (or LARECOMP_HOST_INPUT / LARECOMP_BIND_TEST; LARECOMP_NO_USER_INPUT=0 lets it through again).
+// SF2RECOMP_NO_USER_INPUT=1, on by default whenever SF2RECOMP_INPUT / SF2RECOMP_DOORJUMP_TEST / SF2RECOMP_PLACE is set
+// (or SF2RECOMP_HOST_INPUT / SF2RECOMP_BIND_TEST; SF2RECOMP_NO_USER_INPUT=0 lets it through again).
 bool input_user_blocked(const SDL_Event *e) {
     static int on = -1;
     if (on < 0) {
-        const char *v = getenv(SF2C_INPUT_S_LARECOMP_NO_USER_INPUT_EB20);
-        on = v ? atoi(v) != 0 : (getenv(SF2C_INPUT_S_LARECOMP_INPUT_D0A3) || getenv(SF2C_INPUT_S_LARECOMP_DOORJUMP_TEST_AF02) || getenv(SF2C_INPUT_S_LARECOMP_PLACE_61F0) ||
-                                 getenv(SF2C_INPUT_S_LARECOMP_HOST_INPUT_8D91) || getenv(SF2C_INPUT_S_LARECOMP_BIND_TEST_C2F2));
+        const char *v = getenv(SF2C_INPUT_S_SF2RECOMP_NO_USER_INPUT_EB20);
+        on = v ? atoi(v) != 0 : (getenv(SF2C_INPUT_S_SF2RECOMP_INPUT_D0A3) || getenv(SF2C_INPUT_S_SF2RECOMP_DOORJUMP_TEST_AF02) || getenv(SF2C_INPUT_S_SF2RECOMP_PLACE_61F0) ||
+                                 getenv(SF2C_INPUT_S_SF2RECOMP_HOST_INPUT_8D91) || getenv(SF2C_INPUT_S_SF2RECOMP_BIND_TEST_C2F2));
         if (on) LOG(SF2C_INPUT_S_INPUT_SCRIPTED_RUN_KEYBOARD__420D);
     }
     if (!on) return false;
-    if (test_event(e)) return false;  // (LARECOMP_HOST_INPUT type: / sdlkey: / sdlpad: - the test's own presses)
+    if (test_event(e)) return false;  // (SF2RECOMP_HOST_INPUT type: / sdlkey: / sdlpad: - the test's own presses)
     switch (e->type) {
     case SDL_EVENT_KEY_DOWN: case SDL_EVENT_KEY_UP: case SDL_EVENT_TEXT_INPUT: case SDL_EVENT_TEXT_EDITING:
     case SDL_EVENT_MOUSE_MOTION: case SDL_EVENT_MOUSE_BUTTON_DOWN: case SDL_EVENT_MOUSE_BUTTON_UP:
@@ -347,7 +347,7 @@ void input_load_user_mappings(void) {
 
 // Controller family for input labels and menus: 0 Nintendo / none, 1 Xbox
 // (and every other pad SDL labels like one: generic / third-party pads with A on the bottom), 2 PlayStation.
-// LARECOMP_PAD_TYPE=xbox|playstation|nintendo pretends one is attached (tests).
+// SF2RECOMP_PAD_TYPE=xbox|playstation|nintendo pretends one is attached (tests).
 // By SDL's own face-button labels for the type: the bottom button reads B on Nintendo pads, A on Xbox-style ones,
 // Cross on PlayStation ones.
 int input_family_of_type(int type) {
@@ -367,7 +367,7 @@ static void note_family(void) {
 int input_pad_family(void) {
     static int env = -SF2C_INPUT_N_2_D473;
     if (env == -SF2C_INPUT_N_2_D473) {
-        const char *e = getenv(SF2C_INPUT_S_LARECOMP_PAD_TYPE_2AEC);
+        const char *e = getenv(SF2C_INPUT_S_SF2RECOMP_PAD_TYPE_2AEC);
         env = !e ? -1 : !strcmp(e, SF2C_INPUT_S_XBOX_76AE) ? 1 : !strcmp(e, SF2C_INPUT_S_PLAYSTATION_15B2) || !strcmp(e, SF2C_INPUT_S_PS_5831) ? SF2C_INPUT_N_2_D473 : 0;
     }
     return env >= 0 ? env : pad_family;
@@ -385,7 +385,7 @@ int input_menu_family(SDL_JoystickID which) {
     case PROMPTS_PLAYSTATION: return SF2C_INPUT_N_2_D473;
     default: break;
     }
-    if (getenv(SF2C_INPUT_S_LARECOMP_PAD_TYPE_2AEC)) return input_pad_family();
+    if (getenv(SF2C_INPUT_S_SF2RECOMP_PAD_TYPE_2AEC)) return input_pad_family();
     if (which && SDL_IsGamepad(which)) return input_family_of_type(SDL_GetGamepadTypeForID(which));
     return bind_label_family();
 }
@@ -536,14 +536,14 @@ void input_handle_event(const SDL_Event *e) {
     }
 }
 
-// Scripted input for testing: LARECOMP_INPUT="frame:BUTTON:frames,..." (BUTTON = A,B,X,Y,L,R,ZL,ZR,PLUS,
+// Scripted input for testing: SF2RECOMP_INPUT="frame:BUTTON:frames,..." (BUTTON = A,B,X,Y,L,R,ZL,ZR,PLUS,
 // MINUS,LEFT,UP,RIGHT,DOWN, or STICK_UP/DOWN/LEFT/RIGHT, RSTICK_UP/DOWN/LEFT/RIGHT, STICK_<degrees>: full tilt at
 // that angle, 0 = right, 90 = up).
 static _Atomic uint64_t script_buttons;
 static _Atomic int32_t script_lx, script_ly, script_rx, script_ry;
 
 // Tests of the bindings, through them like a real player:
-// LARECOMP_HOST_INPUT="frame:key:<SDL key name>:frames,frame:pad:<button>:frames,..." holds a host key / controller
+// SF2RECOMP_HOST_INPUT="frame:key:<SDL key name>:frames,frame:pad:<button>:frames,..." holds a host key / controller
 //   button (names as in sf2recomp.ini control sections: "Z", "Keypad 0", "south", "ltrigger"...);
 //   "frame:lstick:<x>/<y>:frames" holds the controller's left stick there (raw SDL units, y up: a drifting stick).
 // "frame:type:<text>" types <text> as real key events (down, text, up per character), through the overlay menu / name
@@ -554,7 +554,7 @@ static _Atomic int32_t script_lx, script_ly, script_rx, script_ry;
 // "frame:mouse:click" taps; "down" / "up" hold/release left (real SDL events).
 // "frame:shot:<name>" saves the window (game + menus) to build/<name>.png.
 // "frame:resize:<W>x<H>" resizes the window to W x H points (menu_apply_window_requests: the main thread).
-// LARECOMP_BIND_TEST="frame:pad|key:<input>:<host>,..." starts a rebind capture of <input> (bind_* name: a, zl,
+// SF2RECOMP_BIND_TEST="frame:pad|key:<input>:<host>,..." starts a rebind capture of <input> (bind_* name: a, zl,
 //   ls_up...) at that frame (the Controls tab shows it waiting) and presses <host> 90 frames later ("esc" cancels,
 //   "wait" lets it time out); "frame:reset:pad|key" resets to the defaults.
 static void push_key(SDL_Scancode sc, SDL_Keymod mod, bool down) {
@@ -650,13 +650,13 @@ static void test_push(uint64_t frame, unsigned long start, unsigned long len, co
 static void host_test_frame(uint64_t frame) {
     static const char *hspec, *bspec;
     static int init;
-    if (!init) { init = 1; hspec = getenv(SF2C_INPUT_S_LARECOMP_HOST_INPUT_8D91); bspec = getenv(SF2C_INPUT_S_LARECOMP_BIND_TEST_C2F2); host_test = hspec; }
+    if (!init) { init = 1; hspec = getenv(SF2C_INPUT_S_SF2RECOMP_HOST_INPUT_8D91); bspec = getenv(SF2C_INPUT_S_SF2RECOMP_BIND_TEST_C2F2); host_test = hspec; }
     // Developer UI automation can append future SDL events while a real match
     // is running. The converted game never needs this file or an interpreter.
     static const char *script_file;
     static bool file_checked;
     static char *file_script;
-    if(!file_checked) { file_checked=true;script_file=getenv(SF2C_INPUT_S_LARECOMP_HOST_INPUT_FILE_D436); }
+    if(!file_checked) { file_checked=true;script_file=getenv(SF2C_INPUT_S_SF2RECOMP_HOST_INPUT_FILE_D436); }
     if(script_file) {
         if(!file_script)file_script=malloc(SF2C_INPUT_N_65537_D572);
         FILE *file=fopen(script_file,SF2C_INPUT_S_RB_46CA);
@@ -741,7 +741,7 @@ volatile int g_inject_plus;  // frames to hold Plus for the game (developer inpu
 RT_ON_RESET(input_reboot_reset) { g_pad_obj = 0; g_inject_plus = 0; }  // (reboot: the controller object was guest memory)
 void input_frame(uint64_t frame) {
     atomic_store(&rumble_frame_ms, SDL_GetTicks());
-    if (g_pad_obj && getenv(SF2C_INPUT_S_LARECOMP_DUMP_PAD_10A5) && frame % SF2C_INPUT_N_600_284B == 0) {
+    if (g_pad_obj && getenv(SF2C_INPUT_S_SF2RECOMP_DUMP_PAD_10A5) && frame % SF2C_INPUT_N_600_284B == 0) {
         const uint8_t *m = (const uint8_t *)(uintptr_t)(g_pad_obj - SF2C_INPUT_N_0X98_14A1);
         LOG(SF2C_INPUT_S_PAD_MGR_LLX_4E0_U_4E4_U_4E8__7E44, g_pad_obj - SF2C_INPUT_N_0X98_14A1,
             *(uint32_t *)(m + SF2C_INPUT_N_0X4E0_5731), *(uint32_t *)(m + SF2C_INPUT_N_0X4E4_8500), *(uint32_t *)(m + SF2C_INPUT_N_0X4E8_E512), *(uint32_t *)(m + SF2C_INPUT_N_0X548_9D5D),
@@ -757,7 +757,7 @@ void input_frame(uint64_t frame) {
     extern void watch_arm(void);
     watch_arm();
     host_test_frame(frame);
-    const char *spec = getenv(SF2C_INPUT_S_LARECOMP_INPUT_D0A3);
+    const char *spec = getenv(SF2C_INPUT_S_SF2RECOMP_INPUT_D0A3);
     if (!spec) return;
     static const char *const names[] = {SF2C_INPUT_S_A_7986, SF2C_INPUT_S_B_955C, SF2C_INPUT_S_X_DE9E, SF2C_INPUT_S_Y_DB5B, SF2C_INPUT_S_LSTICK_69E3, SF2C_INPUT_S_RSTICK_E134, SF2C_INPUT_S_L_8463, SF2C_INPUT_S_R_D742, SF2C_INPUT_S_ZL_38D1, SF2C_INPUT_S_ZR_5317, SF2C_INPUT_S_PLUS_7BAB,
                                         SF2C_INPUT_S_MINUS_0698, SF2C_INPUT_S_LEFT_251C, SF2C_INPUT_S_UP_DC56, SF2C_INPUT_S_RIGHT_1DD8, SF2C_INPUT_S_DOWN_31A3};
@@ -848,7 +848,7 @@ static void fill_state(Cpu *c) {
         uint64_t t = atomic_exchange(&tap_buttons[player], 0), f = renderer_present_count();
         if (t) {
             tap[player] |= t, tap_frame[player] = f;
-            if (getenv(SF2C_INPUT_S_LARECOMP_INPUT_D0A3)) LOG(SF2C_INPUT_S_INPUT_SHORT_PRESS_LLX_N_25D6, (unsigned long long)t);
+            if (getenv(SF2C_INPUT_S_SF2RECOMP_INPUT_D0A3)) LOG(SF2C_INPUT_S_INPUT_SHORT_PRESS_LLX_N_25D6, (unsigned long long)t);
         } else if (f > tap_frame[player]) tap[player] = 0;
     }
     uint64_t scripted_buttons = player == 0 ? script_buttons & ~consumed : 0;
@@ -886,7 +886,7 @@ static void fill_state(Cpu *c) {
     if (ry < -SF2C_INPUT_N_16000_2570) b |= SF2C_INPUT_N_1ULL_622E << SF2C_INPUT_N_23_535F;
 
     *(uint64_t *)(s + SF2C_INPUT_N_8_2C62) = b;
-    if (b != last_b[player] && getenv(SF2C_INPUT_S_LARECOMP_INPUT_D0A3))
+    if (b != last_b[player] && getenv(SF2C_INPUT_S_SF2RECOMP_INPUT_D0A3))
         LOG(SF2C_INPUT_S_INPUT_ID_X_BUTTONS_LLX_SAMPL_47C5, id, (unsigned long long)b,
             (long long)sampling, c->x[SF2C_INPUT_N_30_624B]);
     last_b[player] = b;

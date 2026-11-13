@@ -37,10 +37,10 @@ def configure(args,output):
     return config
 
 def environment(args,output,config):
-    env={k:v for k,v in os.environ.items() if not k.startswith((K.S_SF2_LAN_17C4,K.S_SF2_REPLAY_DA3E,K.S_LARECOMP_B959))}
-    env.update(SF2_CONFIG=str(config),LARECOMP_DATA_ROOT=str(output),LARECOMP_DATA_HOME=str(output),
-               SF2_LAN_PORT=str(args.port),LARECOMP_RENDER_THREAD=K.S_1_9A76,
-               LARECOMP_INPUT=K.S_EMPTY_EE1B.join(f'{round(t*args.fps/K.N_60_39FA)}:{key}:{max(K.N_2_D473,round(K.N_8_2C62*args.fps/K.N_60_39FA))}' for t,key in MENU))
+    env={k:v for k,v in os.environ.items() if not k.startswith((K.S_SF2_LAN_17C4,K.S_SF2_REPLAY_DA3E,K.S_SF2RECOMP_B959))}
+    env.update(SF2_CONFIG=str(config),SF2RECOMP_DATA_ROOT=str(output),SF2RECOMP_DATA_HOME=str(output),
+               SF2_LAN_PORT=str(args.port),SF2RECOMP_RENDER_THREAD=K.S_1_9A76,
+               SF2RECOMP_INPUT=K.S_EMPTY_EE1B.join(f'{round(t*args.fps/K.N_60_39FA)}:{key}:{max(K.N_2_D473,round(K.N_8_2C62*args.fps/K.N_60_39FA))}' for t,key in MENU))
     if args.role==K.S_HOST_E293:
         env.update(SF2_LAN_HOST=args.bind,SF2_LAN_MATCH=args.match,SF2_LAN_DELAY=str(args.delay))
         if args.seed is not None:env[K.S_SF2_LAN_SEED_2218]=str(args.seed)
@@ -48,7 +48,7 @@ def environment(args,output,config):
     if args.ticks is not None:
         env.update(SF2_REPLAY_TICKS=str(args.ticks),SF2_REPLAY_TRACE=str(output/K.S_TRACE_JSONL_FB9A))
     if args.input_tape is not None:env[K.S_SF2_REPLAY_INPUT_2230]=str(args.input_tape.resolve(strict=True))
-    if args.hidden:env.update(LARECOMP_HIDDEN=K.S_1_9A76,LARECOMP_NO_USER_INPUT=K.S_1_9A76,LARECOMP_WINDOW=K.S_960X540_9D0F)
+    if args.hidden:env.update(SF2RECOMP_HIDDEN=K.S_1_9A76,SF2RECOMP_NO_USER_INPUT=K.S_1_9A76,SF2RECOMP_WINDOW=K.S_960X540_9D0F)
     if args.icd:
         env[K.S_VK_DRIVER_FILES_B081]=str(args.icd.resolve(strict=True))
         if K.S_NVIDIA_7F25 in env[K.S_VK_DRIVER_FILES_B081]:env[K.S_NV_PRIME_RENDER_OFFLOAD_E67F]=K.S_1_9A76
@@ -96,7 +96,7 @@ def main(argv=None):
     try:config=configure(args,output)
     except ValueError as error:p.error(str(error))
     env=environment(args,output,config)
-    (output/K.S_ENVIRONMENT_JSON_64EE).write_text(json.dumps({k:v for k,v in env.items() if k.startswith((K.S_SF2_8749,K.S_LARECOMP_B959,K.S_VK_6B79))},indent=K.N_2_D473)+K.S_N_AD65)
+    (output/K.S_ENVIRONMENT_JSON_64EE).write_text(json.dumps({k:v for k,v in env.items() if k.startswith((K.S_SF2_8749,K.S_SF2RECOMP_B959,K.S_VK_6B79))},indent=K.N_2_D473)+K.S_N_AD65)
     print(f'LAN {args.role}: private session {output}',flush=True)
     print(K.S_USE_YOUR_NORMAL_PLAYER_1_KEY_3C3B,flush=True)
     try:return subprocess.call([str(args.binary),str(args.game)],cwd=output,env=env)

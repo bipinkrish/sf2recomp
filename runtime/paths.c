@@ -64,8 +64,8 @@ static bool mkdirs(const char *path) {
 }
 
 bool rt_data_root_early(char *out, size_t size) {
-    const char *root = getenv(SF2C_PATHS_S_LARECOMP_DATA_ROOT_B22A);
-    if (!root || !*root) root = getenv(SF2C_PATHS_S_LARECOMP_DATA_HOME_1E74);
+    const char *root = getenv(SF2C_PATHS_S_SF2RECOMP_DATA_ROOT_B22A);
+    if (!root || !*root) root = getenv(SF2C_PATHS_S_SF2RECOMP_DATA_HOME_1E74);
     return root && *root ? absolute_path(root, out, size) : executable_dir(out, size);
 }
 

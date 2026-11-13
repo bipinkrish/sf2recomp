@@ -92,7 +92,7 @@ typedef struct {
 extern uint64_t maxwell_gmem_base, maxwell_gmem_size;
 // (GLSL / Vulkan) The heap reaches shaders in chunks of 1 << maxwell_gmem_chunk_shift bytes in two cases:
 // - windows of one import where a storage buffer can't span the heap (issue #8) and lazy chunks aren't possible (or
-//   LARECOMP_VK_GMEM_LAZY=0): one binding per window (GMEM_CHUNK_BINDING + k in set GMEM_CHUNK_SET) and plain
+//   SF2RECOMP_VK_GMEM_LAZY=0): one binding per window (GMEM_CHUNK_BINDING + k in set GMEM_CHUNK_SET) and plain
 //   branches, each word picking its own window (a wide access over a window's end reads both);
 // - chunks imported as the game binds them (AMD APUs, Intel: vulkan/exec.c gmem_lazy; maxwell_gmem_lazy): the shader takes
 //   the chunk's device address and size from a table (GChunks, binding 0) and goes through a buffer reference after
@@ -105,7 +105,7 @@ extern uint32_t maxwell_gmem_chunk_shift;
 extern bool maxwell_gmem_lazy;
 // Lazy mode, fragment: a shader without discard / depth output / stores declares early fragment tests (its GMiss
 // atomics would turn them off); one with discard / depth output (no stores) counts no misses - the
-// runtime imports the bound storage buffers' chunks before the draw. true (LARECOMP_VK_GMEM_FS_MISS=1): every shader
+// runtime imports the bound storage buffers' chunks before the draw. true (SF2RECOMP_VK_GMEM_FS_MISS=1): every shader
 // counts, none declares early tests.
 extern bool maxwell_gmem_fs_miss;
 // Lazy mode, vertex / fragment: the chunks under the draw's storage buffers (where the heap reads are) come as push

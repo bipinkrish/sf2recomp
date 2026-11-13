@@ -217,7 +217,7 @@
 // runtime/dispatch.c:39
 #define SF2C_DISPATCH_S_HLE_Z_14B5 ".hle$z"
 // runtime/dispatch.c:44
-#define SF2C_DISPATCH_S_LARECOMP_HLE_SKIP_8648 "LARECOMP_HLE_SKIP"
+#define SF2C_DISPATCH_S_SF2RECOMP_HLE_SKIP_8648 "SF2RECOMP_HLE_SKIP"
 // runtime/dispatch.c:47
 #define SF2C_DISPATCH_S_EMPTY_12AE ""
 // runtime/dispatch.c:47
@@ -299,7 +299,7 @@
 // runtime/dispatch.c:290
 #define SF2C_DISPATCH_S_N_D7A5 "\n"
 // runtime/dispatch.c:295
-#define SF2C_DISPATCH_S_LARECOMP_HWBREAK_8AFC "LARECOMP_HWBREAK"
+#define SF2C_DISPATCH_S_SF2RECOMP_HWBREAK_8AFC "SF2RECOMP_HWBREAK"
 // runtime/dispatch.c:296
 #define SF2C_DISPATCH_S_HWBREAK_STOPPED_PID_D_FROZEN_C10E "hwbreak: stopped pid %d (frozen; gdb -p %d now)\n"
 // runtime/dispatch.c:297
@@ -325,7 +325,7 @@
 // runtime/dispatch.c:349
 #define SF2C_DISPATCH_S_WATCH_PAGE_LLX_RELEASED_N_5CD7 "[watch] page %llx released\n"
 // runtime/dispatch.c:356
-#define SF2C_DISPATCH_S_LARECOMP_WATCH_ADDR_5B12 "LARECOMP_WATCH_ADDR"
+#define SF2C_DISPATCH_S_SF2RECOMP_WATCH_ADDR_5B12 "SF2RECOMP_WATCH_ADDR"
 // runtime/dispatch.c:357
 #define SF2C_DISPATCH_CH_EMPTY_EE1B ','
 // runtime/dispatch.c:386
@@ -363,7 +363,7 @@
 // runtime/fnprof.c:18
 #define SF2C_FNPROF_N_256_51E8 256
 // runtime/fnprof.c:27
-#define SF2C_FNPROF_S_LARECOMP_FNPROF_BT_ACF6 "LARECOMP_FNPROF_BT"
+#define SF2C_FNPROF_S_SF2RECOMP_FNPROF_BT_ACF6 "SF2RECOMP_FNPROF_BT"
 // runtime/fnprof.c:29
 #define SF2C_FNPROF_N_16_B17E 16
 // runtime/fnprof.c:30
@@ -381,13 +381,13 @@
 // runtime/fnprof.c:48
 #define SF2C_FNPROF_N_0X9E3779B1U_BCDD 0x9E3779B1u
 // runtime/fnprof.c:67
-#define SF2C_FNPROF_S_LARECOMP_FNPROF_CC00 "LARECOMP_FNPROF"
+#define SF2C_FNPROF_S_SF2RECOMP_FNPROF_CC00 "SF2RECOMP_FNPROF"
 // runtime/fnprof.c:68
 #define SF2C_FNPROF_S_LD_LD_CF3A "%ld:%ld"
 // runtime/fnprof.c:71
 #define SF2C_FNPROF_S_FNPROF_ON_AT_FRAME_LLU_N_0098 "[fnprof] on at frame %llu\n"
 // runtime/fnprof.c:79
-#define SF2C_FNPROF_S_LARECOMP_FNPROF_OUT_EA89 "LARECOMP_FNPROF_OUT"
+#define SF2C_FNPROF_S_SF2RECOMP_FNPROF_OUT_EA89 "SF2RECOMP_FNPROF_OUT"
 // runtime/fnprof.c:79
 #define SF2C_FNPROF_S_BUILD_FNPROF_TXT_A5F6 "build/fnprof.txt"
 // runtime/fnprof.c:80
@@ -613,7 +613,7 @@
 // runtime/kernel.c:51
 #define SF2C_KERNEL_N_0X101_83A4 0x101
 // runtime/kernel.c:86
-#define SF2C_KERNEL_S_LARECOMP_TICK_SCALE_2FD4 "LARECOMP_TICK_SCALE"
+#define SF2C_KERNEL_S_SF2RECOMP_TICK_SCALE_2FD4 "SF2RECOMP_TICK_SCALE"
 // runtime/kernel.c:88
 #define SF2C_KERNEL_N_192_EB3B 192
 // runtime/kernel.c:88
@@ -671,19 +671,19 @@
 // runtime/kernel.c:271
 #define SF2C_KERNEL_N_0XFFFFULL_2BD3 0xFFFFull
 // runtime/kernel.c:289
-#define SF2C_KERNEL_S_LARECOMP_HANG_DUMP_B06A "LARECOMP_HANG_DUMP"
+#define SF2C_KERNEL_S_SF2RECOMP_HANG_DUMP_B06A "SF2RECOMP_HANG_DUMP"
 // runtime/kernel.c:389
 #define SF2C_KERNEL_N_256_51E8 256
 // runtime/kernel.c:395
-#define SF2C_KERNEL_S_LARECOMP_KTRACE_A502 "LARECOMP_KTRACE"
+#define SF2C_KERNEL_S_SF2RECOMP_KTRACE_A502 "SF2RECOMP_KTRACE"
 // runtime/kernel.c:405
 #define SF2C_KERNEL_N_16_B17E 16
 // runtime/kernel.c:443
-#define SF2C_KERNEL_S_LARECOMP_DEBUG_CV_LATE_WAIT_BD4A "LARECOMP_DEBUG_CV_LATE_WAIT"
+#define SF2C_KERNEL_S_SF2RECOMP_DEBUG_CV_LATE_WAIT_BD4A "SF2RECOMP_DEBUG_CV_LATE_WAIT"
 // runtime/kernel.c:455
 #define SF2C_KERNEL_N_0XFFFFFFFFU_7BAF 0xffffffffu
 // runtime/kernel.c:580
-#define SF2C_KERNEL_S_LARECOMP_VSYNC_BT_9A1D "LARECOMP_VSYNC_BT"
+#define SF2C_KERNEL_S_SF2RECOMP_VSYNC_BT_9A1D "SF2RECOMP_VSYNC_BT"
 // runtime/kernel.c:586
 #define SF2C_KERNEL_S_VSYNC_BT_WAIT_ON_VSYNC_D_HAN_880D "[vsync-bt] wait on vsync (%d handles, timeout %lld) lr %llx:\n"
 // runtime/kernel.c:618
@@ -695,7 +695,7 @@
 // runtime/kernel.c:627
 #define SF2C_KERNEL_N_0X80_D41C 0x80
 // runtime/kernel.c:638
-#define SF2C_KERNEL_S_LARECOMP_PROF_SVC_6FEB "LARECOMP_PROF_SVC"
+#define SF2C_KERNEL_S_SF2RECOMP_PROF_SVC_6FEB "SF2RECOMP_PROF_SVC"
 // runtime/kernel.c:641
 #define SF2C_KERNEL_N_0X18_D47C 0x18
 // runtime/kernel.c:646
@@ -725,7 +725,7 @@
 // runtime/kernel.c:666
 #define SF2C_KERNEL_S_N_D7A5 "\n"
 // runtime/kernel.c:671
-#define SF2C_KERNEL_S_LARECOMP_TRACE_SVC_4E28 "LARECOMP_TRACE_SVC"
+#define SF2C_KERNEL_S_SF2RECOMP_TRACE_SVC_4E28 "SF2RECOMP_TRACE_SVC"
 // runtime/kernel.c:675
 #define SF2C_KERNEL_S_SVC_02X_LLX_LLX_LLX_LLX_LLX__80CD "[svc] %02x(%llx, %llx, %llx, %llx) -> %llx %llx %llx  @%llx\n"
 // runtime/kernel.c:682
@@ -1367,13 +1367,13 @@
 // runtime/main.c:49
 #define SF2C_MAIN_N_101_16DC 101
 // runtime/main.c:50
-#define SF2C_MAIN_S_LARECOMP_REEXEC_FORCE_8398 "LARECOMP_REEXEC_FORCE"
+#define SF2C_MAIN_S_SF2RECOMP_REEXEC_FORCE_8398 "SF2RECOMP_REEXEC_FORCE"
 // runtime/main.c:51
 #define SF2C_MAIN_S_0_9808 "0"
 // runtime/main.c:51
-#define SF2C_MAIN_S_LARECOMP_REEXEC_1A16 "LARECOMP_REEXEC"
+#define SF2C_MAIN_S_SF2RECOMP_REEXEC_1A16 "SF2RECOMP_REEXEC"
 // runtime/main.c:52
-#define SF2C_MAIN_S_LARECOMP_REEXEC_WHY_6D9D "LARECOMP_REEXEC_WHY"
+#define SF2C_MAIN_S_SF2RECOMP_REEXEC_WHY_6D9D "SF2RECOMP_REEXEC_WHY"
 // runtime/main.c:54
 #define SF2C_MAIN_S_EMPTY_12AE ""
 // runtime/main.c:57
@@ -1435,7 +1435,7 @@
 // runtime/main.c:122
 #define SF2C_MAIN_S_SF2RECOMP_6431 "SF2Recomp "
 // runtime/main.c:126
-#define SF2C_MAIN_S_LARECOMP_DATA_ROOT_B22A "LARECOMP_DATA_ROOT"
+#define SF2C_MAIN_S_SF2RECOMP_DATA_ROOT_B22A "SF2RECOMP_DATA_ROOT"
 // runtime/main.c:130
 #define SF2C_MAIN_S_SF2_RECOMP_AA83 "SF2 Recomp"
 // runtime/main.c:131
@@ -1535,9 +1535,9 @@
 // runtime/paths.c:56
 #define SF2C_PATHS_N_0755_64A5 0755
 // runtime/paths.c:66
-#define SF2C_PATHS_S_LARECOMP_DATA_ROOT_B22A "LARECOMP_DATA_ROOT"
+#define SF2C_PATHS_S_SF2RECOMP_DATA_ROOT_B22A "SF2RECOMP_DATA_ROOT"
 // runtime/paths.c:67
-#define SF2C_PATHS_S_LARECOMP_DATA_HOME_1E74 "LARECOMP_DATA_HOME"
+#define SF2C_PATHS_S_SF2RECOMP_DATA_HOME_1E74 "SF2RECOMP_DATA_HOME"
 // runtime/paths.c:73
 #define SF2C_PATHS_S_SF2_CONFIG_3707 "SF2_CONFIG"
 // runtime/paths.c:77
@@ -2091,7 +2091,7 @@
 // runtime/replay.c:596
 #define SF2C_REPLAY_S_CANNOT_CREATE_COMBAT_CHECKPO_7D0D "cannot create combat checkpoint stream"
 // runtime/replay.c:598
-#define SF2C_REPLAY_S_LARECOMP_LAN_TRACE_DIR_236B "LARECOMP_LAN_TRACE_DIR"
+#define SF2C_REPLAY_S_SF2RECOMP_LAN_TRACE_DIR_236B "SF2RECOMP_LAN_TRACE_DIR"
 // runtime/replay.c:601
 #define SF2C_REPLAY_S_S_MATCH_U_JSONL_F685 "%s/match-%u.jsonl"
 // runtime/replay.c:601
@@ -2281,17 +2281,17 @@
 // runtime/settings.c:76
 #define SF2C_SETTINGS_S_0_9808 "0"
 // runtime/settings.c:97
-#define SF2C_SETTINGS_S_LARECOMP_VOLUME_6C32 "LARECOMP_VOLUME"
+#define SF2C_SETTINGS_S_SF2RECOMP_VOLUME_6C32 "SF2RECOMP_VOLUME"
 // runtime/settings.c:98
-#define SF2C_SETTINGS_S_LARECOMP_REVERB_419C "LARECOMP_REVERB"
+#define SF2C_SETTINGS_S_SF2RECOMP_REVERB_419C "SF2RECOMP_REVERB"
 // runtime/settings.c:100
-#define SF2C_SETTINGS_S_SETTINGS_INVALID_LARECOMP_RE_ED26 "[settings] invalid LARECOMP_REVERB='%s', expected true/false, keeping previous value\n"
+#define SF2C_SETTINGS_S_SETTINGS_INVALID_SF2RECOMP_RE_ED26 "[settings] invalid SF2RECOMP_REVERB='%s', expected true/false, keeping previous value\n"
 // runtime/settings.c:101
-#define SF2C_SETTINGS_S_LARECOMP_SAVE_DIR_4AEE "LARECOMP_SAVE_DIR"
+#define SF2C_SETTINGS_S_SF2RECOMP_SAVE_DIR_4AEE "SF2RECOMP_SAVE_DIR"
 // runtime/settings.c:103
-#define SF2C_SETTINGS_S_SETTINGS_INVALID_LARECOMP_SA_EC52 "[settings] invalid LARECOMP_SAVE_DIR, keeping previous save directory\n"
+#define SF2C_SETTINGS_S_SETTINGS_INVALID_SF2RECOMP_SA_EC52 "[settings] invalid SF2RECOMP_SAVE_DIR, keeping previous save directory\n"
 // runtime/settings.c:104
-#define SF2C_SETTINGS_S_LARECOMP_LANG_74DD "LARECOMP_LANG"
+#define SF2C_SETTINGS_S_SF2RECOMP_LANG_74DD "SF2RECOMP_LANG"
 // runtime/settings.c:106
 #define SF2C_SETTINGS_S_AUTO_6346 "auto"
 // runtime/settings.c:108
@@ -4645,7 +4645,7 @@
 
 #define SF2C_KERNEL_STACK_SIZE 0x0040000000ull
 
-#define SF2C_MAIN_REEXEC_FORCED "forced by LARECOMP_REEXEC_FORCE"
+#define SF2C_MAIN_REEXEC_FORCED "forced by SF2RECOMP_REEXEC_FORCE"
 
 
 #define SF2C_PLATFORM_PLAT_VENV_PYTHON "venv/bin/python"

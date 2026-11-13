@@ -1,9 +1,9 @@
 #include "../../constants/nvn_vulkan.h"
 // The recorder thread (record.c): every Vulkan call that touches a command buffer, the command pool, the descriptor
 // pools or the queue is made by a thread of its own. The translating thread (the render thread, rqueue.c; the game's
-// GPU thread with LARECOMP_RENDER_THREAD=0; the UI thread for the start screen) keeps every decision and calls the
+// GPU thread with SF2RECOMP_RENDER_THREAD=0; the UI thread for the start screen) keeps every decision and calls the
 // rec_* functions below instead of vkCmd* etc.: each copies its arguments into a packet in a ring, in the order it
-// was called, and the recorder makes the real call in that order. With the recorder off (LARECOMP_VK_RECORDER=0, or
+// was called, and the recorder makes the real call in that order. With the recorder off (SF2RECOMP_VK_RECORDER=0, or
 // no thread could be made) the same functions make the call at once, on the calling thread, so the two modes differ
 // only in which thread holds the driver's lock: the calls and their order are the same.
 //
@@ -12,7 +12,7 @@
 #include "vk.h"
 
 // Submissions in flight (exec.c's ring of Sub slots; the recorder's descriptor pools follow them). A frame is ~10
-// submissions with the render thread (LARECOMP_CHUNK_PASSES) plus the window's; with the game's frame fence waited
+// submissions with the render thread (SF2RECOMP_CHUNK_PASSES) plus the window's; with the game's frame fence waited
 // one frame late (exec.c overlap_on) two frames are queued, so 8 slots would have had sub() wait for the GPU on
 // every slot reuse within the frame. 24: two frames and a margin.
 #define VK_SUBS SF2C_RECORD_VK_SUBS
@@ -24,7 +24,7 @@ bool rec_on(void);  // commands go through the recorder thread
 void rec_BeginCommandBuffer(VkCommandBuffer cb);  // ONE_TIME_SUBMIT
 void rec_EndCommandBuffer(VkCommandBuffer cb);
 // Submits si (up to 2 command buffers, 1 wait, 2 signals; nothing chained). seq: the timeline value it signals, which
-// rec_submitted() reaches once the driver has it. dl_trace: LARECOMP_VK_DEVLOST_TRACE's dump runs on a device loss.
+// rec_submitted() reaches once the driver has it. dl_trace: SF2RECOMP_VK_DEVLOST_TRACE's dump runs on a device loss.
 void rec_QueueSubmit2(const VkSubmitInfo2 *si, uint64_t seq);
 // vkQueuePresentKHR(image of swapchain, after wait). The result reaches rec_present_recreate(); the wait inside the
 // driver (FIFO: until the display) is the recorder's, counted in g_vk_frame_waits[2].
@@ -37,8 +37,8 @@ bool rec_present_recreate(void);  // (and clears it) the last present asked for 
 // rec_* (never passed to the driver by the caller), and only before slot's pools are reset again.
 VkDescriptorSet rec_alloc_set(int slot, VkDescriptorSetLayout layout);
 void rec_reset_pools(int slot);  // the slot's submission is done (exec.c sub()): its sets go
-bool rec_set_batch(void);          // sets are allocated in batches (LARECOMP_VK_NO_SET_BATCH=1: one per call)
-bool rec_set_recycle(void);        // a slot's sets are handed out again instead of resetting its pools (LARECOMP_VK_NO_SET_RECYCLE=1: off)
+bool rec_set_batch(void);          // sets are allocated in batches (SF2RECOMP_VK_NO_SET_BATCH=1: one per call)
+bool rec_set_recycle(void);        // a slot's sets are handed out again instead of resetting its pools (SF2RECOMP_VK_NO_SET_RECYCLE=1: off)
 // n writes, each of one descriptor (buffer or image info), to sets from rec_alloc_set or real ones
 void rec_UpdateDescriptorSets(uint32_t n, const VkWriteDescriptorSet *w);
 
@@ -58,13 +58,13 @@ void rec_quit(void);
 
 // ---- pipelines
 // A graphics pipeline still being built (exec.c Pipe): the recorder resolves obj through this at the bind, waiting
-// for it with LARECOMP_VK_RECORDER_WAIT_PIPES=1 (0: ready pipelines only reach it). Returns the pipeline, or NULL
+// for it with SF2RECOMP_VK_RECORDER_WAIT_PIPES=1 (0: ready pipelines only reach it). Returns the pipeline, or NULL
 // once the build failed (the draws until the next bind are dropped).
 typedef VkPipeline (*RecPipeResolve)(void *obj, bool wait);
 void rec_set_pipe_resolver(RecPipeResolve f);
-bool rec_wait_pipes(void);  // LARECOMP_VK_RECORDER_WAIT_PIPES=1: draws wait for their pipeline instead of being skipped
+bool rec_wait_pipes(void);  // SF2RECOMP_VK_RECORDER_WAIT_PIPES=1: draws wait for their pipeline instead of being skipped
 
-// ---- profiling (LARECOMP_VK_PROF, read by exec.c renderer_stats; counts since the last take)
+// ---- profiling (SF2RECOMP_VK_PROF, read by exec.c renderer_stats; counts since the last take)
 typedef struct {
     uint64_t packets, bytes, enqueue_ns;          // packets queued, their bytes, the translating thread's time queuing them
     uint64_t busy_ns, wakeups;                    // the recorder's time making calls; times it woke from its sleep
@@ -74,7 +74,7 @@ typedef struct {
     uint64_t present_waits, present_wait_ns;      // rec_wait_presents waits that had to wait
     uint64_t full_waits, full_ns;                 // the ring was full
     uint64_t set_allocs, set_calls;               // descriptor sets allocated, vkAllocateDescriptorSets calls
-    uint64_t sets_fresh;                          // of those, new from the pools (the rest recycled: LARECOMP_VK_NO_SET_RECYCLE)
+    uint64_t sets_fresh;                          // of those, new from the pools (the rest recycled: SF2RECOMP_VK_NO_SET_RECYCLE)
     uint64_t pool_resets, pool_reset_ns;          // vkResetDescriptorPool calls and their time (on the recorder when it is on)
     uint64_t pipe_waits, pipe_wait_ns;            // binds that waited for a pipeline build (WAIT_PIPES)
     uint64_t draws_dropped;                       // draws dropped after a failed pipeline (WAIT_PIPES)

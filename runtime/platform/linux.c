@@ -44,7 +44,7 @@ void rt_crash_explain(char *out, size_t n, const char *log_path);  // runtime/cr
 // protection on its first write (no fault handler thread, no signal) and remembers it was written. PAGEMAP_SCAN then
 // lists the written pages of a range and protects them again in one call, like GetWriteWatch(WRITE_WATCH_FLAG_RESET).
 // Pages are only protected once a query has covered them, so memory nobody asks about never faults. Linux 6.7+;
-// without it (older kernel, userfaultfd unavailable): no tracking, as before. LARECOMP_WRITE_TRACKING=0: off.
+// without it (older kernel, userfaultfd unavailable): no tracking, as before. SF2RECOMP_WRITE_TRACKING=0: off.
 #ifndef UFFD_USER_MODE_ONLY
 #define UFFD_USER_MODE_ONLY 1
 #endif
@@ -86,7 +86,7 @@ static void wt_init(uint64_t lo, uint64_t hi) {
     (void)lo; (void)hi;
     return;
 #endif
-    const char *e = getenv(SF2C_LINUX_S_LARECOMP_WRITE_TRACKING_EF34);
+    const char *e = getenv(SF2C_LINUX_S_SF2RECOMP_WRITE_TRACKING_EF34);
     if (e && !atoi(e)) return;
     // user-mode faults only: allowed without privileges (vm.unprivileged_userfaultfd=0); the asynchronous protection
     // is lifted by the kernel either way, also for its own writes (read() into guest memory)
@@ -108,10 +108,10 @@ static void wt_init(uint64_t lo, uint64_t hi) {
 }
 
 // Tracking off after all (the Vulkan backend at boot, before any query protected a page: nothing is protected yet), with
-// the reason logged; LARECOMP_WRITE_TRACKING=1 keeps it on. Closing the userfaultfd unregisters the window.
+// the reason logged; SF2RECOMP_WRITE_TRACKING=1 keeps it on. Closing the userfaultfd unregisters the window.
 void plat_write_tracking_off(const char *why) {
     if (g_uffd < 0 && g_pagemap < 0) return;
-    const char *e = getenv(SF2C_LINUX_S_LARECOMP_WRITE_TRACKING_EF34);
+    const char *e = getenv(SF2C_LINUX_S_SF2RECOMP_WRITE_TRACKING_EF34);
     if (e && atoi(e)) { fprintf(stderr, SF2C_LINUX_S_PLAT_PAGE_WRITE_TRACKING_KEP_71B3, why); return; }
     fprintf(stderr, SF2C_LINUX_S_PLAT_PAGE_WRITE_TRACKING_OFF_D150, why);
     if (g_pagemap >= 0) close(g_pagemap);

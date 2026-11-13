@@ -94,7 +94,7 @@ coverage remains useful.
 The Python tools `tools/lan_sparring.py` and `tools/test_lan_sparring.py` remain
 developer diagnostics for the older command-line single-match path. They are
 not used or shipped as a requirement of the native game UI.
-`LARECOMP_LAN_TRACE_DIR` optionally records native GUI matches for developers;
+`SF2RECOMP_LAN_TRACE_DIR` optionally records native GUI matches for developers;
 ordinary sessions use a bounded temporary checkpoint stream.
 
 The investigations below retain the earlier command-line integration history.

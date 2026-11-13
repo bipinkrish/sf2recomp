@@ -882,7 +882,7 @@ static void emit_insn(Ctx *c, uint64_t w, uint32_t pc) {
         sp(&c->body, c->branchy ? SF2C_TRANSLATE_S_EXIT_NOW_TRUE_BREAK_N_75A2 : SF2C_TRANSLATE_S_BREAK_N_EED1);
     } else if (OPM(SF2C_TRANSLATE_N_0XE330000000000000ULL_622B, SF2C_TRANSLATE_N_0XFFF0000000000000ULL_8D1D)) {  // KIL
         c->info->uses_discard = true;
-        if (getenv(SF2C_TRANSLATE_S_LARECOMP_NO_DISCARD_5FB6)) {
+        if (getenv(SF2C_TRANSLATE_S_SF2RECOMP_NO_DISCARD_5FB6)) {
         } else if (!c->glsl) sp(&c->body, SF2C_TRANSLATE_S_DISCARD_FRAGMENT_N_C2EB);
         else if (c->stage == STAGE_FRAGMENT) sp(&c->body, SF2C_TRANSLATE_S_DISCARD_N_A332);
         else sp(&c->body, SF2C_TRANSLATE_S_KIL_N_ADC3);  // GLSL has discard in fragment shaders only
@@ -1854,7 +1854,7 @@ static const char glsl_h2f_exact[] =
     SF2C_TRANSLATE_S_VEC2_UNPACK_H2_UINT_V_RETURN_B80A;
 // ... and in fragment / compute shaders the native conversion: positions don't depend on them, and the by-bits
 // version (~12 integer ops and two branches per half) was half of the main lighting pass's GPU time on an Intel UHD
-// 770 and a third on an RTX 3080 Ti (the game's shaders use packed halves heavily). LARECOMP_VK_EXACT_H2F=1: by bits
+// 770 and a third on an RTX 3080 Ti (the game's shaders use packed halves heavily). SF2RECOMP_VK_EXACT_H2F=1: by bits
 // in every stage.
 static const char glsl_h2f_native[] =
     SF2C_TRANSLATE_S_FLOAT_H2F_UINT_H_RETURN_UNPA_408E
@@ -1902,7 +1902,7 @@ static ShaderInfo *glsl_finish(Ctx *c, bool any_branch, bool dbg) {
     if (info->uses_gmem && maxwell_gmem_chunk_shift && maxwell_gmem_lazy) sp(&s, SF2C_TRANSLATE_S_EXTENSION_GL_EXT_BUFFER_REFE_B65B);
     sp(&s, SF2C_TRANSLATE_S_S_0030, glsl_prelude + sizeof SF2C_TRANSLATE_S_VERSION_460_N_855F - 1);
     static int exact = -1;
-    if (exact < 0) exact = getenv(SF2C_TRANSLATE_S_LARECOMP_VK_EXACT_H2F_F30C) && atoi(getenv(SF2C_TRANSLATE_S_LARECOMP_VK_EXACT_H2F_F30C)) != 0;
+    if (exact < 0) exact = getenv(SF2C_TRANSLATE_S_SF2RECOMP_VK_EXACT_H2F_F30C) && atoi(getenv(SF2C_TRANSLATE_S_SF2RECOMP_VK_EXACT_H2F_F30C)) != 0;
     sp(&s, SF2C_TRANSLATE_S_S_S_72BD, !exact && (stage == STAGE_FRAGMENT || stage == STAGE_COMPUTE) ? glsl_h2f_native : glsl_h2f_exact,
        glsl_prelude_half);
     for (int i = 0; i < SF2C_TRANSLATE_N_18_4EC9; i++) {
@@ -1953,7 +1953,7 @@ static ShaderInfo *glsl_finish(Ctx *c, bool any_branch, bool dbg) {
         // early tests (glsl_early_tests) and keeps its counter; one that can't (discard / depth, no stores)
         // counts nothing - it would cost those tests - and relies on the runtime bringing its chunks in before the draw:
         // the bound storage buffers' chunks (gmem_chunk_bind), pointers in uniform buffers, the chunks other shaders
-        // missed (cache/gmem_chunks.txt). LARECOMP_VK_GMEM_FS_MISS=1 (maxwell_gmem_fs_miss): every shader counts, no
+        // missed (cache/gmem_chunks.txt). SF2RECOMP_VK_GMEM_FS_MISS=1 (maxwell_gmem_fs_miss): every shader counts, no
         // early tests (as before; to find a chunk only such a shader reaches).
         bool count = stage != STAGE_FRAGMENT || maxwell_gmem_fs_miss || c->uses_gmem_store || glsl_early_tests(c);
         if (count) {
@@ -2124,10 +2124,10 @@ static ShaderInfo *glsl_finish(Ctx *c, bool any_branch, bool dbg) {
 // the BRX register by an LDC c[0x1][Rx + table] shortly before: BRX Ra, imm goes to pc + 8 + table[k] + imm. Entries
 // are read until one isn't an instruction of this shader (the end of the table; a word past it that still looks like
 // one only adds a harmless case). False: not that shape (the register set some other way, no constants, nothing
-// valid) - the caller labels every instruction as before. LARECOMP_BRX_ALL_LABELS=1: always every instruction.
+// valid) - the caller labels every instruction as before. SF2RECOMP_BRX_ALL_LABELS=1: always every instruction.
 static bool brx_table_labels(const uint8_t *code, size_t i, size_t end, const uint8_t *blob, size_t const_offset, uint8_t *label) {
     static int all = -1;
-    if (all < 0) { const char *e = getenv(SF2C_TRANSLATE_S_LARECOMP_BRX_ALL_LABELS_13D9); all = e && atoi(e) != 0; }
+    if (all < 0) { const char *e = getenv(SF2C_TRANSLATE_S_SF2RECOMP_BRX_ALL_LABELS_13D9); all = e && atoi(e) != 0; }
     if (all || const_offset >= SF2C_TRANSLATE_N_0X10000_4939 || const_offset < SF2C_TRANSLATE_N_0X80_D41C) return false;  // (0x10000: no constants known)
     uint64_t brx = ((const uint64_t *)code)[i];
     int ra = (int)bits(brx, SF2C_TRANSLATE_N_8_2C62, SF2C_TRANSLATE_N_8_2C62);
@@ -2224,7 +2224,7 @@ ShaderInfo *maxwell_translate(const uint8_t *blob, size_t max_size, int stage, c
     // translate
     bool dbg = maxwell_dbg_code && blob == maxwell_dbg_code && stage == STAGE_FRAGMENT;
     static int annotate = -1;
-    if (annotate < 0) annotate = getenv(SF2C_TRANSLATE_S_LARECOMP_SAVE_MSL_AF49) != NULL;
+    if (annotate < 0) annotate = getenv(SF2C_TRANSLATE_S_SF2RECOMP_SAVE_MSL_AF49) != NULL;
     c->branchy = any_branch;
     for (size_t i = 0; i < end && !c->fail; i++) {
         if (i % SF2C_TRANSLATE_N_4_4B22 == 0) continue;

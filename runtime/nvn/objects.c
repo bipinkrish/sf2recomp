@@ -174,17 +174,17 @@ void renderer_flush(void);
 NVN(nvnSyncWait) {  // NVN_SYNC_WAIT_RESULT_ALREADY_SIGNALED
     static int flush = -1;
     static uint64_t n;
-    if (flush < 0) flush = getenv(SF2C_OBJECTS_S_LARECOMP_SYNC_FLUSH_2EFC) ? 1 : 0;
-    if (getenv(SF2C_OBJECTS_S_LARECOMP_LOG_SYNC_0941) && n++ % SF2C_OBJECTS_N_60_39FA == 0) LOG(SF2C_OBJECTS_S_NVN_SYNCWAIT_LLU_LR_LLX_N_7DAE, (unsigned long long)n, c->x[SF2C_OBJECTS_N_30_624B]);
-    static int whole = -1;  // LARECOMP_SYNC_ALL=1: old behaviour, wait for all submitted work
-    if (whole < 0) whole = getenv(SF2C_OBJECTS_S_LARECOMP_SYNC_ALL_2142) ? 1 : 0;
+    if (flush < 0) flush = getenv(SF2C_OBJECTS_S_SF2RECOMP_SYNC_FLUSH_2EFC) ? 1 : 0;
+    if (getenv(SF2C_OBJECTS_S_SF2RECOMP_LOG_SYNC_0941) && n++ % SF2C_OBJECTS_N_60_39FA == 0) LOG(SF2C_OBJECTS_S_NVN_SYNCWAIT_LLU_LR_LLX_N_7DAE, (unsigned long long)n, c->x[SF2C_OBJECTS_N_30_624B]);
+    static int whole = -1;  // SF2RECOMP_SYNC_ALL=1: old behaviour, wait for all submitted work
+    if (whole < 0) whole = getenv(SF2C_OBJECTS_S_SF2RECOMP_SYNC_ALL_2142) ? 1 : 0;
     uint64_t t0 = 0;
     if (flush) { if (rq_on()) rq_flush(); else { t0 = plat_now_ns(); renderer_flush(); } }
     else if (whole) { if (rq_on()) rq_drain(); t0 = plat_now_ns(); rq_watch(SF2C_OBJECTS_S_SYNCWAIT_ALL_THE_GPU_76A4, 0); renderer_sync(); }
     else {  // only the submission that holds this fence
         uint64_t seq = sync_of(A(0))->seq, q = seq;
-        static int stats = -1;  // (LARECOMP_LOG_PACE: which fences the game waits on, and how long)
-        if (stats < 0) stats = getenv(SF2C_OBJECTS_S_LARECOMP_LOG_PACE_ED01) != NULL;
+        static int stats = -1;  // (SF2RECOMP_LOG_PACE: which fences the game waits on, and how long)
+        if (stats < 0) stats = getenv(SF2C_OBJECTS_S_SF2RECOMP_LOG_PACE_ED01) != NULL;
         uint64_t behind = 0, w0 = 0;
         bool cur = false, untranslated = false;
         if (seq && rq_on()) {
@@ -194,8 +194,8 @@ NVN(nvnSyncWait) {  // NVN_SYNC_WAIT_RESULT_ALREADY_SIGNALED
         t0 = plat_now_ns();
         rq_watch(SF2C_OBJECTS_S_SYNCWAIT_THE_GPU_SUBMISSION_69A5, seq);
         renderer_wait_seq(seq);
-        static long tr_at = -1;  // (debug, rqueue.c LARECOMP_RQ_TRACE) the game thread's fence waits in those frames
-        if (tr_at < 0) tr_at = getenv(SF2C_OBJECTS_S_LARECOMP_RQ_TRACE_50B2) ? atol(getenv(SF2C_OBJECTS_S_LARECOMP_RQ_TRACE_50B2)) : 0;
+        static long tr_at = -1;  // (debug, rqueue.c SF2RECOMP_RQ_TRACE) the game thread's fence waits in those frames
+        if (tr_at < 0) tr_at = getenv(SF2C_OBJECTS_S_SF2RECOMP_RQ_TRACE_50B2) ? atol(getenv(SF2C_OBJECTS_S_SF2RECOMP_RQ_TRACE_50B2)) : 0;
         extern uint64_t renderer_present_count(void);
         if (tr_at && renderer_present_count() >= (uint64_t)tr_at && renderer_present_count() < (uint64_t)tr_at + SF2C_OBJECTS_N_4_4B22)
         {
@@ -271,7 +271,7 @@ NVN(nvnMemoryPoolInitialize) {
     p->size = G(uint64_t, A(1), SF2C_OBJECTS_N_0X18_D47C);
     p->flags = G(uint32_t, A(1), SF2C_OBJECTS_N_8_2C62);
     SET_HOST(A(0), p);
-    if (getenv(SF2C_OBJECTS_S_LARECOMP_LOG_BINDS_8A9A)) LOG(SF2C_OBJECTS_S_POOL_LLX_LLU_KB_FLAGS_X_N_98EF, (unsigned long long)p->storage, (unsigned long long)(p->size >> SF2C_OBJECTS_N_10_4A44), p->flags);
+    if (getenv(SF2C_OBJECTS_S_SF2RECOMP_LOG_BINDS_8A9A)) LOG(SF2C_OBJECTS_S_POOL_LLX_LLU_KB_FLAGS_X_N_98EF, (unsigned long long)p->storage, (unsigned long long)(p->size >> SF2C_OBJECTS_N_10_4A44), p->flags);
     if (npools < SF2C_OBJECTS_N_256_51E8) pools[npools++] = *p;  // (debug: nvn_pool_flags_at)
     RET(1);
 }
@@ -406,7 +406,7 @@ static void builder_layout(uint64_t b, TexLayout *t) {
     // from the driver default: NVNpackagedTextureLayout's low word is log2(GOBs per block).
     uint64_t pl = G(uint64_t, b, SF2C_OBJECTS_N_0X50_4171);
     if (pl && (uint32_t)pl <= SF2C_OBJECTS_N_5_EF2D) t->block_height_log2 = (uint32_t)pl;
-    if (pl && getenv(SF2C_OBJECTS_S_LARECOMP_LOG_PACKAGED_A712)) {
+    if (pl && getenv(SF2C_OBJECTS_S_SF2RECOMP_LOG_PACKAGED_A712)) {
         static int n;
         if (n++ < SF2C_OBJECTS_N_4000_B090) LOG(SF2C_OBJECTS_S_NVN_PACKAGED_LAYOUT_016LLX_F_DBE6, pl, G(uint32_t, b, SF2C_OBJECTS_N_0X20_A766), t->width, t->height, t->levels, t->block_height_log2);
     }
@@ -815,9 +815,9 @@ NVN(nvnWindowGetNumTextures) { RET(WIN->num); }
 NVN(nvnWindowGetNumActiveTextures) { RET(WIN->active); }
 NVN(nvnWindowSetNumActiveTextures) { WIN->active = (int)A(1); }
 NVN(nvnWindowGetPresentInterval) { RET(WIN->interval); }
-NVN(nvnWindowSetPresentInterval) {  // (the game's 60 / 30 fps mode: 1 / 2; LARECOMP_LOG_INTERVAL=1 logs each change)
+NVN(nvnWindowSetPresentInterval) {  // (the game's 60 / 30 fps mode: 1 / 2; SF2RECOMP_LOG_INTERVAL=1 logs each change)
     static int log = -1;
-    if (log < 0) log = getenv(SF2C_OBJECTS_S_LARECOMP_LOG_INTERVAL_D6E7) != NULL;
+    if (log < 0) log = getenv(SF2C_OBJECTS_S_SF2RECOMP_LOG_INTERVAL_D6E7) != NULL;
     if (log && WIN->interval != (int)A(1)) LOG(SF2C_OBJECTS_S_NVN_PRESENT_INTERVAL_D_D_N_0899, WIN->interval, (int)A(1));
     WIN->interval = (int)A(1);
 }

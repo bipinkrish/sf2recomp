@@ -45,7 +45,7 @@ int main(void) {
 
     def run_paths(self, converted, launch, **overrides):
         env = os.environ.copy()
-        for key in ("SF2_CONFIG", "LARECOMP_DATA_ROOT", "LARECOMP_DATA_HOME"):
+        for key in ("SF2_CONFIG", "SF2RECOMP_DATA_ROOT", "SF2RECOMP_DATA_HOME"):
             env.pop(key, None)
         env.update(SF2_TEST_EXE=str(converted / "sf2"), **overrides)
         result = subprocess.run([str(self.binary)], cwd=launch, env=env,
@@ -78,7 +78,7 @@ int main(void) {
             custom = launch / "my config.ini"
             custom.write_text("explicit custom configuration\n")
             got = self.run_paths(converted, launch, SF2_CONFIG="my config.ini",
-                                 LARECOMP_DATA_ROOT="state/session")
+                                 SF2RECOMP_DATA_ROOT="state/session")
             self.assertEqual(got["config"], str(custom))
             self.assertEqual(got["root"], str(launch / "state/session"))
             self.assertEqual(got["cwd"], got["root"])
@@ -88,7 +88,7 @@ int main(void) {
         with tempfile.TemporaryDirectory(prefix="sf2-data-override-") as folder:
             workspace = pathlib.Path(folder)
             converted, launch = self.make_folders(workspace)
-            for override in ("LARECOMP_DATA_ROOT", "LARECOMP_DATA_HOME"):
+            for override in ("SF2RECOMP_DATA_ROOT", "SF2RECOMP_DATA_HOME"):
                 with self.subTest(override=override):
                     state = workspace / override / "save state"
                     got = self.run_paths(converted, launch, **{override: str(state)})

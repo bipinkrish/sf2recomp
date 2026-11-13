@@ -218,7 +218,7 @@ class COMBAT_REPLAY:
     S_1_9A76 = '1'  # tools/combat_replay.py:303
     S_SF2_LAN_17C4 = 'SF2_LAN_'  # tools/combat_replay.py:301
     S_SF2_REPLAY_DA3E = 'SF2_REPLAY_'  # tools/combat_replay.py:301
-    S_LARECOMP_B959 = 'LARECOMP_'  # tools/combat_replay.py:301
+    S_SF2RECOMP_B959 = 'SF2RECOMP_'  # tools/combat_replay.py:301
     S_SF2RECOMP_INI_8714 = 'sf2recomp.ini'  # tools/combat_replay.py:278
     S_SAVE_FBDD = 'save'  # tools/combat_replay.py:277
     S_EMPTY_15A7 = '*'  # tools/combat_replay.py:272
@@ -807,7 +807,7 @@ class LAN_SPARRING:
     N_60_39FA = 60  # tools/lan_sparring.py:42
     S_EMPTY_EE1B = ','  # tools/lan_sparring.py:42
     S_1_9A76 = '1'  # tools/lan_sparring.py:41
-    S_LARECOMP_B959 = 'LARECOMP_'  # tools/lan_sparring.py:39
+    S_SF2RECOMP_B959 = 'SF2RECOMP_'  # tools/lan_sparring.py:39
     S_SF2_REPLAY_DA3E = 'SF2_REPLAY_'  # tools/lan_sparring.py:39
     S_SF2_LAN_17C4 = 'SF2_LAN_'  # tools/lan_sparring.py:39
     S_W_780F = 'w'  # tools/lan_sparring.py:35
@@ -1409,7 +1409,7 @@ class TEST_LAN_SPARRING:
     S_N_AD65 = '\n'  # tools/test_lan_sparring.py:43
     S_SDL_8FFE = 'SDL_'  # tools/test_lan_sparring.py:43
     S_VK_6B79 = 'VK_'  # tools/test_lan_sparring.py:43
-    S_LARECOMP_B959 = 'LARECOMP_'  # tools/test_lan_sparring.py:43
+    S_SF2RECOMP_B959 = 'SF2RECOMP_'  # tools/test_lan_sparring.py:43
     S_SF2_8749 = 'SF2_'  # tools/test_lan_sparring.py:43
     S_ENVIRONMENT_JSON_64EE = 'environment.json'  # tools/test_lan_sparring.py:43
     S_Y_8CC0 = 'Y'  # tools/test_lan_sparring.py:41
@@ -1426,8 +1426,8 @@ class TEST_LAN_SPARRING:
     N_60_39FA = 60  # tools/test_lan_sparring.py:37
     S_EMPTY_4266 = ':'  # tools/test_lan_sparring.py:37
     S_EMPTY_EE1B = ','  # tools/test_lan_sparring.py:36
-    S_LARECOMP_INPUT_07C4 = 'LARECOMP_INPUT'  # tools/test_lan_sparring.py:36
-    S_LARECOMP_VK_VALIDATION_STOP_3771 = 'LARECOMP_VK_VALIDATION_STOP'  # tools/test_lan_sparring.py:33
+    S_SF2RECOMP_INPUT_07C4 = 'SF2RECOMP_INPUT'  # tools/test_lan_sparring.py:36
+    S_SF2RECOMP_VK_VALIDATION_STOP_3771 = 'SF2RECOMP_VK_VALIDATION_STOP'  # tools/test_lan_sparring.py:33
     S_SF2_LAN_TEST_VALIDATE_B138 = 'SF2_LAN_TEST_VALIDATE'  # tools/test_lan_sparring.py:33
     S_1_9A76 = '1'  # tools/test_lan_sparring.py:32
     S_X11_7FD2 = 'x11'  # tools/test_lan_sparring.py:32

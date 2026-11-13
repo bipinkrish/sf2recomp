@@ -79,7 +79,7 @@ KThread *kernel_current_thread(void);
 // (diagnostics) the "[hang]" dump (kernel.c): every guest thread and what it waits on, the kernel trace
 void kernel_dump_threads(const char *prefix);
 // The renderer's part of the hang dump (runtime/nvn/rqueue.c), called from the hang watch thread every second:
-// check fills why and returns true when it sees a hang (limit_ns: LARECOMP_HANG_DUMP); state logs its side.
+// check fills why and returns true when it sees a hang (limit_ns: SF2RECOMP_HANG_DUMP); state logs its side.
 void kernel_hang_hooks(bool (*check)(uint64_t limit_ns, char *why, size_t n), void (*state)(const char *prefix));
 uint64_t kernel_heap_size(void);  // bytes from HEAP_BASE set by SetHeapSize
 uint64_t backend_guest_heap_capacity(void);

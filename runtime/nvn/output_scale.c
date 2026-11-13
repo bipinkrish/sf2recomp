@@ -11,8 +11,8 @@
 //                  The render targets stay allocated at the Match display size (ax, ay) and the frame is drawn into
 //                  their top-left part at (sx, sy): no reallocation at a step, so no hitch (each step reallocated
 //                  every screen-sized texture before: ~325 ms on an M3 Max, seconds at 4K on Vulkan, issue #100).
-// Test overrides: LARECOMP_SCALE=<f> (render height = 1080 x f), LARECOMP_WIDE_TEST=<f> (forced shape),
-// LARECOMP_DYN_TEST=<f> (Dynamic pinned at factor f of the allocation: shots at a fixed part), LARECOMP_DYN_START=<f>
+// Test overrides: SF2RECOMP_SCALE=<f> (render height = 1080 x f), SF2RECOMP_WIDE_TEST=<f> (forced shape),
+// SF2RECOMP_DYN_TEST=<f> (Dynamic pinned at factor f of the allocation: shots at a fixed part), SF2RECOMP_DYN_START=<f>
 // (Dynamic starts at factor f).
 #include <math.h>
 #include <stdlib.h>
@@ -38,8 +38,8 @@
 // the slow raises, keep it low for a minute). With GPU times (Metal's command buffers, Vulkan's timestamps) it goes by
 // those alone. Without, by the frame times with the spikes left out: the mean of the half second's frames up to 3x their
 // median (a frame missing one vsync still counts). Either way a spike
-// neither steps it down nor, so, doubles the raise wait. LARECOMP_DYN_NO_GPU=1: ignore the GPU times (tests the
-// frame-time path); LARECOMP_SPIKE_MS (pace.c): CPU-side spikes.
+// neither steps it down nor, so, doubles the raise wait. SF2RECOMP_DYN_NO_GPU=1: ignore the GPU times (tests the
+// frame-time path); SF2RECOMP_SPIKE_MS (pace.c): CPU-side spikes.
 //
 // The GPU time has two parts: the game's (G, scales with the factor: about its area, factor^2) and the window step's
 // (W: the image drawn into the window - upscale, SMAA - and the menu: depends on the window's size only). The budget
@@ -180,16 +180,16 @@ static int cmp_double(const void *a, const void *b) {
 // game_ms: the game's GPU time of the last frame (< 0: unknown); win_ms: the window step's (< 0: unknown / not counted)
 static void dyn_update(double now, double game_ms, double win_ms, double lines) {
     static int no_gpu = -1;
-    if (no_gpu < 0) no_gpu = getenv(SF2C_OUTPUT_SCALE_S_LARECOMP_DYN_NO_GPU_D34F) && atoi(getenv(SF2C_OUTPUT_SCALE_S_LARECOMP_DYN_NO_GPU_D34F));
+    if (no_gpu < 0) no_gpu = getenv(SF2C_OUTPUT_SCALE_S_SF2RECOMP_DYN_NO_GPU_D34F) && atoi(getenv(SF2C_OUTPUT_SCALE_S_SF2RECOMP_DYN_NO_GPU_D34F));
     if (no_gpu) game_ms = -1;
     static double prev_lines;
     if (prev_lines > 0 && fabs(lines - prev_lines) > SF2C_OUTPUT_SCALE_N_0_5_D2CB) dyn_window_changed(now, prev_lines, lines);
     prev_lines = lines;
     dyn_set_floor(lines);
-    static int start = -1;  // LARECOMP_DYN_START=<f>: Dynamic starts at factor f (tests: climbing back from the floor)
+    static int start = -1;  // SF2RECOMP_DYN_START=<f>: Dynamic starts at factor f (tests: climbing back from the floor)
     if (start < 0) {
         start = 0;
-        if (getenv(SF2C_OUTPUT_SCALE_S_LARECOMP_DYN_START_0C8E)) g_dyn = dyn_grid(fmin(1.0, atof(getenv(SF2C_OUTPUT_SCALE_S_LARECOMP_DYN_START_0C8E))));
+        if (getenv(SF2C_OUTPUT_SCALE_S_SF2RECOMP_DYN_START_0C8E)) g_dyn = dyn_grid(fmin(1.0, atof(getenv(SF2C_OUTPUT_SCALE_S_SF2RECOMP_DYN_START_0C8E))));
     }
     double frame_ms = target_frame_ms();
     int samples = dyn_sample_count();
@@ -216,8 +216,8 @@ static void dyn_update(double now, double game_ms, double win_ms, double lines) 
     g_sum_ms = 0, g_sum_n = 0;
     if (now < g_dyn_cool_until) return;
     double prev = g_dyn;
-    static int log = -1;  // LARECOMP_LOG_DYNRES=1: every decision, not only the steps
-    if (log < 0) log = getenv(SF2C_OUTPUT_SCALE_S_LARECOMP_LOG_DYNRES_73A7) != NULL;
+    static int log = -1;  // SF2RECOMP_LOG_DYNRES=1: every decision, not only the steps
+    if (log < 0) log = getenv(SF2C_OUTPUT_SCALE_S_SF2RECOMP_LOG_DYNRES_73A7) != NULL;
     double budget = frame_ms * SF2C_OUTPUT_SCALE_N_0_87_36C2;
     bool hold_up = false;  // (a held rate stepped up: the factor was set to fit it already)
     if (gpu) {
@@ -434,8 +434,8 @@ void output_scale(double dw, double dh, bool reshape_allowed, double now, double
     double base_width = settings_screen_width(SF2C_OUTPUT_SCALE_N_1080_32EB);
     double fit = fmin(dw / base_width, dh / SF2C_OUTPUT_SCALE_N_1080_0_AF38);
     static double forced = -1, wide_test = -1;
-    if (forced < 0) forced = getenv(SF2C_OUTPUT_SCALE_S_LARECOMP_SCALE_2675) ? atof(getenv(SF2C_OUTPUT_SCALE_S_LARECOMP_SCALE_2675)) : 0;
-    if (wide_test < 0) wide_test = getenv(SF2C_OUTPUT_SCALE_S_LARECOMP_WIDE_TEST_A818) ? atof(getenv(SF2C_OUTPUT_SCALE_S_LARECOMP_WIDE_TEST_A818)) : 0;
+    if (forced < 0) forced = getenv(SF2C_OUTPUT_SCALE_S_SF2RECOMP_SCALE_2675) ? atof(getenv(SF2C_OUTPUT_SCALE_S_SF2RECOMP_SCALE_2675)) : 0;
+    if (wide_test < 0) wide_test = getenv(SF2C_OUTPUT_SCALE_S_SF2RECOMP_WIDE_TEST_A818) ? atof(getenv(SF2C_OUTPUT_SCALE_S_SF2RECOMP_WIDE_TEST_A818)) : 0;
     double shape = wide_test > 0 ? wide_test : (dw / dh) / (base_width / SF2C_OUTPUT_SCALE_N_1080_0_AF38);
     bool reshape = reshape_allowed && fabs(shape - 1.0) > SF2C_OUTPUT_SCALE_N_0_005_07E1;
     if (!reshape) shape = 1.0;
@@ -456,7 +456,7 @@ void output_scale(double dw, double dh, bool reshape_allowed, double now, double
         h = reshape ? dh / SF2C_OUTPUT_SCALE_N_1080_0_AF38 : fit;  // Match display
         if (mode == RES_DYNAMIC) {
             static double pinned = -1;
-            if (pinned < 0) pinned = getenv(SF2C_OUTPUT_SCALE_S_LARECOMP_DYN_TEST_AACD) ? atof(getenv(SF2C_OUTPUT_SCALE_S_LARECOMP_DYN_TEST_AACD)) : 0;
+            if (pinned < 0) pinned = getenv(SF2C_OUTPUT_SCALE_S_SF2RECOMP_DYN_TEST_AACD) ? atof(getenv(SF2C_OUTPUT_SCALE_S_SF2RECOMP_DYN_TEST_AACD)) : 0;
             if (pinned > 0) dyn = pinned;
             else { dyn_update(now, game_ms, win_ms, h * SF2C_OUTPUT_SCALE_N_1080_32EB); dyn = g_dyn; }
         }

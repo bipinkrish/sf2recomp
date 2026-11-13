@@ -40,14 +40,14 @@ int main(void) {
     g_vk.managed_heap=true;
     assert(!lazy_heap_predicted(true,&probe) && !probe);
     // The generic diagnostic override cannot silently re-enable userptr imports in managed mode.
-    setenv("LARECOMP_VK_GMEM_LAZY","1",1);probe=true;
+    setenv("SF2RECOMP_VK_GMEM_LAZY","1",1);probe=true;
     assert(!lazy_heap_predicted(true,&probe) && !probe);
     g_vk.managed_heap=false;
     assert(lazy_heap_predicted(true,&probe) && !probe);
     g_vk.staged_heap=true;probe=true;
     assert(!lazy_heap_predicted(true,&probe) && !probe);
     g_vk.staged_heap=false;
-    unsetenv("LARECOMP_VK_GMEM_LAZY");setenv("LARECOMP_VK_NO_GMEM","1",1);
+    unsetenv("SF2RECOMP_VK_GMEM_LAZY");setenv("SF2RECOMP_VK_NO_GMEM","1",1);
     assert(!lazy_heap_predicted(true,&probe) && !probe);
     VkPhysicalDeviceMemoryProperties mp = {
         .memoryTypeCount = 2, .memoryHeapCount = 2,

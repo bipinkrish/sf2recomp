@@ -9,23 +9,23 @@
 // runtime/nvn/vulkan/device.c:45
 #define SF2C_DEVICE_N_20_F5CA 20
 // runtime/nvn/vulkan/device.c:69
-#define SF2C_DEVICE_S_LARECOMP_VK_SIM_HEAP_OOM_49B8 "LARECOMP_VK_SIM_HEAP_OOM"
+#define SF2C_DEVICE_S_SF2RECOMP_VK_SIM_HEAP_OOM_49B8 "SF2RECOMP_VK_SIM_HEAP_OOM"
 // runtime/nvn/vulkan/device.c:74
 #define SF2C_DEVICE_S_VK_GUEST_HEAP_MEMORY_HEAP_D__4307 "[vk] guest heap: memory heap %d holds %llu MB (size %llu, budget %llu), one import needs %llu MB: "
 // runtime/nvn/vulkan/device.c:75
 #define SF2C_DEVICE_S_IMPORTED_IN_CHUNKS_AS_THE_GA_905F "imported in chunks as the game binds them\n"
 // runtime/nvn/vulkan/device.c:93
-#define SF2C_DEVICE_S_LARECOMP_VK_GMEM_LAZY_EABE "LARECOMP_VK_GMEM_LAZY"
+#define SF2C_DEVICE_S_SF2RECOMP_VK_GMEM_LAZY_EABE "SF2RECOMP_VK_GMEM_LAZY"
 // runtime/nvn/vulkan/device.c:95
-#define SF2C_DEVICE_S_LARECOMP_VK_NO_GMEM_2D48 "LARECOMP_VK_NO_GMEM"
+#define SF2C_DEVICE_S_SF2RECOMP_VK_NO_GMEM_2D48 "SF2RECOMP_VK_NO_GMEM"
 // runtime/nvn/vulkan/device.c:101
 #define SF2C_DEVICE_N_0X1002_D106 0x1002
 // runtime/nvn/vulkan/device.c:105
 #define SF2C_DEVICE_S_RADV_6945 "RADV"
 // runtime/nvn/vulkan/device.c:108
-#define SF2C_DEVICE_S_LARECOMP_VK_HEAP_DMABUF_419D "LARECOMP_VK_HEAP_DMABUF"
+#define SF2C_DEVICE_S_SF2RECOMP_VK_HEAP_DMABUF_419D "SF2RECOMP_VK_HEAP_DMABUF"
 // runtime/nvn/vulkan/device.c:128
-#define SF2C_DEVICE_S_LARECOMP_VK_VALIDATION_STOP_43F5 "LARECOMP_VK_VALIDATION_STOP"
+#define SF2C_DEVICE_S_SF2RECOMP_VK_VALIDATION_STOP_43F5 "SF2RECOMP_VK_VALIDATION_STOP"
 // runtime/nvn/vulkan/device.c:130
 #define SF2C_DEVICE_N_500_0604 500
 // runtime/nvn/vulkan/device.c:130
@@ -37,7 +37,7 @@
 // runtime/nvn/vulkan/device.c:147
 #define SF2C_DEVICE_N_14_8527 14
 // runtime/nvn/vulkan/device.c:149
-#define SF2C_DEVICE_S_LARECOMP_VK_VALIDATION_1BC8 "LARECOMP_VK_VALIDATION"
+#define SF2C_DEVICE_S_SF2RECOMP_VK_VALIDATION_1BC8 "SF2RECOMP_VK_VALIDATION"
 // runtime/nvn/vulkan/device.c:155
 #define SF2C_DEVICE_S_VK_LAYER_KHRONOS_VALIDATION_84A0 "VK_LAYER_KHRONOS_validation"
 // runtime/nvn/vulkan/device.c:158
@@ -61,7 +61,7 @@
 // runtime/nvn/vulkan/device.c:208
 #define SF2C_DEVICE_S_NO_VULKAN_DEVICE_N_9110 "no Vulkan device\n"
 // runtime/nvn/vulkan/device.c:211
-#define SF2C_DEVICE_S_LARECOMP_GPU_D219 "LARECOMP_GPU"
+#define SF2C_DEVICE_S_SF2RECOMP_GPU_D219 "SF2RECOMP_GPU"
 // runtime/nvn/vulkan/device.c:215
 #define SF2C_DEVICE_S_VK_GPU_U_S_API_U_U_U_N_A70D "[vk] gpu %u: %s (api %u.%u.%u)\n"
 // runtime/nvn/vulkan/device.c:219
@@ -73,11 +73,11 @@
 // runtime/nvn/vulkan/device.c:241
 #define SF2C_DEVICE_S_VK_USING_S_N_0687 "[vk] using %s\n"
 // runtime/nvn/vulkan/device.c:247
-#define SF2C_DEVICE_S_LARECOMP_VK_LEAN_USAGE_E9A0 "LARECOMP_VK_LEAN_USAGE"
+#define SF2C_DEVICE_S_SF2RECOMP_VK_LEAN_USAGE_E9A0 "SF2RECOMP_VK_LEAN_USAGE"
 // runtime/nvn/vulkan/device.c:249
-#define SF2C_DEVICE_S_LARECOMP_VK_SMAA_STENCIL_B8BB "LARECOMP_VK_SMAA_STENCIL"
+#define SF2C_DEVICE_S_SF2RECOMP_VK_SMAA_STENCIL_B8BB "SF2RECOMP_VK_SMAA_STENCIL"
 // runtime/nvn/vulkan/device.c:251
-#define SF2C_DEVICE_S_LARECOMP_NO_FRAME_CLEAR_D7F3 "LARECOMP_NO_FRAME_CLEAR"
+#define SF2C_DEVICE_S_SF2RECOMP_NO_FRAME_CLEAR_D7F3 "SF2RECOMP_NO_FRAME_CLEAR"
 // runtime/nvn/vulkan/device.c:253
 #define SF2C_DEVICE_S_VK_LEAN_USAGE_S_SMAA_STENCIL_643B "[vk] lean usage %s, SMAA stencil %s, per-frame target clears %s (%s GPU)\n"
 // runtime/nvn/vulkan/device.c:253
@@ -131,7 +131,7 @@
 // runtime/nvn/vulkan/device.c:334
 #define SF2C_DEVICE_S_VK_KHR_PORTABILITY_SUBSET_3197 "VK_KHR_portability_subset"
 // runtime/nvn/vulkan/device.c:339
-#define SF2C_DEVICE_S_LARECOMP_VK_MANAGED_HEAP_29F9 "LARECOMP_VK_MANAGED_HEAP"
+#define SF2C_DEVICE_S_SF2RECOMP_VK_MANAGED_HEAP_29F9 "SF2RECOMP_VK_MANAGED_HEAP"
 // runtime/nvn/vulkan/device.c:347
 #define SF2C_DEVICE_S_VK_GUEST_HEAP_DRIVER_MANAGED_03F5 "[vk] guest heap: driver-managed memory required; host-pointer imports disabled\n"
 // runtime/nvn/vulkan/device.c:403
@@ -155,7 +155,7 @@
 // runtime/nvn/vulkan/device.c:429
 #define SF2C_DEVICE_S_VK_DRIVER_S_S_GRAPHICS_PIPEL_6E0F "[vk] driver %s %s; graphics pipeline library: %s; vertex input dynamic state: %s; extended dynamic state 3: %s\n"
 // runtime/nvn/vulkan/device.c:434
-#define SF2C_DEVICE_S_LARECOMP_VK_DYN_VERTEX_0922 "LARECOMP_VK_DYN_VERTEX"
+#define SF2C_DEVICE_S_SF2RECOMP_VK_DYN_VERTEX_0922 "SF2RECOMP_VK_DYN_VERTEX"
 // runtime/nvn/vulkan/device.c:440
 #define SF2C_DEVICE_N_0X8086_D5E6 0x8086
 // runtime/nvn/vulkan/device.c:440
@@ -165,13 +165,13 @@
 // runtime/nvn/vulkan/device.c:446
 #define SF2C_DEVICE_S_INTEL_S_OLDER_WINDOWS_DRIVER_8E1D "Intel's older Windows driver: drew nothing with it"
 // runtime/nvn/vulkan/device.c:447
-#define SF2C_DEVICE_S_LARECOMP_VK_DYN_VERTEX_0_7B69 "LARECOMP_VK_DYN_VERTEX=0"
+#define SF2C_DEVICE_S_SF2RECOMP_VK_DYN_VERTEX_0_7B69 "SF2RECOMP_VK_DYN_VERTEX=0"
 // runtime/nvn/vulkan/device.c:448
 #define SF2C_DEVICE_S_NO_VK_EXT_VERTEX_INPUT_DYNAM_300C "no VK_EXT_vertex_input_dynamic_state"
 // runtime/nvn/vulkan/device.c:448
 #define SF2C_DEVICE_S_VERTEXINPUTDYNAMICSTATE_NOT__E76B "vertexInputDynamicState not supported"
 // runtime/nvn/vulkan/device.c:452
-#define SF2C_DEVICE_S_LARECOMP_VK_GPL_PROBE_6BED "LARECOMP_VK_GPL_PROBE"
+#define SF2C_DEVICE_S_SF2RECOMP_VK_GPL_PROBE_6BED "SF2RECOMP_VK_GPL_PROBE"
 // runtime/nvn/vulkan/device.c:458
 #define SF2C_DEVICE_S_GPL_PROBE_THE_DRIVER_HAS_NO__0DBA "[gpl] probe: the driver has no graphics pipeline library; skipped\n"
 // runtime/nvn/vulkan/device.c:462
@@ -201,7 +201,7 @@
 // runtime/nvn/vulkan/device.c:603
 #define SF2C_DEVICE_S_VK_PIPELINE_CACHE_SAVED_ZU_B_6C21 "[vk] pipeline cache: saved %zu bytes\n"
 // runtime/nvn/vulkan/device.c:616
-#define SF2C_DEVICE_S_LARECOMP_VK_PRESENT_0D5A "LARECOMP_VK_PRESENT"
+#define SF2C_DEVICE_S_SF2RECOMP_VK_PRESENT_0D5A "SF2RECOMP_VK_PRESENT"
 // runtime/nvn/vulkan/device.c:617
 #define SF2C_DEVICE_S_MAILBOX_69E3 "mailbox"
 // runtime/nvn/vulkan/device.c:618
@@ -219,13 +219,13 @@
 // runtime/nvn/vulkan/device.c:669
 #define SF2C_DEVICE_S_OTHER_PRESENT_MODE_5564 "other present mode"
 // runtime/nvn/vulkan/device.c:748
-#define SF2C_DEVICE_S_LARECOMP_VK_TRACE_B60E "LARECOMP_VK_TRACE"
+#define SF2C_DEVICE_S_SF2RECOMP_VK_TRACE_B60E "SF2RECOMP_VK_TRACE"
 // runtime/nvn/vulkan/device.c:749
 #define SF2C_DEVICE_S_VK_FRAME_BEGIN_DX_D_SWAPCHAI_7589 "[vk] frame begin %dx%d (swapchain %ux%u)\n"
 // runtime/nvn/vulkan/device.c:760
 #define SF2C_DEVICE_S_VK_ACQUIRE_FAILED_D_N_9B2A "[vk] acquire failed: %d\n"
 // runtime/nvn/vulkan/device.c:862
-#define SF2C_DEVICE_S_LARECOMP_VK_OVERLAY_DIRECT_EFEC "LARECOMP_VK_OVERLAY_DIRECT"
+#define SF2C_DEVICE_S_SF2RECOMP_VK_OVERLAY_DIRECT_EFEC "SF2RECOMP_VK_OVERLAY_DIRECT"
 // runtime/nvn/vulkan/device.c:864
 #define SF2C_DEVICE_S_VK_OVERLAY_S_N_AA59 "[vk] overlay: %s\n"
 // runtime/nvn/vulkan/device.c:864
@@ -245,7 +245,7 @@
 // runtime/nvn/vulkan/device.c:1000
 #define SF2C_DEVICE_S_PRESENT_FRAME_SUBMIT_3F_ACQU_616E " | present/frame submit %.3f acquire %.3f scale %.3f blit %.3f overlay %.3f end %.3f rest %.3f ms"
 // runtime/nvn/vulkan/device.c:1011
-#define SF2C_DEVICE_S_LARECOMP_VK_PROF_CC43 "LARECOMP_VK_PROF"
+#define SF2C_DEVICE_S_SF2RECOMP_VK_PROF_CC43 "SF2RECOMP_VK_PROF"
 // runtime/nvn/vulkan/device.c:1032
 #define SF2C_DEVICE_N_30000000_07BA 30000000
 // runtime/nvn/vulkan/device.c:1034
@@ -253,7 +253,7 @@
 // runtime/nvn/vulkan/device.c:1034
 #define SF2C_DEVICE_N_1000000_6CCE 1000000
 // runtime/nvn/vulkan/device.c:1042
-#define SF2C_DEVICE_S_LARECOMP_DYNRES_COUNT_PRESEN_D71E "LARECOMP_DYNRES_COUNT_PRESENT"
+#define SF2C_DEVICE_S_SF2RECOMP_DYNRES_COUNT_PRESEN_D71E "SF2RECOMP_DYNRES_COUNT_PRESENT"
 // runtime/nvn/vulkan/device.c:1065
 #define SF2C_DEVICE_N_1E9_EFAC 1e9
 // runtime/nvn/vulkan/device.c:1077
@@ -263,17 +263,17 @@
 // runtime/nvn/vulkan/device.c:1091
 #define SF2C_DEVICE_N_0_0F_6895 0.0f
 // runtime/nvn/vulkan/device.c:1104
-#define SF2C_DEVICE_S_LARECOMP_MENU_AT_945C "LARECOMP_MENU_AT"
+#define SF2C_DEVICE_S_SF2RECOMP_MENU_AT_945C "SF2RECOMP_MENU_AT"
 // runtime/nvn/vulkan/device.c:1110
-#define SF2C_DEVICE_S_LARECOMP_WINDOW_SHOT_AF3A "LARECOMP_WINDOW_SHOT"
+#define SF2C_DEVICE_S_SF2RECOMP_WINDOW_SHOT_AF3A "SF2RECOMP_WINDOW_SHOT"
 // runtime/nvn/vulkan/device.c:1112
 #define SF2C_DEVICE_S_BUILD_WINDOW_PNG_58F7 "build/window.png"
 // runtime/nvn/vulkan/device.c:1119
-#define SF2C_DEVICE_S_LARECOMP_EXIT_AFTER_SHOT_7B52 "LARECOMP_EXIT_AFTER_SHOT"
+#define SF2C_DEVICE_S_SF2RECOMP_EXIT_AFTER_SHOT_7B52 "SF2RECOMP_EXIT_AFTER_SHOT"
 // runtime/nvn/vulkan/device.c:1129
-#define SF2C_DEVICE_S_LARECOMP_SCREENSHOT_EVERY_CEF8 "LARECOMP_SCREENSHOT_EVERY"
+#define SF2C_DEVICE_S_SF2RECOMP_SCREENSHOT_EVERY_CEF8 "SF2RECOMP_SCREENSHOT_EVERY"
 // runtime/nvn/vulkan/device.c:1134
-#define SF2C_DEVICE_S_LARECOMP_GPUPROF_AT_4834 "LARECOMP_GPUPROF_AT"
+#define SF2C_DEVICE_S_SF2RECOMP_GPUPROF_AT_4834 "SF2RECOMP_GPUPROF_AT"
 // runtime/nvn/vulkan/device.c:1136
 #define SF2C_DEVICE_N_10_4A44 10
 // runtime/nvn/vulkan/device.c:1138
@@ -281,7 +281,7 @@
 // runtime/nvn/vulkan/device.c:1141
 #define SF2C_DEVICE_S_DEBUG_FRAME_LLU_N_3556 "===== debug frame %llu =====\n"
 // runtime/nvn/vulkan/device.c:1145
-#define SF2C_DEVICE_S_LARECOMP_SHOT_AT_8756 "LARECOMP_SHOT_AT"
+#define SF2C_DEVICE_S_SF2RECOMP_SHOT_AT_8756 "SF2RECOMP_SHOT_AT"
 // runtime/nvn/vulkan/device.c:1145
 #define SF2C_DEVICE_S_BUILD_E99A "build"
 // runtime/nvn/vulkan/device.c:1145
@@ -293,17 +293,17 @@
 // runtime/nvn/vulkan/device.c:1151
 #define SF2C_DEVICE_S_BUILD_FRAMES_FRAME_05LLU_PNG_C878 "build/frames/frame_%05llu.png"
 // runtime/nvn/vulkan/device.c:1158
-#define SF2C_DEVICE_S_LARECOMP_SCREENSHOT_FROM_32B7 "LARECOMP_SCREENSHOT_FROM"
+#define SF2C_DEVICE_S_SF2RECOMP_SCREENSHOT_FROM_32B7 "SF2RECOMP_SCREENSHOT_FROM"
 // runtime/nvn/vulkan/device.c:1163
 #define SF2C_DEVICE_S_BUILD_FRAME_05LLU_PNG_CBB4 "build/frame_%05llu.png"
 // runtime/nvn/vulkan/device.c:1169
 #define SF2C_DEVICE_N_1000_0_4250 1000.0
 // runtime/nvn/vulkan/device.c:1171
-#define SF2C_DEVICE_S_LARECOMP_FPS_INTERVAL_D507 "LARECOMP_FPS_INTERVAL"
+#define SF2C_DEVICE_S_SF2RECOMP_FPS_INTERVAL_D507 "SF2RECOMP_FPS_INTERVAL"
 // runtime/nvn/vulkan/device.c:1171
 #define SF2C_DEVICE_N_2_0_D84B 2.0
 // runtime/nvn/vulkan/device.c:1174
-#define SF2C_DEVICE_S_LARECOMP_LOG_HITCH_MS_631F "LARECOMP_LOG_HITCH_MS"
+#define SF2C_DEVICE_S_SF2RECOMP_LOG_HITCH_MS_631F "SF2RECOMP_LOG_HITCH_MS"
 // runtime/nvn/vulkan/device.c:1175
 #define SF2C_DEVICE_N_1000_4051 1000
 // runtime/nvn/vulkan/device.c:1176
@@ -317,15 +317,15 @@
 // runtime/nvn/vulkan/device.c:1189
 #define SF2C_DEVICE_N_600_0_F7EA 600.0
 // runtime/nvn/vulkan/device.c:1199
-#define SF2C_DEVICE_S_LARECOMP_SIM_SLOW_FRAME_MS_ECED "LARECOMP_SIM_SLOW_FRAME_MS"
+#define SF2C_DEVICE_S_SF2RECOMP_SIM_SLOW_FRAME_MS_ECED "SF2RECOMP_SIM_SLOW_FRAME_MS"
 // runtime/nvn/vulkan/device.c:1201
-#define SF2C_DEVICE_S_LARECOMP_SLOW_FRAME_UNTIL_0859 "LARECOMP_SLOW_FRAME_UNTIL"
+#define SF2C_DEVICE_S_SF2RECOMP_SLOW_FRAME_UNTIL_0859 "SF2RECOMP_SLOW_FRAME_UNTIL"
 // runtime/nvn/vulkan/device.c:1202
 #define SF2C_DEVICE_N_2600_3A0E 2600
 // runtime/nvn/vulkan/device.c:1206
-#define SF2C_DEVICE_S_LARECOMP_DEBUG_FRAME_DEA8 "LARECOMP_DEBUG_FRAME"
+#define SF2C_DEVICE_S_SF2RECOMP_DEBUG_FRAME_DEA8 "SF2RECOMP_DEBUG_FRAME"
 // runtime/nvn/vulkan/device.c:1211
-#define SF2C_DEVICE_S_LARECOMP_DEBUG_FRAMES_8FB4 "LARECOMP_DEBUG_FRAMES"
+#define SF2C_DEVICE_S_SF2RECOMP_DEBUG_FRAMES_8FB4 "SF2RECOMP_DEBUG_FRAMES"
 // runtime/nvn/vulkan/device.c:1247
 #define SF2C_DEVICE_N_50000000ULL_F253 50000000ull
 // runtime/nvn/vulkan/device.c:1263
@@ -355,19 +355,19 @@
 // runtime/nvn/vulkan/device.c:1344
 #define SF2C_DEVICE_N_720_D829 720
 // runtime/nvn/vulkan/device.c:1345
-#define SF2C_DEVICE_S_LARECOMP_WINDOW_7651 "LARECOMP_WINDOW"
+#define SF2C_DEVICE_S_SF2RECOMP_WINDOW_7651 "SF2RECOMP_WINDOW"
 // runtime/nvn/vulkan/device.c:1345
 #define SF2C_DEVICE_S_DX_D_3DD6 "%dx%d"
 // runtime/nvn/vulkan/device.c:1347
-#define SF2C_DEVICE_S_LARECOMP_HIDDEN_AFF5 "LARECOMP_HIDDEN"
+#define SF2C_DEVICE_S_SF2RECOMP_HIDDEN_AFF5 "SF2RECOMP_HIDDEN"
 // runtime/nvn/vulkan/device.c:1350
-#define SF2C_DEVICE_S_LARECOMP_NO_USER_INPUT_EB20 "LARECOMP_NO_USER_INPUT"
+#define SF2C_DEVICE_S_SF2RECOMP_NO_USER_INPUT_EB20 "SF2RECOMP_NO_USER_INPUT"
 // runtime/nvn/vulkan/device.c:1351
-#define SF2C_DEVICE_S_LARECOMP_INPUT_D0A3 "LARECOMP_INPUT"
+#define SF2C_DEVICE_S_SF2RECOMP_INPUT_D0A3 "SF2RECOMP_INPUT"
 // runtime/nvn/vulkan/device.c:1351
-#define SF2C_DEVICE_S_LARECOMP_HOST_INPUT_8D91 "LARECOMP_HOST_INPUT"
+#define SF2C_DEVICE_S_SF2RECOMP_HOST_INPUT_8D91 "SF2RECOMP_HOST_INPUT"
 // runtime/nvn/vulkan/device.c:1351
-#define SF2C_DEVICE_S_LARECOMP_BIND_TEST_C2F2 "LARECOMP_BIND_TEST"
+#define SF2C_DEVICE_S_SF2RECOMP_BIND_TEST_C2F2 "SF2RECOMP_BIND_TEST"
 // runtime/nvn/vulkan/device.c:1355
 #define SF2C_DEVICE_S_SDL_CREATEWINDOW_S_N_9FD0 "SDL_CreateWindow: %s\n"
 // runtime/nvn/vulkan/device.c:1361
@@ -393,15 +393,15 @@
 // runtime/nvn/vulkan/exec.c:65
 #define SF2C_EXEC_N_2048_BFA0 2048
 // runtime/nvn/vulkan/exec.c:119
-#define SF2C_EXEC_S_LARECOMP_GPU_OVERLAP_B13C "LARECOMP_GPU_OVERLAP"
+#define SF2C_EXEC_S_SF2RECOMP_GPU_OVERLAP_B13C "SF2RECOMP_GPU_OVERLAP"
 // runtime/nvn/vulkan/exec.c:119
-#define SF2C_EXEC_S_LARECOMP_OVERLAP_WATCH_FEAE "LARECOMP_OVERLAP_WATCH"
+#define SF2C_EXEC_S_SF2RECOMP_OVERLAP_WATCH_FEAE "SF2RECOMP_OVERLAP_WATCH"
 // runtime/nvn/vulkan/exec.c:125
-#define SF2C_EXEC_S_VK_GPU_OVERLAP_OFF_NO_PAGE_W_0515 "[vk] GPU overlap off: no page write tracking on this system (%s); LARECOMP_GPU_OVERLAP=1 forces it on\n"
+#define SF2C_EXEC_S_VK_GPU_OVERLAP_OFF_NO_PAGE_W_0515 "[vk] GPU overlap off: no page write tracking on this system (%s); SF2RECOMP_GPU_OVERLAP=1 forces it on\n"
 // runtime/nvn/vulkan/exec.c:126
-#define SF2C_EXEC_S_LARECOMP_OVERLAP_WATCH_0_14BB "LARECOMP_OVERLAP_WATCH=0"
+#define SF2C_EXEC_S_SF2RECOMP_OVERLAP_WATCH_0_14BB "SF2RECOMP_OVERLAP_WATCH=0"
 // runtime/nvn/vulkan/exec.c:129
-#define SF2C_EXEC_S_VK_GPU_OVERLAP_S_THE_GAME_S__C69C "[vk] GPU overlap %s (the game's frame fence waited one frame late; LARECOMP_GPU_OVERLAP=%d: %s%s)\n"
+#define SF2C_EXEC_S_VK_GPU_OVERLAP_S_THE_GAME_S__C69C "[vk] GPU overlap %s (the game's frame fence waited one frame late; SF2RECOMP_GPU_OVERLAP=%d: %s%s)\n"
 // runtime/nvn/vulkan/exec.c:129
 #define SF2C_EXEC_S_ON_990C "on"
 // runtime/nvn/vulkan/exec.c:129
@@ -435,7 +435,7 @@
 // runtime/nvn/vulkan/exec.c:223
 #define SF2C_EXEC_N_625_AD72 625
 // runtime/nvn/vulkan/exec.c:230
-#define SF2C_EXEC_S_LARECOMP_VK_COUNTER_DD98 "LARECOMP_VK_COUNTER"
+#define SF2C_EXEC_S_SF2RECOMP_VK_COUNTER_DD98 "SF2RECOMP_VK_COUNTER"
 // runtime/nvn/vulkan/exec.c:231
 #define SF2C_EXEC_S_CPU_C4FC "cpu"
 // runtime/nvn/vulkan/exec.c:231
@@ -443,7 +443,7 @@
 // runtime/nvn/vulkan/exec.c:231
 #define SF2C_EXEC_S_LEGACY_E4C1 "legacy"
 // runtime/nvn/vulkan/exec.c:247
-#define SF2C_EXEC_S_LARECOMP_LOG_COUNTER_8119 "LARECOMP_LOG_COUNTER"
+#define SF2C_EXEC_S_SF2RECOMP_LOG_COUNTER_8119 "SF2RECOMP_LOG_COUNTER"
 // runtime/nvn/vulkan/exec.c:250
 #define SF2C_EXEC_S_COUNTER_SEQ_LLU_U_AT_LLX_HOS_B703 "[counter] seq %llu #%u at %llx host %.3f gpu %.3f ms\n"
 // runtime/nvn/vulkan/exec.c:251
@@ -467,7 +467,7 @@
 // runtime/nvn/vulkan/exec.c:444
 #define SF2C_EXEC_N_128_2747 128
 // runtime/nvn/vulkan/exec.c:448
-#define SF2C_EXEC_S_LARECOMP_VK_DEVLOST_TRACE_28EE "LARECOMP_VK_DEVLOST_TRACE"
+#define SF2C_EXEC_S_SF2RECOMP_VK_DEVLOST_TRACE_28EE "SF2RECOMP_VK_DEVLOST_TRACE"
 // runtime/nvn/vulkan/exec.c:452
 #define SF2C_EXEC_N_63_DA4E 63
 // runtime/nvn/vulkan/exec.c:456
@@ -503,11 +503,11 @@
 // runtime/nvn/vulkan/exec.c:638
 #define SF2C_EXEC_N_20_F5CA 20
 // runtime/nvn/vulkan/exec.c:660
-#define SF2C_EXEC_S_LARECOMP_VK_RING_BAR_E550 "LARECOMP_VK_RING_BAR"
+#define SF2C_EXEC_S_SF2RECOMP_VK_RING_BAR_E550 "SF2RECOMP_VK_RING_BAR"
 // runtime/nvn/vulkan/exec.c:673
 #define SF2C_EXEC_S_VK_TRANSIENT_RING_DEVICE_LOC_9CB6 "[vk] transient ring: device-local window %llu of %llu MB budget in use: new chunks in system memory\n"
 // runtime/nvn/vulkan/exec.c:678
-#define SF2C_EXEC_S_LARECOMP_VK_RING_SYSMEM_6E5D "LARECOMP_VK_RING_SYSMEM"
+#define SF2C_EXEC_S_SF2RECOMP_VK_RING_SYSMEM_6E5D "SF2RECOMP_VK_RING_SYSMEM"
 // runtime/nvn/vulkan/exec.c:684
 #define SF2C_EXEC_S_VK_TRANSIENT_RING_DEVICE_LOC_07EC "[vk] transient ring: device-local memory full after %d chunks, system memory from now on\n"
 // runtime/nvn/vulkan/exec.c:685
@@ -545,7 +545,7 @@
 // runtime/nvn/vulkan/exec.c:810
 #define SF2C_EXEC_N_256_51E8 256
 // runtime/nvn/vulkan/exec.c:841
-#define SF2C_EXEC_S_LARECOMP_SYNC_SHADERS_2655 "LARECOMP_SYNC_SHADERS"
+#define SF2C_EXEC_S_SF2RECOMP_SYNC_SHADERS_2655 "SF2RECOMP_SYNC_SHADERS"
 // runtime/nvn/vulkan/exec.c:921
 #define SF2C_EXEC_N_0X18_D47C 0x18
 // runtime/nvn/vulkan/exec.c:927
@@ -579,7 +579,7 @@
 // runtime/nvn/vulkan/exec.c:974
 #define SF2C_EXEC_S_HIDDEN_ON_PURPOSE_BE0D "hidden on purpose"
 // runtime/nvn/vulkan/exec.c:981
-#define SF2C_EXEC_S_LARECOMP_LOG_SKIPS_F37B "LARECOMP_LOG_SKIPS"
+#define SF2C_EXEC_S_SF2RECOMP_LOG_SKIPS_F37B "SF2RECOMP_LOG_SKIPS"
 // runtime/nvn/vulkan/exec.c:1001
 #define SF2C_EXEC_S_SKIP_DRAW_WHY_S_D_N_44B1 "[skip_draw] why=%s (%d)\n"
 // runtime/nvn/vulkan/exec.c:1002
@@ -679,9 +679,9 @@
 // runtime/nvn/vulkan/exec.c:1214
 #define SF2C_EXEC_S_SF2_TRACE_RENDER_5E88 "SF2_TRACE_RENDER"
 // runtime/nvn/vulkan/exec.c:1215
-#define SF2C_EXEC_S_LARECOMP_VK_PROF_CC43 "LARECOMP_VK_PROF"
+#define SF2C_EXEC_S_SF2RECOMP_VK_PROF_CC43 "SF2RECOMP_VK_PROF"
 // runtime/nvn/vulkan/exec.c:1218
-#define SF2C_EXEC_S_LARECOMP_VK_GPU_TIMER_3DAF "LARECOMP_VK_GPU_TIMER"
+#define SF2C_EXEC_S_SF2RECOMP_VK_GPU_TIMER_3DAF "SF2RECOMP_VK_GPU_TIMER"
 // runtime/nvn/vulkan/exec.c:1224
 #define SF2C_EXEC_S_VK_GPU_TIMER_S_DYNAMIC_RESOL_571C "[vk] GPU timer %s (dynamic resolution goes by %s)\n"
 // runtime/nvn/vulkan/exec.c:1224
@@ -699,15 +699,15 @@
 // runtime/nvn/vulkan/exec.c:1280
 #define SF2C_EXEC_N_15_E629 15
 // runtime/nvn/vulkan/exec.c:1301
-#define SF2C_EXEC_S_LARECOMP_VK_STATE_FILTER_DE2C "LARECOMP_VK_STATE_FILTER"
+#define SF2C_EXEC_S_SF2RECOMP_VK_STATE_FILTER_DE2C "SF2RECOMP_VK_STATE_FILTER"
 // runtime/nvn/vulkan/exec.c:1323
-#define SF2C_EXEC_S_LARECOMP_DEBUG_FRAMES_8FB4 "LARECOMP_DEBUG_FRAMES"
+#define SF2C_EXEC_S_SF2RECOMP_DEBUG_FRAMES_8FB4 "SF2RECOMP_DEBUG_FRAMES"
 // runtime/nvn/vulkan/exec.c:1325
 #define SF2C_EXEC_S_BUILD_PASS_LLU_03D_PNG_DD88 "build/pass_%llu_%03d.png"
 // runtime/nvn/vulkan/exec.c:1326
 #define SF2C_EXEC_S_BUILD_PASS_03D_PNG_48B9 "build/pass_%03d.png"
 // runtime/nvn/vulkan/exec.c:1360
-#define SF2C_EXEC_S_LARECOMP_CHUNK_PASSES_088B "LARECOMP_CHUNK_PASSES"
+#define SF2C_EXEC_S_SF2RECOMP_CHUNK_PASSES_088B "SF2RECOMP_CHUNK_PASSES"
 // runtime/nvn/vulkan/exec.c:1367
 #define SF2C_EXEC_S_VK_SUBMISSION_CHUNKS_OFF_THE_8F06 "[vk] submission chunks off: the guest heap is one userptr import (AMD)\n"
 // runtime/nvn/vulkan/exec.c:1377
@@ -729,11 +729,11 @@
 // runtime/nvn/vulkan/exec.c:1455
 #define SF2C_EXEC_S_VK_PASS_WITH_NO_ATTACHMENTS__8C1F "[vk] pass with no attachments (%d color slots bound)\n"
 // runtime/nvn/vulkan/exec.c:1462
-#define SF2C_EXEC_S_LARECOMP_VK_PLACEHOLDER_COLO_DDE6 "LARECOMP_VK_PLACEHOLDER_COLOR"
+#define SF2C_EXEC_S_SF2RECOMP_VK_PLACEHOLDER_COLO_DDE6 "SF2RECOMP_VK_PLACEHOLDER_COLOR"
 // runtime/nvn/vulkan/exec.c:1463
 #define SF2C_EXEC_N_0X8086_D5E6 0x8086
 // runtime/nvn/vulkan/exec.c:1485
-#define SF2C_EXEC_S_LARECOMP_VK_LOG_PASSES_B952 "LARECOMP_VK_LOG_PASSES"
+#define SF2C_EXEC_S_SF2RECOMP_VK_LOG_PASSES_B952 "SF2RECOMP_VK_LOG_PASSES"
 // runtime/nvn/vulkan/exec.c:1486
 #define SF2C_EXEC_N_300_983B 300
 // runtime/nvn/vulkan/exec.c:1490
@@ -781,13 +781,13 @@
 // runtime/nvn/vulkan/exec.c:1729
 #define SF2C_EXEC_N_96_7B1A 96
 // runtime/nvn/vulkan/exec.c:1761
-#define SF2C_EXEC_S_LARECOMP_VK_NO_SET_REUSE_7972 "LARECOMP_VK_NO_SET_REUSE"
+#define SF2C_EXEC_S_SF2RECOMP_VK_NO_SET_REUSE_7972 "SF2RECOMP_VK_NO_SET_REUSE"
 // runtime/nvn/vulkan/exec.c:1772
 #define SF2C_EXEC_N_19_9400 19
 // runtime/nvn/vulkan/exec.c:1785
 #define SF2C_EXEC_S_VK_SET_REUSE_U_DYNAMIC_UNIFO_C87C "[vk] set reuse: %u dynamic uniform buffers allowed; a program with %u dynamic, %d left static\n"
 // runtime/nvn/vulkan/exec.c:1805
-#define SF2C_EXEC_S_LARECOMP_SAVE_MSL_AF49 "LARECOMP_SAVE_MSL"
+#define SF2C_EXEC_S_SF2RECOMP_SAVE_MSL_AF49 "SF2RECOMP_SAVE_MSL"
 // runtime/nvn/vulkan/exec.c:1806
 #define SF2C_EXEC_S_BUILD_GLSL_6A40 "build/glsl"
 // runtime/nvn/vulkan/exec.c:1806
@@ -821,7 +821,7 @@
 // runtime/nvn/vulkan/exec.c:1927
 #define SF2C_EXEC_N_1024_E39E 1024
 // runtime/nvn/vulkan/exec.c:1973
-#define SF2C_EXEC_S_LARECOMP_VK_NO_KEY_MEMO_ED46 "LARECOMP_VK_NO_KEY_MEMO"
+#define SF2C_EXEC_S_SF2RECOMP_VK_NO_KEY_MEMO_ED46 "SF2RECOMP_VK_NO_KEY_MEMO"
 // runtime/nvn/vulkan/exec.c:1999
 #define SF2C_EXEC_S_VK_GET_PROGRAM_MISSING_STAGE_1F8E "[vk] get_program_ missing stage: np=%p mask=%#x (s0=%llx, s1=%llx, s5=%llx)\n"
 // runtime/nvn/vulkan/exec.c:2009
@@ -975,7 +975,7 @@
 // runtime/nvn/vulkan/exec.c:2540
 #define SF2C_EXEC_S_VK_SAVED_S_UX_U_DEPTH_6F_6F__EB88 "[vk] saved %s (%ux%u depth %.6f..%.6f)\n"
 // runtime/nvn/vulkan/exec.c:2546
-#define SF2C_EXEC_S_LARECOMP_COPY_TRACE_ACED "LARECOMP_COPY_TRACE"
+#define SF2C_EXEC_S_SF2RECOMP_COPY_TRACE_ACED "SF2RECOMP_COPY_TRACE"
 // runtime/nvn/vulkan/exec.c:2556
 #define SF2C_EXEC_CH_EMPTY_EE1B ','
 // runtime/nvn/vulkan/exec.c:2558
@@ -995,7 +995,7 @@
 // runtime/nvn/vulkan/exec.c:2571
 #define SF2C_EXEC_S_V_F192 "v:"
 // runtime/nvn/vulkan/exec.c:2598
-#define SF2C_EXEC_S_LARECOMP_VK_COPY_OPT_AFEA "LARECOMP_VK_COPY_OPT"
+#define SF2C_EXEC_S_SF2RECOMP_VK_COPY_OPT_AFEA "SF2RECOMP_VK_COPY_OPT"
 // runtime/nvn/vulkan/exec.c:2622
 #define SF2C_EXEC_S_COPY_TEXTURE_DEFERRED_S_S_UX_6301 "copy texture (deferred, %s%s) %ux%u"
 // runtime/nvn/vulkan/exec.c:2622
@@ -1021,9 +1021,9 @@
 // runtime/nvn/vulkan/exec.c:2724
 #define SF2C_EXEC_S_DST_BOUND_2C5E "dst bound"
 // runtime/nvn/vulkan/exec.c:2730
-#define SF2C_EXEC_S_LARECOMP_NO_FEEDBACK_AC2E "LARECOMP_NO_FEEDBACK"
+#define SF2C_EXEC_S_SF2RECOMP_NO_FEEDBACK_AC2E "SF2RECOMP_NO_FEEDBACK"
 // runtime/nvn/vulkan/exec.c:2741
-#define SF2C_EXEC_S_LARECOMP_NO_SNAPSHOT_REUSE_E42A "LARECOMP_NO_SNAPSHOT_REUSE"
+#define SF2C_EXEC_S_SF2RECOMP_NO_SNAPSHOT_REUSE_E42A "SF2RECOMP_NO_SNAPSHOT_REUSE"
 // runtime/nvn/vulkan/exec.c:2756
 #define SF2C_EXEC_S_CT_SNAPSHOT_P_UX_U_WAS_S_SI__1660 "[ct] snapshot %p %ux%u (was %s, si %d)\n"
 // runtime/nvn/vulkan/exec.c:2756
@@ -1035,7 +1035,7 @@
 // runtime/nvn/vulkan/exec.c:2770
 #define SF2C_EXEC_S_BUILD_FBDEPTH_03D_SNAP_PGM_03E6 "build/fbdepth_%03d_snap.pgm"
 // runtime/nvn/vulkan/exec.c:2794
-#define SF2C_EXEC_S_LARECOMP_VK_NO_CBUF_LEAN_6E8F "LARECOMP_VK_NO_CBUF_LEAN"
+#define SF2C_EXEC_S_SF2RECOMP_VK_NO_CBUF_LEAN_6E8F "SF2RECOMP_VK_NO_CBUF_LEAN"
 // runtime/nvn/vulkan/exec.c:2798
 #define SF2C_EXEC_N_65_108C 65
 // runtime/nvn/vulkan/exec.c:2846
@@ -1045,7 +1045,7 @@
 // runtime/nvn/vulkan/exec.c:2866
 #define SF2C_EXEC_N_1099511628211ULL_D3BD 1099511628211ull
 // runtime/nvn/vulkan/exec.c:2875
-#define SF2C_EXEC_S_LARECOMP_OVERLAP_SNAP_4B30 "LARECOMP_OVERLAP_SNAP"
+#define SF2C_EXEC_S_SF2RECOMP_OVERLAP_SNAP_4B30 "SF2RECOMP_OVERLAP_SNAP"
 // runtime/nvn/vulkan/exec.c:2878
 #define SF2C_EXEC_N_0XFFFFULL_2BD3 0xFFFFull
 // runtime/nvn/vulkan/exec.c:2881
@@ -1073,7 +1073,7 @@
 // runtime/nvn/vulkan/exec.c:2944
 #define SF2C_EXEC_S_SNAP_COPY_RING_FULL_LLU_BYTE_4F0D "[snap] copy ring full: %llu bytes in place\n"
 // runtime/nvn/vulkan/exec.c:2975
-#define SF2C_EXEC_S_LARECOMP_LOG_BINDS_8A9A "LARECOMP_LOG_BINDS"
+#define SF2C_EXEC_S_SF2RECOMP_LOG_BINDS_8A9A "SF2RECOMP_LOG_BINDS"
 // runtime/nvn/vulkan/exec.c:2976
 #define SF2C_EXEC_S_SNAP_LLX_LLU_REMADE_LLU_BYTE_DB50 "[snap] %llx+%llu remade: %llu bytes of the GPU's kept (frame %llu)\n"
 // runtime/nvn/vulkan/exec.c:2990
@@ -1087,7 +1087,7 @@
 // runtime/nvn/vulkan/exec.c:3023
 #define SF2C_EXEC_S_VK_STORAGE_WRITE_WATCH_S_COM_0106 "[vk] storage write watch %s (compute-bound ranges copied once the OS's page write tracking sees a CPU write; no page protection)\n"
 // runtime/nvn/vulkan/exec.c:3024
-#define SF2C_EXEC_S_OFF_LARECOMP_OVERLAP_WATCH_0_557F "off (LARECOMP_OVERLAP_WATCH=0)"
+#define SF2C_EXEC_S_OFF_SF2RECOMP_OVERLAP_WATCH_0_557F "off (SF2RECOMP_OVERLAP_WATCH=0)"
 // runtime/nvn/vulkan/exec.c:3060
 #define SF2C_EXEC_S_VK_STORAGE_RANGE_LLX_LLU_TOO_B84F "[vk] storage range %llx+%llu too large for a snapshot: read in place\n"
 // runtime/nvn/vulkan/exec.c:3065
@@ -1145,13 +1145,13 @@
 // runtime/nvn/vulkan/exec.c:3306
 #define SF2C_EXEC_N_0X500_E9D0 0x500
 // runtime/nvn/vulkan/exec.c:3328
-#define SF2C_EXEC_S_LARECOMP_VK_NO_SCAN_ONCE_88EA "LARECOMP_VK_NO_SCAN_ONCE"
+#define SF2C_EXEC_S_SF2RECOMP_VK_NO_SCAN_ONCE_88EA "SF2RECOMP_VK_NO_SCAN_ONCE"
 // runtime/nvn/vulkan/exec.c:3366
 #define SF2C_EXEC_S_HOST_POINTER_IMPORT_ATTEMPTE_884A "host-pointer import attempted with a driver-managed guest heap\n"
 // runtime/nvn/vulkan/exec.c:3368
 #define SF2C_EXEC_S_VKGETMEMORYHOSTPOINTERPROPER_96C4 "vkGetMemoryHostPointerPropertiesEXT"
 // runtime/nvn/vulkan/exec.c:3411
-#define SF2C_EXEC_S_LARECOMP_VK_SIM_HEAP_OOM_49B8 "LARECOMP_VK_SIM_HEAP_OOM"
+#define SF2C_EXEC_S_SF2RECOMP_VK_SIM_HEAP_OOM_49B8 "SF2RECOMP_VK_SIM_HEAP_OOM"
 // runtime/nvn/vulkan/exec.c:3415
 #define SF2C_EXEC_S_HOST_MEMORY_F00D "host memory"
 // runtime/nvn/vulkan/exec.c:3422
@@ -1159,7 +1159,7 @@
 // runtime/nvn/vulkan/exec.c:3427
 #define SF2C_EXEC_S_SUBMISSION_EEA6 "submission"
 // runtime/nvn/vulkan/exec.c:3460
-#define SF2C_EXEC_S_SIMULATED_LARECOMP_VK_SIM_HE_EDBD "simulated (LARECOMP_VK_SIM_HEAP_OOM)"
+#define SF2C_EXEC_S_SIMULATED_SF2RECOMP_VK_SIM_HE_EDBD "simulated (SF2RECOMP_VK_SIM_HEAP_OOM)"
 // runtime/nvn/vulkan/exec.c:3463
 #define SF2C_EXEC_S_VK_GUEST_HEAP_ONE_IMPORT_OF__CA8E "[vk] guest heap: one import of %llu MB ran out of memory (%s, error %d, %u ms): falling back to chunks "
 // runtime/nvn/vulkan/exec.c:3464
@@ -1175,7 +1175,7 @@
 // runtime/nvn/vulkan/exec.c:3491
 #define SF2C_EXEC_S_UNAVAILABLE_EC83 "unavailable"
 // runtime/nvn/vulkan/exec.c:3524
-#define SF2C_EXEC_S_LARECOMP_VK_NO_GMEM_2D48 "LARECOMP_VK_NO_GMEM"
+#define SF2C_EXEC_S_SF2RECOMP_VK_NO_GMEM_2D48 "SF2RECOMP_VK_NO_GMEM"
 // runtime/nvn/vulkan/exec.c:3533
 #define SF2C_EXEC_S_VK_CANNOT_START_BACKGROUND_G_2EB2 "[vk] cannot start background guest heap preparation: %s\n"
 // runtime/nvn/vulkan/exec.c:3534
@@ -1199,7 +1199,7 @@
 // runtime/nvn/vulkan/exec.c:3595
 #define SF2C_EXEC_S_THE_DRIVER_S_PLACED_MAPPING__FFA7 "the driver's placed mapping failed"
 // runtime/nvn/vulkan/exec.c:3616
-#define SF2C_EXEC_S_LARECOMP_VK_HEAP_DMABUF_419D "LARECOMP_VK_HEAP_DMABUF"
+#define SF2C_EXEC_S_SF2RECOMP_VK_HEAP_DMABUF_419D "SF2RECOMP_VK_HEAP_DMABUF"
 // runtime/nvn/vulkan/exec.c:3617
 #define SF2C_EXEC_S_RADV_6945 "RADV"
 // runtime/nvn/vulkan/exec.c:3633
@@ -1209,7 +1209,7 @@
 // runtime/nvn/vulkan/exec.c:3635
 #define SF2C_EXEC_S_VK_HEAP_AS_DRIVER_MEMORY_NO__2EA9 "[vk] heap as driver memory: no cached host-visible memory type\n"
 // runtime/nvn/vulkan/exec.c:3643
-#define SF2C_EXEC_S_LARECOMP_VK_HEAP_PLACED_F170 "LARECOMP_VK_HEAP_PLACED"
+#define SF2C_EXEC_S_SF2RECOMP_VK_HEAP_PLACED_F170 "SF2RECOMP_VK_HEAP_PLACED"
 // runtime/nvn/vulkan/exec.c:3645
 #define SF2C_EXEC_S_VK_HEAP_AS_DRIVER_MEMORY_NO__1874 "[vk] heap as driver memory: no way to map it here\n"
 // runtime/nvn/vulkan/exec.c:3648
@@ -1289,7 +1289,7 @@
 // runtime/nvn/vulkan/exec.c:3891
 #define SF2C_EXEC_S_NO_STORES_FROM_FRAGMENT_VERT_7E67 "no stores from fragment / vertex shaders"
 // runtime/nvn/vulkan/exec.c:3909
-#define SF2C_EXEC_S_LARECOMP_VK_GMEM_CHUNK_MB_B29B "LARECOMP_VK_GMEM_CHUNK_MB"
+#define SF2C_EXEC_S_SF2RECOMP_VK_GMEM_CHUNK_MB_B29B "SF2RECOMP_VK_GMEM_CHUNK_MB"
 // runtime/nvn/vulkan/exec.c:3914
 #define SF2C_EXEC_N_24_C235 24
 // runtime/nvn/vulkan/exec.c:3923
@@ -1303,9 +1303,9 @@
 // runtime/nvn/vulkan/exec.c:3936
 #define SF2C_EXEC_S_VK_WARNING_ONE_STORAGE_BUFFE_827A "[vk] warning: one storage buffer over the heap exceeds this GPU's %llu MB range\n"
 // runtime/nvn/vulkan/exec.c:3941
-#define SF2C_EXEC_S_LARECOMP_VK_GMEM_FS_MISS_999B "LARECOMP_VK_GMEM_FS_MISS"
+#define SF2C_EXEC_S_SF2RECOMP_VK_GMEM_FS_MISS_999B "SF2RECOMP_VK_GMEM_FS_MISS"
 // runtime/nvn/vulkan/exec.c:3942
-#define SF2C_EXEC_S_VK_LAZY_CHUNKS_EVERY_FRAGMEN_6FE6 "[vk] lazy chunks: every fragment shader counts misses, no early tests (LARECOMP_VK_GMEM_FS_MISS)\n"
+#define SF2C_EXEC_S_VK_LAZY_CHUNKS_EVERY_FRAGMEN_6FE6 "[vk] lazy chunks: every fragment shader counts misses, no early tests (SF2RECOMP_VK_GMEM_FS_MISS)\n"
 // runtime/nvn/vulkan/exec.c:3943
 #define SF2C_EXEC_S_VK_GUEST_HEAP_BOUND_TO_SHADE_B153 "[vk] guest heap bound to shaders in %llu MB %s (storage buffers up to %llu MB here)\n"
 // runtime/nvn/vulkan/exec.c:3944
@@ -1323,11 +1323,11 @@
 // runtime/nvn/vulkan/exec.c:4085
 #define SF2C_EXEC_N_3ULL_BD3E 3ull
 // runtime/nvn/vulkan/exec.c:4177
-#define SF2C_EXEC_S_LARECOMP_VK_GMEM_DIRECT_5127 "LARECOMP_VK_GMEM_DIRECT"
+#define SF2C_EXEC_S_SF2RECOMP_VK_GMEM_DIRECT_5127 "SF2RECOMP_VK_GMEM_DIRECT"
 // runtime/nvn/vulkan/exec.c:4178
-#define SF2C_EXEC_S_VK_LAZY_CHUNKS_STORAGE_BUFFE_9506 "[vk] lazy chunks: storage buffer chunks through the table too (LARECOMP_VK_GMEM_DIRECT=0)\n"
+#define SF2C_EXEC_S_VK_LAZY_CHUNKS_STORAGE_BUFFE_9506 "[vk] lazy chunks: storage buffer chunks through the table too (SF2RECOMP_VK_GMEM_DIRECT=0)\n"
 // runtime/nvn/vulkan/exec.c:4210
-#define SF2C_EXEC_S_LARECOMP_LOG_GMEM_SBUF_407A "LARECOMP_LOG_GMEM_SBUF"
+#define SF2C_EXEC_S_SF2RECOMP_LOG_GMEM_SBUF_407A "SF2RECOMP_LOG_GMEM_SBUF"
 // runtime/nvn/vulkan/exec.c:4218
 #define SF2C_EXEC_N_56_7688 56
 // runtime/nvn/vulkan/exec.c:4220
@@ -1339,9 +1339,9 @@
 // runtime/nvn/vulkan/exec.c:4294
 #define SF2C_EXEC_N_32ULL_6898 32ull
 // runtime/nvn/vulkan/exec.c:4314
-#define SF2C_EXEC_S_LARECOMP_VK_GMEM_FAST_4C7B "LARECOMP_VK_GMEM_FAST"
+#define SF2C_EXEC_S_SF2RECOMP_VK_GMEM_FAST_4C7B "SF2RECOMP_VK_GMEM_FAST"
 // runtime/nvn/vulkan/exec.c:4348
-#define SF2C_EXEC_S_LARECOMP_LOG_GFAST_6943 "LARECOMP_LOG_GFAST"
+#define SF2C_EXEC_S_SF2RECOMP_LOG_GFAST_6943 "SF2RECOMP_LOG_GFAST"
 // runtime/nvn/vulkan/exec.c:4351
 #define SF2C_EXEC_S_GFAST_CS_LLX_D_RANGES_LLU_KB_26A0 "[gfast] cs %llx: %d ranges, %llu KB:"
 // runtime/nvn/vulkan/exec.c:4352
@@ -1351,13 +1351,13 @@
 // runtime/nvn/vulkan/exec.c:4430
 #define SF2C_EXEC_S_VK_NO_PAGE_WRITE_TRACKING_D__E489 "[vk] no page write tracking (%d, page %llu)\n"
 // runtime/nvn/vulkan/exec.c:4480
-#define SF2C_EXEC_S_LARECOMP_VK_VCACHE_1A22 "LARECOMP_VK_VCACHE"
+#define SF2C_EXEC_S_SF2RECOMP_VK_VCACHE_1A22 "SF2RECOMP_VK_VCACHE"
 // runtime/nvn/vulkan/exec.c:4485
 #define SF2C_EXEC_S_VK_VERTEX_CACHE_OFF_INTEGRAT_329B "[vk] vertex cache off: integrated GPU\n"
 // runtime/nvn/vulkan/exec.c:4489
 #define SF2C_EXEC_S_VK_VERTEX_CACHE_OFF_NO_PAGE__2B13 "[vk] vertex cache off: no page write tracking\n"
 // runtime/nvn/vulkan/exec.c:4598
-#define SF2C_EXEC_S_LARECOMP_VK_COPY_VERTICES_BDEF "LARECOMP_VK_COPY_VERTICES"
+#define SF2C_EXEC_S_SF2RECOMP_VK_COPY_VERTICES_BDEF "SF2RECOMP_VK_COPY_VERTICES"
 // runtime/nvn/vulkan/exec.c:4677
 #define SF2C_EXEC_S_HANDLE_0_NOTHING_BOUND_A847 "handle 0 (nothing bound)"
 // runtime/nvn/vulkan/exec.c:4677
@@ -1379,7 +1379,7 @@
 // runtime/nvn/vulkan/exec.c:4680
 #define SF2C_EXEC_S_COLOUR_FORMAT_34ED "colour format"
 // runtime/nvn/vulkan/exec.c:4695
-#define SF2C_EXEC_S_LARECOMP_SHADOW_SLOT_LOG_6907 "LARECOMP_SHADOW_SLOT_LOG"
+#define SF2C_EXEC_S_SF2RECOMP_SHADOW_SLOT_LOG_6907 "SF2RECOMP_SHADOW_SLOT_LOG"
 // runtime/nvn/vulkan/exec.c:4702
 #define SF2C_EXEC_S_VK_SHADOW_SLOT_T_D_STAGE_D_T_10AC "[vk] shadow slot t%d (stage %d, type %d) f%llu fs %016llx: %s - handle %#llx tic %u, texture %#llx %ux%ux%u "
 // runtime/nvn/vulkan/exec.c:4703
@@ -1393,7 +1393,7 @@
 // runtime/nvn/vulkan/exec.c:4722
 #define SF2C_EXEC_N_0XFFF_1DF4 0xFFF
 // runtime/nvn/vulkan/exec.c:4736
-#define SF2C_EXEC_S_LARECOMP_VK_NO_TEX_MEMO_FD78 "LARECOMP_VK_NO_TEX_MEMO"
+#define SF2C_EXEC_S_SF2RECOMP_VK_NO_TEX_MEMO_FD78 "SF2RECOMP_VK_NO_TEX_MEMO"
 // runtime/nvn/vulkan/exec.c:4739
 #define SF2C_EXEC_N_1023_6629 1023
 // runtime/nvn/vulkan/exec.c:4850
@@ -1435,7 +1435,7 @@
 // runtime/nvn/vulkan/exec.c:5182
 #define SF2C_EXEC_S_GPL_PROBE_S_BUILD_FAILED_D_N_AAAD "[gpl] probe: %s build failed (%d)\n"
 // runtime/nvn/vulkan/exec.c:5189
-#define SF2C_EXEC_S_LARECOMP_VK_GPL_PROBE_6BED "LARECOMP_VK_GPL_PROBE"
+#define SF2C_EXEC_S_SF2RECOMP_VK_GPL_PROBE_6BED "SF2RECOMP_VK_GPL_PROBE"
 // runtime/nvn/vulkan/exec.c:5195
 #define SF2C_EXEC_S_GPL_PROBE_NO_PREPARED_PIPELI_C3A6 "[gpl] probe: no prepared pipelines to measure\n"
 // runtime/nvn/vulkan/exec.c:5196
@@ -1455,9 +1455,9 @@
 // runtime/nvn/vulkan/exec.c:5216
 #define SF2C_EXEC_S_FAST_LINK_1F_MS_AVG_2F_MAX_2_9FE2 "+ fast link %.1f ms (avg %.2f, max %.2f); optimized link %.0f ms (avg %.1f, max %.1f)\n"
 // runtime/nvn/vulkan/exec.c:5232
-#define SF2C_EXEC_S_LARECOMP_SKIP_CS_863B "LARECOMP_SKIP_CS"
+#define SF2C_EXEC_S_SF2RECOMP_SKIP_CS_863B "SF2RECOMP_SKIP_CS"
 // runtime/nvn/vulkan/exec.c:5235
-#define SF2C_EXEC_S_LARECOMP_LOG_CS_SBUF_F2E3 "LARECOMP_LOG_CS_SBUF"
+#define SF2C_EXEC_S_SF2RECOMP_LOG_CS_SBUF_F2E3 "SF2RECOMP_LOG_CS_SBUF"
 // runtime/nvn/vulkan/exec.c:5242
 #define SF2C_EXEC_S_CS_LLX_UX_UX_U_0E54 "[cs] %llx %ux%ux%u:"
 // runtime/nvn/vulkan/exec.c:5244
@@ -1477,7 +1477,7 @@
 // runtime/nvn/vulkan/exec.c:5337
 #define SF2C_EXEC_N_0XC_D882 0xC
 // runtime/nvn/vulkan/exec.c:5346
-#define SF2C_EXEC_S_LARECOMP_PREP_CHECK_8074 "LARECOMP_PREP_CHECK"
+#define SF2C_EXEC_S_SF2RECOMP_PREP_CHECK_8074 "SF2RECOMP_PREP_CHECK"
 // runtime/nvn/vulkan/exec.c:5356
 #define SF2C_EXEC_S_PROGRAM_P_P_READY_D_D_D7A1 " program %p/%p (ready %d/%d);"
 // runtime/nvn/vulkan/exec.c:5358
@@ -1533,9 +1533,9 @@
 // runtime/nvn/vulkan/exec.c:5435
 #define SF2C_EXEC_S_DRAW_STEP_1_PR_P_VS_LLX_FS_L_7174 "[draw_] step 1: pr=%p vs=%llx fs=%llx\n"
 // runtime/nvn/vulkan/exec.c:5449
-#define SF2C_EXEC_S_LARECOMP_SKIP_FSHASH_2C3B "LARECOMP_SKIP_FSHASH"
+#define SF2C_EXEC_S_SF2RECOMP_SKIP_FSHASH_2C3B "SF2RECOMP_SKIP_FSHASH"
 // runtime/nvn/vulkan/exec.c:5455
-#define SF2C_EXEC_S_LARECOMP_LOG_FSHASH_1DF5 "LARECOMP_LOG_FSHASH"
+#define SF2C_EXEC_S_SF2RECOMP_LOG_FSHASH_1DF5 "SF2RECOMP_LOG_FSHASH"
 // runtime/nvn/vulkan/exec.c:5455
 #define SF2C_EXEC_S_FSHASH_FS_LLX_HASH_016LLX_N_392C "[fshash] fs=%llx hash %016llx\n"
 // runtime/nvn/vulkan/exec.c:5463
@@ -1547,13 +1547,13 @@
 // runtime/nvn/vulkan/exec.c:5549
 #define SF2C_EXEC_S_DRAW_STEP_3_PIPELINE_READY_P_1E2B "[draw_] step 3: pipeline ready, ps=%d pp=%p\n"
 // runtime/nvn/vulkan/exec.c:5558
-#define SF2C_EXEC_S_LARECOMP_NO_DEPTH_TEST_509A "LARECOMP_NO_DEPTH_TEST"
+#define SF2C_EXEC_S_SF2RECOMP_NO_DEPTH_TEST_509A "SF2RECOMP_NO_DEPTH_TEST"
 // runtime/nvn/vulkan/exec.c:5570
-#define SF2C_EXEC_S_LARECOMP_VK_EQUAL_TOL_3D17 "LARECOMP_VK_EQUAL_TOL"
+#define SF2C_EXEC_S_SF2RECOMP_VK_EQUAL_TOL_3D17 "SF2RECOMP_VK_EQUAL_TOL"
 // runtime/nvn/vulkan/exec.c:5600
-#define SF2C_EXEC_S_LARECOMP_VK_FLIP_WINDING_6897 "LARECOMP_VK_FLIP_WINDING"
+#define SF2C_EXEC_S_SF2RECOMP_VK_FLIP_WINDING_6897 "SF2RECOMP_VK_FLIP_WINDING"
 // runtime/nvn/vulkan/exec.c:5611
-#define SF2C_EXEC_S_LARECOMP_NO_DEPTH_BIAS_7DA7 "LARECOMP_NO_DEPTH_BIAS"
+#define SF2C_EXEC_S_SF2RECOMP_NO_DEPTH_BIAS_7DA7 "SF2RECOMP_NO_DEPTH_BIAS"
 // runtime/nvn/vulkan/exec.c:5640
 #define SF2C_EXEC_N_0_01F_C479 0.01f
 // runtime/nvn/vulkan/exec.c:5657
@@ -1581,7 +1581,7 @@
 // runtime/nvn/vulkan/exec.c:5817
 #define SF2C_EXEC_S_VP_0F_0F_0F_0F_ATTRS_X_BLEND_DF54 " | vp %.0f %.0f %.0f %.0f | attrs %#x blend %#x ds %02x%02x%02x poly %02x%02x chmask %08x\n"
 // runtime/nvn/vulkan/exec.c:5820
-#define SF2C_EXEC_S_LARECOMP_DEBUG_DATA_5C9F "LARECOMP_DEBUG_DATA"
+#define SF2C_EXEC_S_SF2RECOMP_DEBUG_DATA_5C9F "SF2RECOMP_DEBUG_DATA"
 // runtime/nvn/vulkan/exec.c:5824
 #define SF2C_EXEC_S_DRAW_VBUF_D_LLX_SIZE_LLU_9FD6 "[draw]   vbuf%d %llx size %llu:"
 // runtime/nvn/vulkan/exec.c:5825
@@ -1619,7 +1619,7 @@
 // runtime/nvn/vulkan/exec.c:6120
 #define SF2C_EXEC_S_CT_ALIAS_MADE_P_P_N_04E7 "[ct] alias made %p -> %p\n"
 // runtime/nvn/vulkan/exec.c:6145
-#define SF2C_EXEC_S_LARECOMP_VK_DEPTH_BLIT_VIA_C_E867 "LARECOMP_VK_DEPTH_BLIT_VIA_COLOR"
+#define SF2C_EXEC_S_SF2RECOMP_VK_DEPTH_BLIT_VIA_C_E867 "SF2RECOMP_VK_DEPTH_BLIT_VIA_COLOR"
 // runtime/nvn/vulkan/exec.c:6147
 #define SF2C_EXEC_S_DEPTH_BLIT_VIA_COLOUR_P_LV_U_C335 "  depth blit via colour %p lv%u (%d,%d %dx%d) -> %p lv%u (%d,%d %dx%d)"
 // runtime/nvn/vulkan/exec.c:6157
@@ -1793,7 +1793,7 @@
 // runtime/nvn/vulkan/exec.c:6758
 #define SF2C_EXEC_S_CMD_RESOLVE_DEPTH_E102 "CMD_RESOLVE_DEPTH"
 // runtime/nvn/vulkan/exec.c:6770
-#define SF2C_EXEC_S_LARECOMP_EXEC_STALL_F300 "LARECOMP_EXEC_STALL"
+#define SF2C_EXEC_S_SF2RECOMP_EXEC_STALL_F300 "SF2RECOMP_EXEC_STALL"
 // runtime/nvn/vulkan/exec.c:6771
 #define SF2C_EXEC_N_5000_0F8E 5000
 // runtime/nvn/vulkan/exec.c:6773
@@ -1805,17 +1805,17 @@
 // runtime/nvn/vulkan/exec.c:6786
 #define SF2C_EXEC_S_UNKNOWN_0F15 "UNKNOWN"
 // runtime/nvn/vulkan/exec.c:6793
-#define SF2C_EXEC_S_LARECOMP_LOG_EXEC_695F "LARECOMP_LOG_EXEC"
+#define SF2C_EXEC_S_SF2RECOMP_LOG_EXEC_695F "SF2RECOMP_LOG_EXEC"
 // runtime/nvn/vulkan/exec.c:6796
 #define SF2C_EXEC_S_EXEC_LIST_P_LLX_OP_U_S_SIZE__C7A1 "[exec_list] p=%llx op=%u (%s) size=%u\n"
 // runtime/nvn/vulkan/exec.c:6799
 #define SF2C_EXEC_S_EXEC_LIST_ERROR_R_SIZE_0_AT__6004 "[exec_list] ERROR: r->size == 0 at p=%llx op=%u! Breaking loop\n"
 // runtime/nvn/vulkan/exec.c:6880
-#define SF2C_EXEC_S_LARECOMP_VK_PASS_RESTART_632A "LARECOMP_VK_PASS_RESTART"
+#define SF2C_EXEC_S_SF2RECOMP_VK_PASS_RESTART_632A "SF2RECOMP_VK_PASS_RESTART"
 // runtime/nvn/vulkan/exec.c:6908
 #define SF2C_EXEC_S_CLEAR_COLOR_289C "clear-color"
 // runtime/nvn/vulkan/exec.c:6910
-#define SF2C_EXEC_S_LARECOMP_LOG_CLEARS_EE39 "LARECOMP_LOG_CLEARS"
+#define SF2C_EXEC_S_SF2RECOMP_LOG_CLEARS_EE39 "SF2RECOMP_LOG_CLEARS"
 // runtime/nvn/vulkan/exec.c:6911
 #define SF2C_EXEC_S_CCLEAR_FRAME_LLU_IDX_D_UX_U__575C "[cclear] frame %llu idx %d %ux%u f%#x mask %#x\n"
 // runtime/nvn/vulkan/exec.c:6914
@@ -1829,11 +1829,11 @@
 // runtime/nvn/vulkan/exec.c:6964
 #define SF2C_EXEC_S_CT_ALIAS_CLEAR_P_FULL_X_WHOL_F5DF "[ct] alias clear %p full %#x (whole %d, x0 %llu x1 %#llx x2 %#llx, dview %d/%#x, ncolor %d)\n"
 // runtime/nvn/vulkan/exec.c:6983
-#define SF2C_EXEC_S_LARECOMP_FENCE_FLUSH_8086 "LARECOMP_FENCE_FLUSH"
+#define SF2C_EXEC_S_SF2RECOMP_FENCE_FLUSH_8086 "SF2RECOMP_FENCE_FLUSH"
 // runtime/nvn/vulkan/exec.c:6995
 #define SF2C_EXEC_S_NVN_REPORTCOUNTER_TYPE_U_N_590C "[nvn] ReportCounter type %u\n"
 // runtime/nvn/vulkan/exec.c:7011
-#define SF2C_EXEC_S_LARECOMP_TEST_COUNTER_DELAY__C285 "LARECOMP_TEST_COUNTER_DELAY_MS"
+#define SF2C_EXEC_S_SF2RECOMP_TEST_COUNTER_DELAY__C285 "SF2RECOMP_TEST_COUNTER_DELAY_MS"
 // runtime/nvn/vulkan/exec.c:7056
 #define SF2C_EXEC_S_EXEC_WATCHDOG_EXEC_IS_D_MS_I_B4A8 "[exec_watchdog] exec is %d ms in, host tid %d (probe: %s)\n"
 // runtime/nvn/vulkan/exec.c:7058
@@ -1851,7 +1851,7 @@
 // runtime/nvn/vulkan/exec.c:7081
 #define SF2C_EXEC_S_EXEC_BACKEND_EXECUTE_EXEC_LI_1E2E "[exec] backend_execute exec_list done\n"
 // runtime/nvn/vulkan/exec.c:7086
-#define SF2C_EXEC_S_LARECOMP_SYNC_SUBMIT_C965 "LARECOMP_SYNC_SUBMIT"
+#define SF2C_EXEC_S_SF2RECOMP_SYNC_SUBMIT_C965 "SF2RECOMP_SYNC_SUBMIT"
 // runtime/nvn/vulkan/exec.c:7089
 #define SF2C_EXEC_S_EXEC_BACKEND_EXECUTE_RENDERE_941D "[exec] backend_execute renderer_submit done\n"
 // runtime/nvn/vulkan/record.c:58
@@ -1861,7 +1861,7 @@
 // runtime/nvn/vulkan/record.c:59
 #define SF2C_RECORD_N_10_4A44 10
 // runtime/nvn/vulkan/record.c:86
-#define SF2C_RECORD_S_LARECOMP_VK_RECORDER_WAIT_PI_72CE "LARECOMP_VK_RECORDER_WAIT_PIPES"
+#define SF2C_RECORD_S_SF2RECOMP_VK_RECORDER_WAIT_PI_72CE "SF2RECOMP_VK_RECORDER_WAIT_PIPES"
 // runtime/nvn/vulkan/record.c:97
 #define SF2C_RECORD_N_1000000000ULL_E860 1000000000ull
 // runtime/nvn/vulkan/record.c:99
@@ -1875,11 +1875,11 @@
 // runtime/nvn/vulkan/record.c:158
 #define SF2C_RECORD_N_15_E629 15
 // runtime/nvn/vulkan/record.c:196
-#define SF2C_RECORD_S_LARECOMP_VK_RECORDER_C9B7 "LARECOMP_VK_RECORDER"
+#define SF2C_RECORD_S_SF2RECOMP_VK_RECORDER_C9B7 "SF2RECOMP_VK_RECORDER"
 // runtime/nvn/vulkan/record.c:200
 #define SF2C_RECORD_N_0X13B5_EC9F 0x13B5
 // runtime/nvn/vulkan/record.c:204
-#define SF2C_RECORD_S_LARECOMP_VK_RECORDER_MB_204D "LARECOMP_VK_RECORDER_MB"
+#define SF2C_RECORD_S_SF2RECOMP_VK_RECORDER_MB_204D "SF2RECOMP_VK_RECORDER_MB"
 // runtime/nvn/vulkan/record.c:205
 #define SF2C_RECORD_N_20_F5CA 20
 // runtime/nvn/vulkan/record.c:213
@@ -1927,7 +1927,7 @@
 // runtime/nvn/vulkan/record.c:364
 #define SF2C_RECORD_S_DESCRIPTOR_POOLS_EXHAUSTED_N_F2ED "descriptor pools exhausted\n"
 // runtime/nvn/vulkan/record.c:371
-#define SF2C_RECORD_S_LARECOMP_VK_NO_SET_REUSE_7972 "LARECOMP_VK_NO_SET_REUSE"
+#define SF2C_RECORD_S_SF2RECOMP_VK_NO_SET_REUSE_7972 "SF2RECOMP_VK_NO_SET_REUSE"
 // runtime/nvn/vulkan/record.c:372
 #define SF2C_RECORD_N_8192_864A 8192
 // runtime/nvn/vulkan/record.c:372
@@ -1937,9 +1937,9 @@
 // runtime/nvn/vulkan/record.c:375
 #define SF2C_RECORD_N_16384_CA90 16384
 // runtime/nvn/vulkan/record.c:390
-#define SF2C_RECORD_S_LARECOMP_VK_NO_SET_BATCH_A810 "LARECOMP_VK_NO_SET_BATCH"
+#define SF2C_RECORD_S_SF2RECOMP_VK_NO_SET_BATCH_A810 "SF2RECOMP_VK_NO_SET_BATCH"
 // runtime/nvn/vulkan/record.c:391
-#define SF2C_RECORD_S_LARECOMP_VK_NO_SET_RECYCLE_B2D9 "LARECOMP_VK_NO_SET_RECYCLE"
+#define SF2C_RECORD_S_SF2RECOMP_VK_NO_SET_RECYCLE_B2D9 "SF2RECOMP_VK_NO_SET_RECYCLE"
 // runtime/nvn/vulkan/record.c:397
 #define SF2C_RECORD_N_17_4523 17
 // runtime/nvn/vulkan/record.c:398
@@ -2051,9 +2051,9 @@
 // runtime/nvn/vulkan/shaders.c:99
 #define SF2C_SHADERS_N_3U_3B80 3u
 // runtime/nvn/vulkan/shaders.c:120
-#define SF2C_SHADERS_S_LARECOMP_VK_NO_SPIRV_CACHE_E859 "LARECOMP_VK_NO_SPIRV_CACHE"
+#define SF2C_SHADERS_S_SF2RECOMP_VK_NO_SPIRV_CACHE_E859 "SF2RECOMP_VK_NO_SPIRV_CACHE"
 // runtime/nvn/vulkan/shaders.c:127
-#define SF2C_SHADERS_S_LARECOMP_VK_OPT_0B7E "LARECOMP_VK_OPT"
+#define SF2C_SHADERS_S_SF2RECOMP_VK_OPT_0B7E "SF2RECOMP_VK_OPT"
 // runtime/nvn/vulkan/shaders.c:129
 #define SF2C_SHADERS_S_MAIN_E4A9 "main"
 // runtime/nvn/vulkan/shaders.c:133
@@ -2369,7 +2369,7 @@
 // runtime/nvn/vulkan/shaders.c:483
 #define SF2C_SHADERS_S_S_0030 "%s"
 // runtime/nvn/vulkan/textures.c:28
-#define SF2C_TEXTURES_S_LARECOMP_VK_D24_4C0A "LARECOMP_VK_D24"
+#define SF2C_TEXTURES_S_SF2RECOMP_VK_D24_4C0A "SF2RECOMP_VK_D24"
 // runtime/nvn/vulkan/textures.c:36
 #define SF2C_TEXTURES_S_VK_DEPTH24_STENCIL8_S_N_2B24 "[vk] depth24 stencil8: %s\n"
 // runtime/nvn/vulkan/textures.c:36
@@ -2507,7 +2507,7 @@
 // runtime/nvn/vulkan/textures.c:106
 #define SF2C_TEXTURES_N_0X4C_CEDB 0x4C
 // runtime/nvn/vulkan/textures.c:108
-#define SF2C_TEXTURES_S_LARECOMP_BC5_UNORM_5171 "LARECOMP_BC5_UNORM"
+#define SF2C_TEXTURES_S_SF2RECOMP_BC5_UNORM_5171 "SF2RECOMP_BC5_UNORM"
 // runtime/nvn/vulkan/textures.c:111
 #define SF2C_TEXTURES_N_0X4D_844B 0x4D
 // runtime/nvn/vulkan/textures.c:112
@@ -2593,7 +2593,7 @@
 // runtime/nvn/vulkan/textures.c:150
 #define SF2C_TEXTURES_N_0X9B_3373 0x9B
 // runtime/nvn/vulkan/textures.c:200
-#define SF2C_TEXTURES_S_LARECOMP_NO_SCALE_224E "LARECOMP_NO_SCALE"
+#define SF2C_TEXTURES_S_SF2RECOMP_NO_SCALE_224E "SF2RECOMP_NO_SCALE"
 // runtime/nvn/vulkan/textures.c:202
 #define SF2C_TEXTURES_N_32_E29C 32
 // runtime/nvn/vulkan/textures.c:202
@@ -2619,13 +2619,13 @@
 // runtime/nvn/vulkan/textures.c:398
 #define SF2C_TEXTURES_S_IMAGE_CREATION_FAILED_4B76 "image creation failed"
 // runtime/nvn/vulkan/textures.c:409
-#define SF2C_TEXTURES_S_LARECOMP_VK_DEVLOST_TRACE_28EE "LARECOMP_VK_DEVLOST_TRACE"
+#define SF2C_TEXTURES_S_SF2RECOMP_VK_DEVLOST_TRACE_28EE "SF2RECOMP_VK_DEVLOST_TRACE"
 // runtime/nvn/vulkan/textures.c:410
 #define SF2C_TEXTURES_S_VK_SMALL_IMAGE_P_UX_UX_U_TYP_6090 "[vk] small image %p %ux%ux%u type %d layers %u samples %u fmt %d allocation flags %#x\n"
 // runtime/nvn/vulkan/textures.c:435
 #define SF2C_TEXTURES_N_0_0F_6895 0.0f
 // runtime/nvn/vulkan/textures.c:441
-#define SF2C_TEXTURES_S_LARECOMP_NEW_TARGET_FILL_112D "LARECOMP_NEW_TARGET_FILL"
+#define SF2C_TEXTURES_S_SF2RECOMP_NEW_TARGET_FILL_112D "SF2RECOMP_NEW_TARGET_FILL"
 // runtime/nvn/vulkan/textures.c:443
 #define SF2C_TEXTURES_S_F_F_F_F_60DF "%f,%f,%f,%f"
 // runtime/nvn/vulkan/textures.c:457
@@ -2655,11 +2655,11 @@
 // runtime/nvn/vulkan/textures.c:559
 #define SF2C_TEXTURES_N_1099511628211ULL_D3BD 1099511628211ull
 // runtime/nvn/vulkan/textures.c:609
-#define SF2C_TEXTURES_S_LARECOMP_TEX_FULLHASH_DEFD "LARECOMP_TEX_FULLHASH"
+#define SF2C_TEXTURES_S_SF2RECOMP_TEX_FULLHASH_DEFD "SF2RECOMP_TEX_FULLHASH"
 // runtime/nvn/vulkan/textures.c:611
 #define SF2C_TEXTURES_N_120_2ABA 120
 // runtime/nvn/vulkan/textures.c:617
-#define SF2C_TEXTURES_S_LARECOMP_VK_TEX_WATCH_599C "LARECOMP_VK_TEX_WATCH"
+#define SF2C_TEXTURES_S_SF2RECOMP_VK_TEX_WATCH_599C "SF2RECOMP_VK_TEX_WATCH"
 // runtime/nvn/vulkan/textures.c:690
 #define SF2C_TEXTURES_N_255_9556 255
 // runtime/nvn/vulkan/textures.c:719
@@ -2703,11 +2703,11 @@
 // runtime/nvn/vulkan/textures.c:1204
 #define SF2C_TEXTURES_N_0_25F_17C9 0.25f
 // runtime/nvn/vulkan/textures.c:1209
-#define SF2C_TEXTURES_S_LARECOMP_LOD_MIN_4349 "LARECOMP_LOD_MIN"
+#define SF2C_TEXTURES_S_SF2RECOMP_LOD_MIN_4349 "SF2RECOMP_LOD_MIN"
 // runtime/nvn/vulkan/textures.c:1212
-#define SF2C_TEXTURES_S_LARECOMP_SAMPLER_TEST_F5E0 "LARECOMP_SAMPLER_TEST"
+#define SF2C_TEXTURES_S_SF2RECOMP_SAMPLER_TEST_F5E0 "SF2RECOMP_SAMPLER_TEST"
 // runtime/nvn/vulkan/textures.c:1216
-#define SF2C_TEXTURES_S_LARECOMP_NO_SHADOW_1863 "LARECOMP_NO_SHADOW"
+#define SF2C_TEXTURES_S_SF2RECOMP_NO_SHADOW_1863 "SF2RECOMP_NO_SHADOW"
 // runtime/nvn/vulkan/vk.h:25
 #define SF2C_VK_S_S_FAILED_D_S_D_N_F130 "%s failed: %d (%s:%d)\n"
 
@@ -2823,18 +2823,18 @@
 
 #define SF2C_DEVICE_FRAMES 3
 // runtime/nvn/vulkan/device.c:351
-#define SF2C_DEVICE_S_LARECOMP_VK_GUEST_HEAP_32E0 "LARECOMP_VK_GUEST_HEAP"
+#define SF2C_DEVICE_S_SF2RECOMP_VK_GUEST_HEAP_32E0 "SF2RECOMP_VK_GUEST_HEAP"
 // runtime/nvn/vulkan/device.c:352
 #define SF2C_DEVICE_S_MANAGED_9C72 "managed"
 // runtime/nvn/vulkan/device.c:353
 #define SF2C_DEVICE_S_STAGED_B47A "staged"
 // runtime/nvn/vulkan/device.c:355
-#define SF2C_DEVICE_S_INVALID_LARECOMP_VK_GUEST_HE_BCE7 "Invalid LARECOMP_VK_GUEST_HEAP value '%s'. Use staged or managed.\n"
+#define SF2C_DEVICE_S_INVALID_SF2RECOMP_VK_GUEST_HE_BCE7 "Invalid SF2RECOMP_VK_GUEST_HEAP value '%s'. Use staged or managed.\n"
 // runtime/nvn/vulkan/device.c:361
-#define SF2C_DEVICE_S_LARECOMP_VK_GUEST_HEAP_MANAG_B46B "LARECOMP_VK_GUEST_HEAP=managed requires Linux.\n"
+#define SF2C_DEVICE_S_SF2RECOMP_VK_GUEST_HEAP_MANAG_B46B "SF2RECOMP_VK_GUEST_HEAP=managed requires Linux.\n"
 // runtime/nvn/vulkan/device.c:368
 #define SF2C_DEVICE_S_VK_GUEST_HEAP_STAGED_UPLOADS_47BC "[vk] guest heap: staged uploads from demand-paged CPU memory\n"
 // runtime/nvn/vulkan/exec.c:5323
 #define SF2C_EXEC_S_STAGED_VULKAN_MEMORY_CANNOT__3851 "Staged Vulkan memory cannot run shader %llx (stage %d), which accesses guest memory directly. "
 // runtime/nvn/vulkan/exec.c:5324
-#define SF2C_EXEC_S_RELAUNCH_WITH_LARECOMP_VK_GU_D353 "Relaunch with LARECOMP_VK_GUEST_HEAP=managed on Linux.\n"
+#define SF2C_EXEC_S_RELAUNCH_WITH_SF2RECOMP_VK_GU_D353 "Relaunch with SF2RECOMP_VK_GUEST_HEAP=managed on Linux.\n"

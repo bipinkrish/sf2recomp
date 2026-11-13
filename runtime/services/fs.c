@@ -234,7 +234,7 @@ static void storage(Service *s, IpcReq *req, IpcResp *resp) {
             static const char *last;
             if (path && path != last) {
                 last = path;
-                if (getenv(SF2C_FS_S_LARECOMP_LOG_FILES_4421)) LOG(SF2C_FS_S_FS_READ_S_N_E4E9, path);
+                if (getenv(SF2C_FS_S_SF2RECOMP_LOG_FILES_4421)) LOG(SF2C_FS_S_FS_READ_S_N_E4E9, path);
             }
         }
         static uint64_t reads, bytes;
@@ -493,7 +493,7 @@ static void file(Service *s, IpcReq *req, IpcResp *resp) {
         if (f->dropped && f->fd < 0) { OUT(int64_t, 0) = 0; resp_size(resp, SF2C_FS_N_8_2C62); break; }  // (nothing open: empty)
         ssize_t n = pread(f->fd, (void *)(uintptr_t)b->addr, (size_t)size, off);
         if (n < 0) resp->result = errno_result();
-        if (n > 0 && !f->scratch && (getenv(SF2C_FS_S_LARECOMP_LOG_FILES_4421) || strstr(f->path, SF2C_FS_S_SAVEDATA_DFAA))) {
+        if (n > 0 && !f->scratch && (getenv(SF2C_FS_S_SF2RECOMP_LOG_FILES_4421) || strstr(f->path, SF2C_FS_S_SAVEDATA_DFAA))) {
             LOG(SF2C_FS_S_SAVE_READ_S_OFF_LLD_SIZE_LLD_E094, f->path, (long long)off, (long long)size, (long long)n);
         }
         OUT(int64_t, 0) = n < 0 ? 0 : n;
@@ -507,10 +507,10 @@ static void file(Service *s, IpcReq *req, IpcResp *resp) {
             resp->result = MAKE_RESULT(SF2C_FS_N_2_D473, SF2C_FS_N_6001_F4E9); break;
         }
         const char *wpath = strstr(f->path, SF2C_FS_S_SAVEDATA_DFAA);
-        if (getenv(SF2C_FS_S_LARECOMP_LOG_FILES_4421) || wpath) {
-            // (debug) content preview of every write when LARECOMP_LOG_FILES=1: the all-zeros users.xml
+        if (getenv(SF2C_FS_S_SF2RECOMP_LOG_FILES_4421) || wpath) {
+            // (debug) content preview of every write when SF2RECOMP_LOG_FILES=1: the all-zeros users.xml
             // story needed the payload, not just the address
-            if (getenv(SF2C_FS_S_LARECOMP_LOG_FILES_4421)) {
+            if (getenv(SF2C_FS_S_SF2RECOMP_LOG_FILES_4421)) {
                 unsigned char pb[SF2C_FS_N_16_B17E] = {0};
                 memcpy(pb, (const void *)(uintptr_t)a->addr, (uint64_t)size < sizeof pb ? (size_t)size : sizeof pb);
                 LOG(SF2C_FS_S_SAVE_WRITE_S_OFF_LLD_SIZE_LL_C514, f->path, (long long)off,
@@ -645,7 +645,7 @@ static void filesystem(Service *s, IpcReq *req, IpcResp *resp) {
     }
     case SF2C_FS_N_8_2C62: {  // OpenFile(mode)
         uint32_t mode = IN(uint32_t, 0);
-        if (getenv(SF2C_FS_S_LARECOMP_LOG_FILES_4421)) LOG(SF2C_FS_S_FS_OPENFILE_S_MODE_U_N_DD15, p, mode);
+        if (getenv(SF2C_FS_S_SF2RECOMP_LOG_FILES_4421)) LOG(SF2C_FS_S_FS_OPENFILE_S_MODE_U_N_DD15, p, mode);
         bool save = fs->journaled && (mode & SF2C_FS_N_2_D473);
         char work[SF2C_FS_N_2100_4F51];
         struct stat sb;
@@ -757,7 +757,7 @@ static bool seed_completed_save(const char *root) {
 static Service *open_host_fs(const char *sub) {
     HostFs *fs = calloc(1, sizeof *fs);
     // Settings are loaded after the data-root chdir; relative paths therefore
-    // refer to that writable root. LARECOMP_SAVE_DIR is applied by settings_init.
+    // refer to that writable root. SF2RECOMP_SAVE_DIR is applied by settings_init.
     g_save_dir = g_settings.save_directory;
     bool completed = g_settings.use_completed_save && strcmp(sub, SF2C_FS_S_SDCARD_852C);
     int length = snprintf(fs->root, sizeof fs->root, SF2C_FS_S_S_S_S_25A7, g_save_dir,

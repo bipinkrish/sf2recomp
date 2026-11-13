@@ -176,7 +176,7 @@ bool shader_rec_parse(const char *line, ShaderRec *r) {
     return r->vs && r->fs;
 }
 
-// ------------------------------------------------------------------ recorder (LARECOMP_RECORD_KEYS)
+// ------------------------------------------------------------------ recorder (SF2RECOMP_RECORD_KEYS)
 static pthread_mutex_t rec_lock = PTHREAD_MUTEX_INITIALIZER;
 static uint64_t *rec_seen;  // line hashes (open addressing, 0 = empty)
 static size_t rec_cap, rec_n;
@@ -208,7 +208,7 @@ static bool seen_add(uint64_t h) {  // false: already there
 static const char *rec_path(void) {
     static const char *p;
     static int done;
-    if (!done) { p = getenv(SF2C_SHADER_PREP_S_LARECOMP_RECORD_KEYS_8236); if (p && !*p) p = NULL; done = 1; }
+    if (!done) { p = getenv(SF2C_SHADER_PREP_S_SF2RECOMP_RECORD_KEYS_8236); if (p && !*p) p = NULL; done = 1; }
     return p;
 }
 
@@ -277,10 +277,10 @@ void shader_first_visit(const char *what, uint64_t a, uint64_t b, uint64_t id) {
 #ifndef SHADER_TRANSLATOR_ID
 #define SHADER_TRANSLATOR_ID SF2C_SHADER_PREP_SHADER_TRANSLATOR_ID
 #endif
-const char *larecomp_version(void);  // runtime/ui/menu_stubs.c
+const char *sf2recomp_version(void);  // runtime/ui/menu_stubs.c
 
 void shader_cache_tag(char *out, size_t n, const char *gpu) {
-    snprintf(out, n, SF2C_SHADER_PREP_S_S_TRANSLATOR_S_CACHE_D_S_73DF, larecomp_version(), SHADER_TRANSLATOR_ID, SHADER_CACHE_VERSION, gpu);
+    snprintf(out, n, SF2C_SHADER_PREP_S_S_TRANSLATOR_S_CACHE_D_S_73DF, sf2recomp_version(), SHADER_TRANSLATOR_ID, SHADER_CACHE_VERSION, gpu);
 }
 
 bool shader_cache_tag_ok(const char *tag_path, const char *tag) {

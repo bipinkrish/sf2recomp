@@ -43,17 +43,17 @@ static void rtld_init_main(Cpu *c) { module_init(c, &g_modules[0]); }
 
 // Claim the guest address range before anything else can map there. The host allocator places
 // regions at random addresses in the same window; on a collision, re-exec for a fresh layout.
-// LARECOMP_REEXEC_FORCE=1 (test): the first process skips the reservation once and starts again, as when the range is
-// taken (the new process has LARECOMP_REEXEC set and reserves normally).
+// SF2RECOMP_REEXEC_FORCE=1 (test): the first process skips the reservation once and starts again, as when the range is
+// taken (the new process has SF2RECOMP_REEXEC set and reserves normally).
 #define REEXEC_FORCED SF2C_MAIN_REEXEC_FORCED
 #ifndef __ANDROID__
 __attribute__((constructor(SF2C_MAIN_N_101_16DC))) static void reserve_guest_space(void) {
-    const char *force = getenv(SF2C_MAIN_S_LARECOMP_REEXEC_FORCE_8398);
-    bool forced = force && *force && strcmp(force, SF2C_MAIN_S_0_9808) && !getenv(SF2C_MAIN_S_LARECOMP_REEXEC_1A16);
-    if (forced) setenv(SF2C_MAIN_S_LARECOMP_REEXEC_WHY_6D9D, REEXEC_FORCED, 1);
+    const char *force = getenv(SF2C_MAIN_S_SF2RECOMP_REEXEC_FORCE_8398);
+    bool forced = force && *force && strcmp(force, SF2C_MAIN_S_0_9808) && !getenv(SF2C_MAIN_S_SF2RECOMP_REEXEC_1A16);
+    if (forced) setenv(SF2C_MAIN_S_SF2RECOMP_REEXEC_WHY_6D9D, REEXEC_FORCED, 1);
     else if (plat_reserve_guest(GUEST_LO, GUEST_HI)) return;
-    else setenv(SF2C_MAIN_S_LARECOMP_REEXEC_WHY_6D9D, SF2C_MAIN_S_EMPTY_12AE, 0);  // (the platform may have said what holds the range; else nothing more)
-    const char *tries = getenv(SF2C_MAIN_S_LARECOMP_REEXEC_1A16);
+    else setenv(SF2C_MAIN_S_SF2RECOMP_REEXEC_WHY_6D9D, SF2C_MAIN_S_EMPTY_12AE, 0);  // (the platform may have said what holds the range; else nothing more)
+    const char *tries = getenv(SF2C_MAIN_S_SF2RECOMP_REEXEC_1A16);
     int n = tries ? atoi(tries) : 0;
     if (n >= SF2C_MAIN_N_20_F5CA) {
         fprintf(stderr, SF2C_MAIN_S_FATAL_GUEST_ADDRESS_RANGE_LL_15E7, GUEST_LO, GUEST_HI);
@@ -61,7 +61,7 @@ __attribute__((constructor(SF2C_MAIN_N_101_16DC))) static void reserve_guest_spa
     }
     char buf[SF2C_MAIN_N_16_B17E];
     snprintf(buf, sizeof buf, SF2C_MAIN_S_D_42B3, n + 1);
-    setenv(SF2C_MAIN_S_LARECOMP_REEXEC_1A16, buf, 1);
+    setenv(SF2C_MAIN_S_SF2RECOMP_REEXEC_1A16, buf, 1);
     plat_exec(NULL);
     perror(SF2C_MAIN_S_RE_EXEC_44E0);
     exit(1);
@@ -124,7 +124,7 @@ int main(int argc, char **argv) {
     }
 #ifdef __ANDROID__
     const char *data = SDL_GetAndroidExternalStoragePath();
-    if (!data || setenv(SF2C_MAIN_S_LARECOMP_DATA_ROOT_B22A, data, 1)) return 1;
+    if (!data || setenv(SF2C_MAIN_S_SF2RECOMP_DATA_ROOT_B22A, data, 1)) return 1;
     // The library is loaded into an existing Activity process; never re-exec
     // Android's app_process when its address layout conflicts with the guest.
     if (!plat_reserve_guest(GUEST_LO, GUEST_HI)) {

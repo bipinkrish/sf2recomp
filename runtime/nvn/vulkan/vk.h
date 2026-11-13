@@ -42,17 +42,17 @@ typedef struct {
     bool staged_heap;   // CPU guest heap with explicit uploads and no shader access to guest addresses
     uint64_t managed_heap_size;
     // VK_EXT_vertex_input_dynamic_state (exec.c): the vertex layout is set per draw (vkCmdSetVertexInputEXT), not
-    // baked into each pipeline - fewer pipelines. Off: no extension / feature, or LARECOMP_VK_DYN_VERTEX=0.
+    // baked into each pipeline - fewer pipelines. Off: no extension / feature, or SF2RECOMP_VK_DYN_VERTEX=0.
     bool vids;
     PFN_vkCmdSetVertexInputEXT set_vertex_input;
-    // LARECOMP_VK_GPL_PROBE=1 only (exec.c gpl_probe, measurement): VK_EXT_graphics_pipeline_library enabled
+    // SF2RECOMP_VK_GPL_PROBE=1 only (exec.c gpl_probe, measurement): VK_EXT_graphics_pipeline_library enabled
     bool gpl_probe;
     bool map_placed, unmap_reserve;  // VK_EXT_map_memory_placed: driver memory mapped at a given address (exec.c guest_heap_dmabuf)
     bool ssbo_chunks;  // stores and atomics from fragment and vertex shaders (exec.c: the heap in chunks counts misses)
     bool lazy_heap, bda;  // the heap imported chunk by chunk (device.c lazy_heap_predicted), buffer device addresses enabled for it
     bool heap_probe;      // one import tried at the start, lazy chunks if it runs out of memory (exec.c whole_import_probe_oom)
-    // on by default on integrated GPUs only (device.c; LARECOMP_VK_LEAN_USAGE / LARECOMP_VK_SMAA_STENCIL /
-    // LARECOMP_NO_FRAME_CLEAR =0 / =1 override):
+    // on by default on integrated GPUs only (device.c; SF2RECOMP_VK_LEAN_USAGE / SF2RECOMP_VK_SMAA_STENCIL /
+    // SF2RECOMP_NO_FRAME_CLEAR =0 / =1 override):
     bool lean_usage;      // colour images list their view formats instead of a bare MUTABLE_FORMAT (textures.c create_image)
     bool smaa_stencil;    // SMAA's weights pass only where the edge pass found edges (exec.c post_process)
     bool no_frame_clear;  // scene targets not cleared at their first use in each frame (textures.c renderer_texture_frame_fresh)

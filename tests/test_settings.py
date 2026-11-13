@@ -52,7 +52,7 @@ class SettingsTests(unittest.TestCase):
 #include "settings.h"
 int main(int argc, char **argv) {
     assert(argc == 3);
-    unsetenv("LARECOMP_LANG"); unsetenv("LARECOMP_VOLUME"); unsetenv("LARECOMP_REVERB");
+    unsetenv("SF2RECOMP_LANG"); unsetenv("SF2RECOMP_VOLUME"); unsetenv("SF2RECOMP_REVERB");
     assert(settings_load_file(argv[1]));
     assert(!strcmp(settings_language(), "de"));
     assert(g_settings.volume == 0.25f && !g_settings.reverb && g_settings.fullscreen);
@@ -60,22 +60,22 @@ int main(int argc, char **argv) {
     assert(!strcmp(settings_language(), "de"));
     assert(g_settings.volume == 0.25f && !g_settings.reverb && g_settings.fullscreen);
     setenv("SF2_CONFIG", argv[1], 1);
-    setenv("LARECOMP_LANG", "en_GB.UTF-8", 1);
-    setenv("LARECOMP_VOLUME", "0.75", 1);
+    setenv("SF2RECOMP_LANG", "en_GB.UTF-8", 1);
+    setenv("SF2RECOMP_VOLUME", "0.75", 1);
     settings_load();
     assert(!strcmp(settings_language(), "en-GB"));
     assert(g_settings.volume == 0.75f && !g_settings.reverb && g_settings.fullscreen);
-    setenv("LARECOMP_REVERB", "true", 1); settings_init();
+    setenv("SF2RECOMP_REVERB", "true", 1); settings_init();
     assert(g_settings.reverb);
-    setenv("LARECOMP_REVERB", "false", 1); settings_init();
+    setenv("SF2RECOMP_REVERB", "false", 1); settings_init();
     assert(!g_settings.reverb);
-    setenv("LARECOMP_REVERB", "only", 1);
+    setenv("SF2RECOMP_REVERB", "only", 1);
     const char *invalid_volumes[] = {"nan", "inf", "-0.5", "2", "garbage"};
     for (int i = 0; i < 5; ++i) {
-        setenv("LARECOMP_VOLUME", invalid_volumes[i], 1); settings_init();
+        setenv("SF2RECOMP_VOLUME", invalid_volumes[i], 1); settings_init();
         assert(g_settings.volume == 0.75f && !g_settings.reverb);
     }
-    setenv("LARECOMP_LANG", "AuTo", 1); setenv("LC_ALL", "fr_FR.UTF-8", 1);
+    setenv("SF2RECOMP_LANG", "AuTo", 1); setenv("LC_ALL", "fr_FR.UTF-8", 1);
     settings_init(); assert(!strcmp(settings_language(), "fr"));
     assert(!settings_load_file("/does/not/exist/sf2.ini"));
 }
@@ -109,7 +109,7 @@ static unsigned field(SettingsGroup group, const char *name) {
 int main(int argc, char **argv) {
     assert(argc == 4);
     setenv("SF2_CONFIG", argv[1], 1);
-    setenv("LARECOMP_VOLUME", "0.8", 1);
+    setenv("SF2RECOMP_VOLUME", "0.8", 1);
     settings_load();
     settings_resolve_defaults(false);
     SettingsConfig draft;
@@ -126,7 +126,7 @@ int main(int argc, char **argv) {
     unsigned key = field(SETTINGS_GROUP_KEYBOARD, "A");
     unsigned pad = field(SETTINGS_GROUP_GAMEPAD, "B");
     assert(draft.settings.volume == 0.25f && g_settings.volume == 0.8f);
-    assert(!strcmp(settings_config_override(volume), "LARECOMP_VOLUME"));
+    assert(!strcmp(settings_config_override(volume), "SF2RECOMP_VOLUME"));
     assert(!settings_config_requires_restart(volume) && !settings_config_requires_restart(fullscreen));
     assert(settings_config_requires_restart(fps) && settings_config_requires_restart(key));
     assert(!settings_config_set(&draft, volume, "nan"));
@@ -160,7 +160,7 @@ int main(int argc, char **argv) {
     assert(settings_config_save(&draft, &result));
     assert(result.applied == 0 && result.overridden == 0 && result.restart_pending == 4);
     assert(!result.request_fullscreen);
-    unsetenv("LARECOMP_VOLUME");
+    unsetenv("SF2RECOMP_VOLUME");
     assert(settings_load_file(argv[1]));
     assert(g_settings.volume == 0.35f && g_settings.fullscreen && g_settings.target_fps == 120);
     assert(!strcmp(g_settings.save_directory, "my saves/it's #1; good"));
@@ -226,7 +226,7 @@ uint64_t renderer_present_count(void) { return 1; }
 volatile int g_inject_plus;
 int main(int argc, char **argv) {
     assert(argc == 3);
-    unsetenv("LARECOMP_LANG"); unsetenv("LARECOMP_VOLUME"); unsetenv("LARECOMP_REVERB");
+    unsetenv("SF2RECOMP_LANG"); unsetenv("SF2RECOMP_VOLUME"); unsetenv("SF2RECOMP_REVERB");
     // Runtime INIs are user-editable; check built-in defaults independently,
     // then reset the loaded map so custom local bindings cannot affect this test.
     assert(bind_is_default(BIND_DEV_KEY) && bind_is_default(BIND_DEV_PAD));
@@ -357,7 +357,7 @@ int main(int argc, char **argv) {
 #include "settings.h"
 int main(int argc, char **argv) {
     assert(argc == 4);
-    unsetenv("LARECOMP_SAVE_DIR");
+    unsetenv("SF2RECOMP_SAVE_DIR");
     assert(!strcmp(g_settings.save_directory, "save"));
     assert(settings_load_file(argv[1]));
     assert(!strcmp(g_settings.save_directory, "my saves/slot #one; ok"));
@@ -365,15 +365,15 @@ int main(int argc, char **argv) {
     assert(!strcmp(g_settings.save_directory, "my saves/slot #one; ok"));
     assert(settings_load_file(argv[3]));
     assert(!strcmp(g_settings.save_directory, "/tmp/absolute saves"));
-    setenv("LARECOMP_SAVE_DIR", "override saves", 1); settings_init();
+    setenv("SF2RECOMP_SAVE_DIR", "override saves", 1); settings_init();
     assert(!strcmp(g_settings.save_directory, "override saves"));
-    setenv("LARECOMP_SAVE_DIR", "", 1); settings_init();
+    setenv("SF2RECOMP_SAVE_DIR", "", 1); settings_init();
     assert(!strcmp(g_settings.save_directory, "override saves"));
     char huge[SETTINGS_SAVE_DIRECTORY_CAP + 1];
     memset(huge, 'x', sizeof huge - 1); huge[sizeof huge - 1] = 0;
-    setenv("LARECOMP_SAVE_DIR", huge, 1); settings_init();
+    setenv("SF2RECOMP_SAVE_DIR", huge, 1); settings_init();
     assert(!strcmp(g_settings.save_directory, "override saves"));
-    setenv("LARECOMP_SAVE_DIR", "bad\tpath", 1); settings_init();
+    setenv("SF2RECOMP_SAVE_DIR", "bad\tpath", 1); settings_init();
     assert(!strcmp(g_settings.save_directory, "override saves"));
 }
 '''
@@ -393,7 +393,7 @@ int main(int argc, char **argv) {
                                     capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("invalid [storage] save_directory", result.stderr)
-            self.assertIn("invalid LARECOMP_SAVE_DIR", result.stderr)
+            self.assertIn("invalid SF2RECOMP_SAVE_DIR", result.stderr)
 
     def test_locale_selection(self):
         harness = r'''
@@ -402,7 +402,7 @@ int main(int argc, char **argv) {
 #include <string.h>
 #include "settings.h"
 int main(void) {
-    unsetenv("LARECOMP_LANG"); unsetenv("LC_ALL"); unsetenv("LC_MESSAGES");
+    unsetenv("SF2RECOMP_LANG"); unsetenv("LC_ALL"); unsetenv("LC_MESSAGES");
     setenv("LANG", "en_US.UTF-8", 1);
     assert(!strcmp(settings_language(), "en-US"));
     assert(!strcmp(settings_language_name(), "English (US)"));
@@ -410,9 +410,9 @@ int main(void) {
     assert(!strcmp(settings_language(), "de"));
     setenv("LC_ALL", "fr_FR.UTF-8", 1);
     assert(!strcmp(settings_language(), "fr"));
-    setenv("LARECOMP_LANG", "ja", 1); settings_init();
+    setenv("SF2RECOMP_LANG", "ja", 1); settings_init();
     assert(!strcmp(settings_language(), "ja"));
-    setenv("LARECOMP_LANG", "ko-Hangul", 1); settings_init();
+    setenv("SF2RECOMP_LANG", "ko-Hangul", 1); settings_init();
     assert(!strcmp(settings_language(), "ko"));
     assert(!strcmp(settings_language_name(), "Korean"));
     assert(settings_language_index("en_GB.UTF-8") == settings_language_index("en-GB"));

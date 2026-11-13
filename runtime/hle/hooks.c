@@ -229,7 +229,7 @@ static int menu_mouse_hook(Cpu *c, uint64_t site) {
 #else
         sparring_mouse_frame(c,&menu_mouse);
 #endif
-        if (ENV(SF2C_HOOKS_S_LARECOMP_MOUSE_TRACE_86DC) &&
+        if (ENV(SF2C_HOOKS_S_SF2RECOMP_MOUSE_TRACE_86DC) &&
             (previous.x != menu_mouse.x || previous.y != menu_mouse.y || menu_mouse.pressed || menu_mouse.released))
             LOG(SF2C_HOOKS_S_MOUSE_SCREEN_UX_U_POINTER_1F_26D7, width, height,
                 menu_mouse.x, menu_mouse.y, menu_mouse.held, menu_mouse.pressed, menu_mouse.released);

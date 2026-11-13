@@ -70,7 +70,7 @@ int main(int argc, char **argv) {
     char directory[] = "/tmp/sf2-macos-XXXXXX", data[4096], previous[4096];
     assert(mkdtemp(directory) && getcwd(previous, sizeof previous));
     snprintf(data, sizeof data, "%s/nested/Unicode-é", directory);
-    assert(!setenv("LARECOMP_DATA_ROOT", data, 1));
+    assert(!setenv("SF2RECOMP_DATA_ROOT", data, 1));
     assert(!setenv("SF2_CONFIG", "relative.ini", 1));
     rt_paths_init();
     assert(!strcmp(rt_data_root(), data) || strstr(rt_data_root(), data));

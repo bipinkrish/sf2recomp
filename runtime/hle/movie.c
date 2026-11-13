@@ -168,7 +168,7 @@ typedef struct {
 #ifndef __ANDROID__
 static bool movie_select_decoder(MovieDecoder *decoder) {
     memset(decoder, 0, sizeof *decoder);
-    const char *override = getenv(SF2C_MOVIE_S_LARECOMP_FFMPEG_0C2D);
+    const char *override = getenv(SF2C_MOVIE_S_SF2RECOMP_FFMPEG_0C2D);
     if (override && *override) {
         return snprintf(decoder->executable, sizeof decoder->executable, SF2C_MOVIE_S_S_0030, override) < (int)sizeof decoder->executable;
     }
@@ -684,14 +684,14 @@ static bool movie_start(const char *guest_path) {
         return false;
     }
 
-    if (!(getenv(SF2C_MOVIE_S_LARECOMP_NO_AUDIO_8230) && strcmp(getenv(SF2C_MOVIE_S_LARECOMP_NO_AUDIO_8230), SF2C_MOVIE_S_0_9808))) {
+    if (!(getenv(SF2C_MOVIE_S_SF2RECOMP_NO_AUDIO_8230) && strcmp(getenv(SF2C_MOVIE_S_SF2RECOMP_NO_AUDIO_8230), SF2C_MOVIE_S_0_9808))) {
         g_movie.audio_subsystem = SDL_InitSubSystem(SDL_INIT_AUDIO);
         if (g_movie.audio_subsystem) {
             SDL_AudioSpec spec = {SDL_AUDIO_S16LE, MOVIE_AUDIO_CHANNELS, MOVIE_AUDIO_RATE};
             g_movie.audio_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, NULL, NULL);
             if (g_movie.audio_stream) {
                 double gain = settings_volume();
-                const char *env_gain = getenv(SF2C_MOVIE_S_LARECOMP_AUDIO_GAIN_1F0B);
+                const char *env_gain = getenv(SF2C_MOVIE_S_SF2RECOMP_AUDIO_GAIN_1F0B);
                 if (env_gain) gain *= atof(env_gain);
                 SDL_SetAudioStreamGain(g_movie.audio_stream, (float)gain);
             } else {

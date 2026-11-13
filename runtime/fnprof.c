@@ -1,5 +1,5 @@
 #include "constants/core.h"
-// Function-entry profiler. LARECOMP_FNPROF=<from>:<to> counts guest function entries (every generated
+// Function-entry profiler. SF2RECOMP_FNPROF=<from>:<to> counts guest function entries (every generated
 // function calls FN_ENTER) between those presented frames, then writes build/fnprof.txt (addr count, most
 // called first). Diffing two runs shows which game functions a change brings in; counts also show hot code.
 #include <stdatomic.h>
@@ -14,7 +14,7 @@ volatile int g_fnprof;
 #define NSLOT (1 << SF2C_FNPROF_N_18_4EC9)
 static struct { _Atomic uint64_t addr; _Atomic uint64_t count; } slots[NSLOT];
 
-// LARECOMP_FNPROF_BT=<hex addr>[,...]: also print the host backtrace (guest functions are f_<addr>) the first time
+// SF2RECOMP_FNPROF_BT=<hex addr>[,...]: also print the host backtrace (guest functions are f_<addr>) the first time
 // each listed function is entered inside the window - who calls it
 static uint64_t bt_addrs[SF2C_FNPROF_N_256_51E8];
 static int bt_n = -1;
@@ -25,7 +25,7 @@ uint64_t g_bt_first_x0;
 static void bt_check(uint64_t a, uint64_t lr, uint64_t x0) {
     if (bt_n < 0) {
         bt_n = 0;
-        const char *e = getenv(SF2C_FNPROF_S_LARECOMP_FNPROF_BT_ACF6);
+        const char *e = getenv(SF2C_FNPROF_S_SF2RECOMP_FNPROF_BT_ACF6);
         for (const char *p = e; p && *p && bt_n < SF2C_FNPROF_N_256_51E8;) {
             bt_addrs[bt_n++] = strtoull(p, (char **)&p, SF2C_FNPROF_N_16_B17E);
             while (*p == SF2C_FNPROF_CH_EMPTY_EE1B || *p == SF2C_FNPROF_CH_EMPTY_730D) p++;
@@ -65,7 +65,7 @@ void fnprof_frame(uint64_t frame) {
     static long from = -SF2C_FNPROF_N_2_D473, to;
     if (from == -SF2C_FNPROF_N_2_D473) {
         from = -1;
-        const char *e = getenv(SF2C_FNPROF_S_LARECOMP_FNPROF_CC00);
+        const char *e = getenv(SF2C_FNPROF_S_SF2RECOMP_FNPROF_CC00);
         if (e && sscanf(e, SF2C_FNPROF_S_LD_LD_CF3A, &from, &to) != SF2C_FNPROF_N_2_D473) from = -1;
     }
     if (from < 0) return;
@@ -77,7 +77,7 @@ void fnprof_frame(uint64_t frame) {
     for (int i = 0; i < NSLOT; i++)
         if (slots[i].addr) { rows[n][0] = slots[i].addr; rows[n][1] = slots[i].count; n++; }
     qsort(rows, n, sizeof rows[0], cmp);
-    const char *out = getenv(SF2C_FNPROF_S_LARECOMP_FNPROF_OUT_EA89) ? getenv(SF2C_FNPROF_S_LARECOMP_FNPROF_OUT_EA89) : SF2C_FNPROF_S_BUILD_FNPROF_TXT_A5F6;  // (parallel runs)
+    const char *out = getenv(SF2C_FNPROF_S_SF2RECOMP_FNPROF_OUT_EA89) ? getenv(SF2C_FNPROF_S_SF2RECOMP_FNPROF_OUT_EA89) : SF2C_FNPROF_S_BUILD_FNPROF_TXT_A5F6;  // (parallel runs)
     FILE *f = fopen(out, SF2C_FNPROF_S_W_7265);
     for (int i = 0; f && i < n; i++) fprintf(f, SF2C_FNPROF_S_LLX_LLU_N_670A, (unsigned long long)rows[i][0], (unsigned long long)rows[i][1]);
     if (f) fclose(f);
@@ -86,8 +86,8 @@ void fnprof_frame(uint64_t frame) {
     from = -1;
 }
 
-// LARECOMP_FNPROF=0:<to>: profile from process start (threads the game starts before the first frame)
+// SF2RECOMP_FNPROF=0:<to>: profile from process start (threads the game starts before the first frame)
 __attribute__((constructor)) static void fnprof_early(void) {
-    const char *e = getenv(SF2C_FNPROF_S_LARECOMP_FNPROF_CC00);
+    const char *e = getenv(SF2C_FNPROF_S_SF2RECOMP_FNPROF_CC00);
     if (e && e[0] == SF2C_FNPROF_CH_0_59A9 && e[1] == SF2C_FNPROF_CH_EMPTY_4266) g_fnprof = 1;
 }

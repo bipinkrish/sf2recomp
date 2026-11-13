@@ -69,7 +69,7 @@ static bool level_check(uint64_t now, uint64_t *changed_at, char *name, size_t n
 void slow_frame_present(uint64_t now, uint64_t gcpu) {
     static int64_t limit = -1;  // ns (0: off)
     if (limit < 0) {
-        const char *e = getenv(SF2C_SLOWFRAME_S_LARECOMP_SLOW_FRAME_MS_04A4);
+        const char *e = getenv(SF2C_SLOWFRAME_S_SF2RECOMP_SLOW_FRAME_MS_04A4);
         limit = (e ? atoll(e) : SF2C_SLOWFRAME_N_50_1A65) * SF2C_SLOWFRAME_N_1000000LL_CC3A;
         if (limit < 0) limit = 0;
     }

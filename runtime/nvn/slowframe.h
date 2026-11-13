@@ -1,4 +1,4 @@
-// Slow-frame log (slowframe.c): every presented frame that took longer than LARECOMP_SLOW_FRAME_MS (default 50; 0 =
+// Slow-frame log (slowframe.c): every presented frame that took longer than SF2RECOMP_SLOW_FRAME_MS (default 50; 0 =
 // off) from the previous present gets one "[slow]" line in the log saying what the renderer did in that time:
 //   [slow] frame 4123 83 ms in Field: 3 pipelines built (41 ms, 1 from cache), 2 programs compiled (12 ms),
 //          2 shaders translated (3 ms), 12 texture uploads 4.1 MB, 5 full texture hashes, 9 submissions,

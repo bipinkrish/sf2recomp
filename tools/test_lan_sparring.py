@@ -30,18 +30,18 @@ def pair(output,save,host_flags,join_flags,ticks=K.N_600_284B,scenario=K.S_EXCHA
             args.binary=args.binary.resolve();args.game=args.game.resolve()
             if live:args.input_tape=None
             config=lan_sparring.configure(args,run)
-            env=lan_sparring.environment(args,run,config);env.update(SDL_VIDEODRIVER=K.S_X11_7FD2,SDL_JOYSTICK_LINUX_CLASSIC=K.S_1_9A76,LARECOMP_VK_DEVLOST_TRACE=K.S_1_9A76)
-            if os.environ.get(K.S_SF2_LAN_TEST_VALIDATE_B138):env[K.S_LARECOMP_VK_VALIDATION_STOP_3771]=K.S_1_9A76
+            env=lan_sparring.environment(args,run,config);env.update(SDL_VIDEODRIVER=K.S_X11_7FD2,SDL_JOYSTICK_LINUX_CLASSIC=K.S_1_9A76,SF2RECOMP_VK_DEVLOST_TRACE=K.S_1_9A76)
+            if os.environ.get(K.S_SF2_LAN_TEST_VALIDATE_B138):env[K.S_SF2RECOMP_VK_VALIDATION_STOP_3771]=K.S_1_9A76
             if role==K.S_JOIN_0986 and join_menu_offset:
                 shifted=[]
-                for command in env[K.S_LARECOMP_INPUT_07C4].split(K.S_EMPTY_EE1B):
+                for command in env[K.S_SF2RECOMP_INPUT_07C4].split(K.S_EMPTY_EE1B):
                     frame,button,length=command.split(K.S_EMPTY_4266);shifted.append(f'{int(frame)+round(join_menu_offset*args.fps/K.N_60_39FA)}:{button}:{length}')
-                env[K.S_LARECOMP_INPUT_07C4]=K.S_EMPTY_EE1B.join(shifted)
+                env[K.S_SF2RECOMP_INPUT_07C4]=K.S_EMPTY_EE1B.join(shifted)
             if no_trace:env.pop(K.S_SF2_REPLAY_TRACE_6C6C,None)
             if live:
                 commands=[(K.N_2800_19D6,K.S_RIGHT_BF07 if role==K.S_HOST_E293 else K.S_LEFT_56A0,K.N_70_FF5A),(K.N_2900_AB4E if role==K.S_HOST_E293 else K.N_2920_B72B,K.S_X_1040,K.N_8_2C62),(K.N_2940_9992 if role==K.S_HOST_E293 else K.N_2960_B519,K.S_Y_8CC0,K.N_8_2C62)]
-                env[K.S_LARECOMP_INPUT_07C4]+=K.S_EMPTY_EE1B+K.S_EMPTY_EE1B.join(f'{round(t*args.fps/K.N_60_39FA)}:{key}:{max(K.N_2_D473,round(length*args.fps/K.N_60_39FA))}' for t,key,length in commands)
-            (run/K.S_ENVIRONMENT_JSON_64EE).write_text(json.dumps({k:v for k,v in env.items() if k.startswith((K.S_SF2_8749,K.S_LARECOMP_B959,K.S_VK_6B79,K.S_SDL_8FFE))},indent=K.N_2_D473)+K.S_N_AD65)
+                env[K.S_SF2RECOMP_INPUT_07C4]+=K.S_EMPTY_EE1B+K.S_EMPTY_EE1B.join(f'{round(t*args.fps/K.N_60_39FA)}:{key}:{max(K.N_2_D473,round(length*args.fps/K.N_60_39FA))}' for t,key,length in commands)
+            (run/K.S_ENVIRONMENT_JSON_64EE).write_text(json.dumps({k:v for k,v in env.items() if k.startswith((K.S_SF2_8749,K.S_SF2RECOMP_B959,K.S_VK_6B79,K.S_SDL_8FFE))},indent=K.N_2_D473)+K.S_N_AD65)
             log=(run/K.S_RUNTIME_LOG_DDBF).open(K.S_W_780F);logs.append(log)
             processes.append(subprocess.Popen([str(args.binary),str(args.game)],cwd=run,env=env,stdout=log,stderr=subprocess.STDOUT))
         for role,process in zip([K.S_HOST_E293,K.S_JOIN_0986],processes):

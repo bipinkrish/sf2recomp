@@ -70,7 +70,7 @@ Settings g_settings = {
     .save_directory = SF2C_SETTINGS_S_SAVE_38AA,
 };
 
-// Defaults from environment overrides (LARECOMP_VOLUME / LARECOMP_REVERB / LARECOMP_LANG) — called by boot.
+// Defaults from environment overrides (SF2RECOMP_VOLUME / SF2RECOMP_REVERB / SF2RECOMP_LANG) — called by boot.
 static const char *env_float(const char *name, float *out) {
     const char *e = getenv(name);
     if (e && *e) {
@@ -108,14 +108,14 @@ static bool assign_path(char *out, size_t capacity, const char *value) {
 }
 
 void settings_init(void) {
-    env_float(SF2C_SETTINGS_S_LARECOMP_VOLUME_6C32, &g_settings.volume);
-    const char *r = getenv(SF2C_SETTINGS_S_LARECOMP_REVERB_419C);
+    env_float(SF2C_SETTINGS_S_SF2RECOMP_VOLUME_6C32, &g_settings.volume);
+    const char *r = getenv(SF2C_SETTINGS_S_SF2RECOMP_REVERB_419C);
     if (r && *r && !parse_bool(r, &g_settings.reverb))
-        fprintf(stderr, SF2C_SETTINGS_S_SETTINGS_INVALID_LARECOMP_RE_ED26, r);
-    const char *save = getenv(SF2C_SETTINGS_S_LARECOMP_SAVE_DIR_4AEE);
+        fprintf(stderr, SF2C_SETTINGS_S_SETTINGS_INVALID_SF2RECOMP_RE_ED26, r);
+    const char *save = getenv(SF2C_SETTINGS_S_SF2RECOMP_SAVE_DIR_4AEE);
     if (save && !assign_path(g_settings.save_directory, sizeof g_settings.save_directory, save))
-        fprintf(stderr, SF2C_SETTINGS_S_SETTINGS_INVALID_LARECOMP_SA_EC52);
-    const char *lang = getenv(SF2C_SETTINGS_S_LARECOMP_LANG_74DD);
+        fprintf(stderr, SF2C_SETTINGS_S_SETTINGS_INVALID_SF2RECOMP_SA_EC52);
+    const char *lang = getenv(SF2C_SETTINGS_S_SF2RECOMP_LANG_74DD);
     if (lang && *lang) {
         if (!strcasecmp(lang, SF2C_SETTINGS_S_AUTO_6346)) { g_settings.language = LANG_AUTO; return; }
         int i = settings_language_index(lang);
@@ -487,11 +487,11 @@ const char *settings_config_override(unsigned field) {
     if (field >= CONFIG_OPTION_COUNT) return NULL;
     const char *name = NULL;
     switch (config_options[field].type) {
-    case CONFIG_LANGUAGE: name = SF2C_SETTINGS_S_LARECOMP_LANG_74DD; break;
-    case CONFIG_VOLUME: name = SF2C_SETTINGS_S_LARECOMP_VOLUME_6C32; break;
-    case CONFIG_PATH: name = SF2C_SETTINGS_S_LARECOMP_SAVE_DIR_4AEE; break;
+    case CONFIG_LANGUAGE: name = SF2C_SETTINGS_S_SF2RECOMP_LANG_74DD; break;
+    case CONFIG_VOLUME: name = SF2C_SETTINGS_S_SF2RECOMP_VOLUME_6C32; break;
+    case CONFIG_PATH: name = SF2C_SETTINGS_S_SF2RECOMP_SAVE_DIR_4AEE; break;
     default:
-        if (config_options[field].offset == offsetof(Settings, reverb)) name = SF2C_SETTINGS_S_LARECOMP_REVERB_419C;
+        if (config_options[field].offset == offsetof(Settings, reverb)) name = SF2C_SETTINGS_S_SF2RECOMP_REVERB_419C;
         break;
     }
     const char *value = name ? getenv(name) : NULL;
@@ -500,15 +500,15 @@ const char *settings_config_override(unsigned field) {
 
     switch (config_options[field].offset) {
     case offsetof(Settings, reverb):
-        if (getenv(SF2C_AUDIO_S_LARECOMP_NO_REVERB_0417)) return SF2C_AUDIO_S_LARECOMP_NO_REVERB_0417;
+        if (getenv(SF2C_AUDIO_S_SF2RECOMP_NO_REVERB_0417)) return SF2C_AUDIO_S_SF2RECOMP_NO_REVERB_0417;
         break;
     case offsetof(Settings, fullscreen):
-        if (getenv(SF2C_DEVICE_S_LARECOMP_WINDOW_7651)) return SF2C_DEVICE_S_LARECOMP_WINDOW_7651;
-        if (getenv(SF2C_DEVICE_S_LARECOMP_HIDDEN_AFF5)) return SF2C_DEVICE_S_LARECOMP_HIDDEN_AFF5;
+        if (getenv(SF2C_DEVICE_S_SF2RECOMP_WINDOW_7651)) return SF2C_DEVICE_S_SF2RECOMP_WINDOW_7651;
+        if (getenv(SF2C_DEVICE_S_SF2RECOMP_HIDDEN_AFF5)) return SF2C_DEVICE_S_SF2RECOMP_HIDDEN_AFF5;
         break;
     case offsetof(Settings, res_mode):
-        value = getenv(SF2C_OUTPUT_SCALE_S_LARECOMP_SCALE_2675);
-        if (value && atof(value) > 0) return SF2C_OUTPUT_SCALE_S_LARECOMP_SCALE_2675;
+        value = getenv(SF2C_OUTPUT_SCALE_S_SF2RECOMP_SCALE_2675);
+        if (value && atof(value) > 0) return SF2C_OUTPUT_SCALE_S_SF2RECOMP_SCALE_2675;
         break;
     default: break;
     }

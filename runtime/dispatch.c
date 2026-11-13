@@ -42,7 +42,7 @@ __attribute__((section(SF2C_DISPATCH_S_HLE_Z_14B5), used)) static const HleImpl 
 
 HostFn hle_lookup_impl(const char *name) {
     if (network_hle_blocked(name)) return NULL;
-    const char *skip = getenv(SF2C_DISPATCH_S_LARECOMP_HLE_SKIP_8648);  // debugging: disable HLE for names containing this
+    const char *skip = getenv(SF2C_DISPATCH_S_SF2RECOMP_HLE_SKIP_8648);  // debugging: disable HLE for names containing this
     if (skip && strstr(name, skip)) return NULL;
     const HleImpl *start = __start_hle_impls, *stop = __stop_hle_impls;
     __asm__(SF2C_DISPATCH_S_EMPTY_12AE : SF2C_DISPATCH_S_R_E649(start), SF2C_DISPATCH_S_R_E649(stop));  // separate objects: keep the compiler from reasoning about them
@@ -291,9 +291,9 @@ void rt_fatal_trace(void) {
                     i % SF2C_DISPATCH_N_4_4B22 == SF2C_DISPATCH_N_3_4E07 || i == SF2C_DISPATCH_N_30_624B ? SF2C_DISPATCH_S_N_D7A5 : SF2C_DISPATCH_S_EMPTY_12AE);
     }
     plat_fatal_notice();
-    // (debug) LARECOMP_HWBREAK=1: park this thread forever instead of aborting, so a `gdb -p`
+    // (debug) SF2RECOMP_HWBREAK=1: park this thread forever instead of aborting, so a `gdb -p`
     // can inspect the crash's exact host state (registers, heap structs) before the core goes away
-    if (getenv(SF2C_DISPATCH_S_LARECOMP_HWBREAK_8AFC)) {
+    if (getenv(SF2C_DISPATCH_S_SF2RECOMP_HWBREAK_8AFC)) {
         fprintf(stderr, SF2C_DISPATCH_S_HWBREAK_STOPPED_PID_D_FROZEN_C10E, (int)getpid(), (int)getpid());
         for (;;) sleep(SF2C_DISPATCH_N_3600_8B34);
     }
@@ -353,8 +353,8 @@ static void *watch_thread(void *a) {
 volatile int g_watch_stop;  // (set by the watcher's client: the watch ends, the page opens for good)
 const char *rt_host_sym(uint64_t pc, uint64_t *off) { return host_sym(pc, off); }  // (the renderer's fault log)
 void watch_arm(void) {
-    if (!g_watch_lo) {  // (debug) LARECOMP_WATCH_ADDR=<lo>,<hi> (hex): who touches [lo, hi) - one page watched
-        const char *e = getenv(SF2C_DISPATCH_S_LARECOMP_WATCH_ADDR_5B12);
+    if (!g_watch_lo) {  // (debug) SF2RECOMP_WATCH_ADDR=<lo>,<hi> (hex): who touches [lo, hi) - one page watched
+        const char *e = getenv(SF2C_DISPATCH_S_SF2RECOMP_WATCH_ADDR_5B12);
         if (e) { g_watch_lo = strtoull(e, (char **)&e, SF2C_DISPATCH_N_16_B17E); if (*e == SF2C_DISPATCH_CH_EMPTY_EE1B) g_watch_hi = strtoull(e + 1, NULL, SF2C_DISPATCH_N_16_B17E); }
     }
     if (!g_watch_lo || watch_page) return;

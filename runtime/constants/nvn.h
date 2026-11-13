@@ -541,7 +541,7 @@
 // runtime/nvn/cmdbuf.c:140
 #define SF2C_CMDBUF_N_16_B17E 16
 // runtime/nvn/cmdbuf.c:339
-#define SF2C_CMDBUF_S_LARECOMP_KEEP_DISCARD_3335 "LARECOMP_KEEP_DISCARD"
+#define SF2C_CMDBUF_S_SF2RECOMP_KEEP_DISCARD_3335 "SF2RECOMP_KEEP_DISCARD"
 // runtime/nvn/cmdbuf.c:340
 #define SF2C_CMDBUF_S_NVN_DISCARDCOLOR_INDEX_LLU_S_0AB6 "[nvn] DiscardColor index %llu%s\n"
 // runtime/nvn/cmdbuf.c:340
@@ -561,7 +561,7 @@
 // runtime/nvn/cmdbuf.c:360
 #define SF2C_CMDBUF_N_30_624B 30
 // runtime/nvn/cmdbuf.c:362
-#define SF2C_CMDBUF_S_LARECOMP_TRACE_COUNT_D3AB "LARECOMP_TRACE_COUNT"
+#define SF2C_CMDBUF_S_SF2RECOMP_TRACE_COUNT_D3AB "SF2RECOMP_TRACE_COUNT"
 // runtime/nvn/cmdbuf.c:365
 #define SF2C_CMDBUF_N_40_D59E 40
 // runtime/nvn/cmdbuf.c:366
@@ -1075,21 +1075,21 @@
 // runtime/nvn/objects.c:143
 #define SF2C_OBJECTS_S_QUEUEFINISH_THE_GPU_BF94 "QueueFinish: the GPU"
 // runtime/nvn/objects.c:176
-#define SF2C_OBJECTS_S_LARECOMP_SYNC_FLUSH_2EFC "LARECOMP_SYNC_FLUSH"
+#define SF2C_OBJECTS_S_SF2RECOMP_SYNC_FLUSH_2EFC "SF2RECOMP_SYNC_FLUSH"
 // runtime/nvn/objects.c:177
-#define SF2C_OBJECTS_S_LARECOMP_LOG_SYNC_0941 "LARECOMP_LOG_SYNC"
+#define SF2C_OBJECTS_S_SF2RECOMP_LOG_SYNC_0941 "SF2RECOMP_LOG_SYNC"
 // runtime/nvn/objects.c:177
 #define SF2C_OBJECTS_S_NVN_SYNCWAIT_LLU_LR_LLX_N_7DAE "[nvn] SyncWait #%llu (lr %llx)\n"
 // runtime/nvn/objects.c:179
-#define SF2C_OBJECTS_S_LARECOMP_SYNC_ALL_2142 "LARECOMP_SYNC_ALL"
+#define SF2C_OBJECTS_S_SF2RECOMP_SYNC_ALL_2142 "SF2RECOMP_SYNC_ALL"
 // runtime/nvn/objects.c:182
 #define SF2C_OBJECTS_S_SYNCWAIT_ALL_THE_GPU_76A4 "SyncWait (all): the GPU"
 // runtime/nvn/objects.c:186
-#define SF2C_OBJECTS_S_LARECOMP_LOG_PACE_ED01 "LARECOMP_LOG_PACE"
+#define SF2C_OBJECTS_S_SF2RECOMP_LOG_PACE_ED01 "SF2RECOMP_LOG_PACE"
 // runtime/nvn/objects.c:194
 #define SF2C_OBJECTS_S_SYNCWAIT_THE_GPU_SUBMISSION_69A5 "SyncWait: the GPU, submission"
 // runtime/nvn/objects.c:197
-#define SF2C_OBJECTS_S_LARECOMP_RQ_TRACE_50B2 "LARECOMP_RQ_TRACE"
+#define SF2C_OBJECTS_S_SF2RECOMP_RQ_TRACE_50B2 "SF2RECOMP_RQ_TRACE"
 // runtime/nvn/objects.c:202
 #define SF2C_OBJECTS_S_RQ_TRACE_GAME_FRAME_LLU_FENC_305D "[rq-trace] game frame %llu: fence wait item %llu (gpu %llu) from %.3f, translation %.3f ms, GPU %.3f ms\n"
 // runtime/nvn/objects.c:204
@@ -1109,7 +1109,7 @@
 // runtime/nvn/objects.c:257
 #define SF2C_OBJECTS_N_0X9_7D3B 0x9
 // runtime/nvn/objects.c:273
-#define SF2C_OBJECTS_S_LARECOMP_LOG_BINDS_8A9A "LARECOMP_LOG_BINDS"
+#define SF2C_OBJECTS_S_SF2RECOMP_LOG_BINDS_8A9A "SF2RECOMP_LOG_BINDS"
 // runtime/nvn/objects.c:273
 #define SF2C_OBJECTS_S_POOL_LLX_LLU_KB_FLAGS_X_N_98EF "[pool] %llx + %llu KB flags %#x\n"
 // runtime/nvn/objects.c:335
@@ -1135,7 +1135,7 @@
 // runtime/nvn/objects.c:362
 #define SF2C_OBJECTS_N_0X50_4171 0x50
 // runtime/nvn/objects.c:408
-#define SF2C_OBJECTS_S_LARECOMP_LOG_PACKAGED_A712 "LARECOMP_LOG_PACKAGED"
+#define SF2C_OBJECTS_S_SF2RECOMP_LOG_PACKAGED_A712 "SF2RECOMP_LOG_PACKAGED"
 // runtime/nvn/objects.c:410
 #define SF2C_OBJECTS_N_4000_B090 4000
 // runtime/nvn/objects.c:410
@@ -1177,7 +1177,7 @@
 // runtime/nvn/objects.c:806
 #define SF2C_OBJECTS_S_NVN_WINDOW_WITH_D_TEXTURES_N_E49B "[nvn] window with %d textures\n"
 // runtime/nvn/objects.c:819
-#define SF2C_OBJECTS_S_LARECOMP_LOG_INTERVAL_D6E7 "LARECOMP_LOG_INTERVAL"
+#define SF2C_OBJECTS_S_SF2RECOMP_LOG_INTERVAL_D6E7 "SF2RECOMP_LOG_INTERVAL"
 // runtime/nvn/objects.c:820
 #define SF2C_OBJECTS_S_NVN_PRESENT_INTERVAL_D_D_N_0899 "[nvn] present interval %d -> %d\n"
 // runtime/nvn/objects.c:828
@@ -1263,15 +1263,15 @@
 // runtime/nvn/output_scale.c:161
 #define SF2C_OUTPUT_SCALE_N_600_284B 600
 // runtime/nvn/output_scale.c:183
-#define SF2C_OUTPUT_SCALE_S_LARECOMP_DYN_NO_GPU_D34F "LARECOMP_DYN_NO_GPU"
+#define SF2C_OUTPUT_SCALE_S_SF2RECOMP_DYN_NO_GPU_D34F "SF2RECOMP_DYN_NO_GPU"
 // runtime/nvn/output_scale.c:186
 #define SF2C_OUTPUT_SCALE_N_0_5_D2CB 0.5
 // runtime/nvn/output_scale.c:192
-#define SF2C_OUTPUT_SCALE_S_LARECOMP_DYN_START_0C8E "LARECOMP_DYN_START"
+#define SF2C_OUTPUT_SCALE_S_SF2RECOMP_DYN_START_0C8E "SF2RECOMP_DYN_START"
 // runtime/nvn/output_scale.c:198
 #define SF2C_OUTPUT_SCALE_N_250_1E47 250
 // runtime/nvn/output_scale.c:220
-#define SF2C_OUTPUT_SCALE_S_LARECOMP_LOG_DYNRES_73A7 "LARECOMP_LOG_DYNRES"
+#define SF2C_OUTPUT_SCALE_S_SF2RECOMP_LOG_DYNRES_73A7 "SF2RECOMP_LOG_DYNRES"
 // runtime/nvn/output_scale.c:221
 #define SF2C_OUTPUT_SCALE_N_0_87_36C2 0.87
 // runtime/nvn/output_scale.c:225
@@ -1359,15 +1359,15 @@
 // runtime/nvn/output_scale.c:435
 #define SF2C_OUTPUT_SCALE_N_1080_0_AF38 1080.0
 // runtime/nvn/output_scale.c:437
-#define SF2C_OUTPUT_SCALE_S_LARECOMP_SCALE_2675 "LARECOMP_SCALE"
+#define SF2C_OUTPUT_SCALE_S_SF2RECOMP_SCALE_2675 "SF2RECOMP_SCALE"
 // runtime/nvn/output_scale.c:438
-#define SF2C_OUTPUT_SCALE_S_LARECOMP_WIDE_TEST_A818 "LARECOMP_WIDE_TEST"
+#define SF2C_OUTPUT_SCALE_S_SF2RECOMP_WIDE_TEST_A818 "SF2RECOMP_WIDE_TEST"
 // runtime/nvn/output_scale.c:440
 #define SF2C_OUTPUT_SCALE_N_0_005_07E1 0.005
 // runtime/nvn/output_scale.c:446
 #define SF2C_OUTPUT_SCALE_N_720_D829 720
 // runtime/nvn/output_scale.c:451
-#define SF2C_OUTPUT_SCALE_S_LARECOMP_DYN_TEST_AACD "LARECOMP_DYN_TEST"
+#define SF2C_OUTPUT_SCALE_S_SF2RECOMP_DYN_TEST_AACD "SF2RECOMP_DYN_TEST"
 // runtime/nvn/output_scale.c:455
 #define SF2C_OUTPUT_SCALE_N_0_75_CE5D 0.75
 // runtime/nvn/renderer.h:16
@@ -1389,11 +1389,11 @@
 // runtime/nvn/rqueue.c:52
 #define SF2C_RQUEUE_N_1024_E39E 1024
 // runtime/nvn/rqueue.c:84
-#define SF2C_RQUEUE_S_LARECOMP_RQ_START_DELAY_MS_CB6C "LARECOMP_RQ_START_DELAY_MS"
+#define SF2C_RQUEUE_S_SF2RECOMP_RQ_START_DELAY_MS_CB6C "SF2RECOMP_RQ_START_DELAY_MS"
 // runtime/nvn/rqueue.c:84
 #define SF2C_RQUEUE_N_1000U_4C8A 1000u
 // runtime/nvn/rqueue.c:85
-#define SF2C_RQUEUE_S_LARECOMP_RENDER_THREAD_5CA6 "LARECOMP_RENDER_THREAD"
+#define SF2C_RQUEUE_S_SF2RECOMP_RENDER_THREAD_5CA6 "SF2RECOMP_RENDER_THREAD"
 // runtime/nvn/rqueue.c:90
 #define SF2C_RQUEUE_N_16_B17E 16
 // runtime/nvn/rqueue.c:90
@@ -1435,13 +1435,13 @@
 // runtime/nvn/rqueue.c:246
 #define SF2C_RQUEUE_N_44_71EE 44
 // runtime/nvn/rqueue.c:265
-#define SF2C_RQUEUE_S_LARECOMP_RQ_STALL_AT_54FA "LARECOMP_RQ_STALL_AT"
+#define SF2C_RQUEUE_S_SF2RECOMP_RQ_STALL_AT_54FA "SF2RECOMP_RQ_STALL_AT"
 // runtime/nvn/rqueue.c:266
-#define SF2C_RQUEUE_S_LARECOMP_RQ_STALL_AT_TEST_755E "LARECOMP_RQ_STALL_AT (test)"
+#define SF2C_RQUEUE_S_SF2RECOMP_RQ_STALL_AT_TEST_755E "SF2RECOMP_RQ_STALL_AT (test)"
 // runtime/nvn/rqueue.c:266
 #define SF2C_RQUEUE_N_60_39FA 60
 // runtime/nvn/rqueue.c:268
-#define SF2C_RQUEUE_S_LARECOMP_LOG_PACE_ED01 "LARECOMP_LOG_PACE"
+#define SF2C_RQUEUE_S_SF2RECOMP_LOG_PACE_ED01 "SF2RECOMP_LOG_PACE"
 // runtime/nvn/rqueue.c:274
 #define SF2C_RQUEUE_S_SF2_TRACE_RENDER_5E88 "SF2_TRACE_RENDER"
 // runtime/nvn/rqueue.c:275
@@ -1455,7 +1455,7 @@
 // runtime/nvn/rqueue.c:297
 #define SF2C_RQUEUE_N_1E6_8C96 1e6
 // runtime/nvn/rqueue.c:304
-#define SF2C_RQUEUE_S_LARECOMP_RQ_TRACE_50B2 "LARECOMP_RQ_TRACE"
+#define SF2C_RQUEUE_S_SF2RECOMP_RQ_TRACE_50B2 "SF2RECOMP_RQ_TRACE"
 // runtime/nvn/rqueue.c:307
 #define SF2C_RQUEUE_N_1000000000ULL_E860 1000000000ull
 // runtime/nvn/rqueue.c:308
@@ -1653,7 +1653,7 @@
 // runtime/nvn/shader_prep.c:186
 #define SF2C_SHADER_PREP_N_4096_8B92 4096
 // runtime/nvn/shader_prep.c:210
-#define SF2C_SHADER_PREP_S_LARECOMP_RECORD_KEYS_8236 "LARECOMP_RECORD_KEYS"
+#define SF2C_SHADER_PREP_S_SF2RECOMP_RECORD_KEYS_8236 "SF2RECOMP_RECORD_KEYS"
 // runtime/nvn/shader_prep.c:220
 #define SF2C_SHADER_PREP_N_2048_BFA0 2048
 // runtime/nvn/shader_prep.c:226
@@ -1689,7 +1689,7 @@
 // runtime/nvn/shader_seen.c:16
 #define SF2C_SHADER_SEEN_N_20000_876C 20000
 // runtime/nvn/shader_seen.c:21
-#define SF2C_SHADER_SEEN_S_LARECOMP_SHADER_SEEN_DA2E "LARECOMP_SHADER_SEEN"
+#define SF2C_SHADER_SEEN_S_SF2RECOMP_SHADER_SEEN_DA2E "SF2RECOMP_SHADER_SEEN"
 // runtime/nvn/shader_seen.c:37
 #define SF2C_SHADER_SEEN_N_4096_8B92 4096
 // runtime/nvn/shader_seen.c:68
@@ -1729,7 +1729,7 @@
 // runtime/nvn/slowframe.c:62
 #define SF2C_SLOWFRAME_S_S_0030 "%s"
 // runtime/nvn/slowframe.c:72
-#define SF2C_SLOWFRAME_S_LARECOMP_SLOW_FRAME_MS_04A4 "LARECOMP_SLOW_FRAME_MS"
+#define SF2C_SLOWFRAME_S_SF2RECOMP_SLOW_FRAME_MS_04A4 "SF2RECOMP_SLOW_FRAME_MS"
 // runtime/nvn/slowframe.c:73
 #define SF2C_SLOWFRAME_N_50_1A65 50
 // runtime/nvn/slowframe.c:73
@@ -1859,7 +1859,7 @@
 // runtime/nvn/tex_hash.h:50
 #define SF2C_TEX_HASH_N_1099511628211ULL_D3BD 1099511628211ull
 // runtime/nvn/tex_hash.h:73
-#define SF2C_TEX_HASH_S_LARECOMP_TEX_FASTHASH_365E "LARECOMP_TEX_FASTHASH"
+#define SF2C_TEX_HASH_S_SF2RECOMP_TEX_FASTHASH_365E "SF2RECOMP_TEX_FASTHASH"
 
 #define SF2C_OUTPUT_SCALE_MAX_TEX 16384.0
 

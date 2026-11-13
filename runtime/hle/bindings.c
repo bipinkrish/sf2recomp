@@ -96,7 +96,7 @@ const char *bind_key_label(int sc) {
 }
 
 int bind_label_family(void) {
-    extern int input_pad_family(void);  // runtime/hle/input.c (the game's open pad, or LARECOMP_PAD_TYPE)
+    extern int input_pad_family(void);  // runtime/hle/input.c (the game's open pad, or SF2RECOMP_PAD_TYPE)
     int f = input_pad_family();
     if (f) return f;
     int n = 0, t = 0;  // start screen: input.c hasn't opened a pad yet

@@ -114,18 +114,18 @@ static uint32_t *no_contraction(uint32_t *spv, size_t *nwords) {
 // compiler per thread (a shared one behind a lock serialised all the pipeline workers).
 // No spirv-opt by default: it rewrote the depth pre-pass and colour-pass vertex shaders differently enough that
 // their depths stopped matching (EQUAL test: black holes in foliage), and it was most of the compile time; the
-// driver optimises anyway. LARECOMP_VK_OPT=1 turns it back on (experiments).
+// driver optimises anyway. SF2RECOMP_VK_OPT=1 turns it back on (experiments).
 uint32_t *vk_glsl_to_spirv(const char *src, int stage, const char *name, size_t *nwords) {
     uint64_t h = src_hash(src, stage);
     static int nocache = -1;
-    if (nocache < 0) nocache = getenv(SF2C_SHADERS_S_LARECOMP_VK_NO_SPIRV_CACHE_E859) != NULL;
+    if (nocache < 0) nocache = getenv(SF2C_SHADERS_S_SF2RECOMP_VK_NO_SPIRV_CACHE_E859) != NULL;
     uint32_t *out = nocache ? NULL : cache_load(h, nwords);
     if (out) return out;
     static __thread shaderc_compiler_t comp;
     if (!comp) comp = shaderc_compiler_initialize();
     shaderc_compile_options_t o = shaderc_compile_options_initialize();
     shaderc_compile_options_set_target_env(o, shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_3);
-    shaderc_compile_options_set_optimization_level(o, getenv(SF2C_SHADERS_S_LARECOMP_VK_OPT_0B7E) ? shaderc_optimization_level_performance
+    shaderc_compile_options_set_optimization_level(o, getenv(SF2C_SHADERS_S_SF2RECOMP_VK_OPT_0B7E) ? shaderc_optimization_level_performance
                                                                                   : shaderc_optimization_level_zero);
     shaderc_compilation_result_t r = shaderc_compile_into_spv(comp, src, strlen(src), kind_of(stage), name, SF2C_SHADERS_S_MAIN_E4A9, o);
     shaderc_compile_options_release(o);

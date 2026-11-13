@@ -20,7 +20,7 @@ class TextureLifetimeTests(unittest.TestCase):
             ], check=True)
             for mode in ("0", "1"):
                 with self.subTest(render_thread=mode):
-                    env = dict(os.environ, LARECOMP_RENDER_THREAD=mode,
+                    env = dict(os.environ, SF2RECOMP_RENDER_THREAD=mode,
                                ASAN_OPTIONS=os.environ.get("ASAN_OPTIONS", "detect_leaks=0"))
                     subprocess.run([str(binary)], env=env, check=True, timeout=20)
 

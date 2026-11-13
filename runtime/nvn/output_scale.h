@@ -22,7 +22,7 @@ double output_scale_dynamic_hold_fps(void);  // held frame rate when the target 
 // (diagnostics) "[scale] frame f drawable WxH -> render scale sx x sy" whenever the render scale or the window changes
 void output_scale_log(unsigned long long frame, double dw, double dh, const OutScale *o);
 
-// (Vulkan) where a frame's time went, noted once per frame before output_scale(); LARECOMP_LOG_DYNRES's [dynres] line
+// (Vulkan) where a frame's time went, noted once per frame before output_scale(); SF2RECOMP_LOG_DYNRES's [dynres] line
 // shows the per-frame averages. ms over the frame: game = the game's submissions' GPU time, win = the window image's
 // (from after its acquire wait), span = GPU time from the frame's first game work to its window submission's end
 // (over `frames` frames that ended in it), CPU waits: frame slot's fence, acquire, present, other vk_wait_seq waits.
@@ -32,5 +32,5 @@ typedef struct {
 } DynSplit;
 void output_scale_note_split(const DynSplit *s);
 // (Metal) the frame's command buffers' GPU spans summed, overlaps and all (what dynamic resolution went by before it
-// counted their union): shown in LARECOMP_LOG_DYNRES's [dynres] line
+// counted their union): shown in SF2RECOMP_LOG_DYNRES's [dynres] line
 void output_scale_note_sum(double ms);

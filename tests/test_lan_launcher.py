@@ -32,12 +32,12 @@ class LanLauncherTests(unittest.TestCase):
     def test_join_does_not_inherit_host_or_replay_options(self):
         with tempfile.TemporaryDirectory() as folder:
             args,out,_,_=self.fixture(folder,'join');config=launcher.configure(args,out)
-            with patch.dict(os.environ,{'SF2_LAN_HOST':'bad','SF2_LAN_SEED':'999','SF2_REPLAY_INPUT':'old','LARECOMP_NO_SCALE':'1'}):
+            with patch.dict(os.environ,{'SF2_LAN_HOST':'bad','SF2_LAN_SEED':'999','SF2_REPLAY_INPUT':'old','SF2RECOMP_NO_SCALE':'1'}):
                 env=launcher.environment(args,out,config)
             self.assertEqual(env['SF2_LAN_JOIN'],'127.0.0.1')
-            for key in ['SF2_LAN_HOST','SF2_LAN_SEED','SF2_LAN_MATCH','SF2_REPLAY_INPUT','LARECOMP_NO_SCALE','SF2_REPLAY_TRACE']:
+            for key in ['SF2_LAN_HOST','SF2_LAN_SEED','SF2_LAN_MATCH','SF2_REPLAY_INPUT','SF2RECOMP_NO_SCALE','SF2_REPLAY_TRACE']:
                 self.assertNotIn(key,env)
-            self.assertIn('1200:DOWN:',env['LARECOMP_INPUT'])
+            self.assertIn('1200:DOWN:',env['SF2RECOMP_INPUT'])
     def test_missing_save_fails_before_starting_game(self):
         with tempfile.TemporaryDirectory() as folder:
             args,out,source,_=self.fixture(folder,'host');(source/'profile.xml').unlink();source.rmdir()

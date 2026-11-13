@@ -515,7 +515,7 @@ static void lan_ui_pump(Cpu *c) {
                 uint32_t id=input?LD32(input+SF2C_LAN_UI_HOOKS_N_0X18_D47C):event.player;
                 uint64_t method=kind? (event.down?SF2C_LAN_UI_HOOKS_N_0X7000D98C30ULL_0A5A:SF2C_LAN_UI_HOOKS_N_0X7000D98DE0ULL_F125) :
                                                      (event.down?SF2C_LAN_UI_HOOKS_N_0X7000E44AA0ULL_2848:SF2C_LAN_UI_HOOKS_N_0X7000E44DF0ULL_11B3);
-                if(ENV(SF2C_LAN_UI_HOOKS_S_LARECOMP_LAN_UI_TRACE_DC31))LOG(SF2C_LAN_UI_HOOKS_S_LAN_UI_APPLY_MENU_PLAYER_U_M_E9B9,event.player+1,kind,event.event,event.down,id);
+                if(ENV(SF2C_LAN_UI_HOOKS_S_SF2RECOMP_LAN_UI_TRACE_DC31))LOG(SF2C_LAN_UI_HOOKS_S_LAN_UI_APPLY_MENU_PLAYER_U_M_E9B9,event.player+1,kind,event.event,event.down,id);
                 lan_native_call=true;
                 guest_invoke4(c,method,lan_active_module,event.input_type,id,event.event);
                 lan_native_call=false;

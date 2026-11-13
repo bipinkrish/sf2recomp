@@ -1,6 +1,6 @@
 #include "constants/core.h"
 // The converted game is portable: sf2recomp.ini, saves and caches live beside
-// its executable. LARECOMP_DATA_ROOT/HOME override writable state for testing;
+// its executable. SF2RECOMP_DATA_ROOT/HOME override writable state for testing;
 // SF2_CONFIG overrides the INI (relative to the launch directory).
 #pragma once
 #include <stdbool.h>

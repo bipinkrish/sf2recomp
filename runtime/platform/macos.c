@@ -166,13 +166,13 @@ int plat_thread_realtime_check(uint64_t period_ns) {
 
 // Guest threads start at the default QoS, and on a Mac with efficiency cores (an M1 Air: 4 + 4) the scheduler may run
 // the game's frame-critical threads there - the main thread (priority 44) builds and submits every frame. Priorities
-// 44 and more urgent get user-interactive (performance cores first), the rest user-initiated. LARECOMP_THREAD_QOS=0:
+// 44 and more urgent get user-interactive (performance cores first), the rest user-initiated. SF2RECOMP_THREAD_QOS=0:
 // the default class as before.
 int plat_cpu_count(void) { return 0; }  // (no affinity masks here: the caller uses the machine's count)
 
 void plat_thread_guest(int prio) {
     static int on = -1;
-    if (on < 0) on = !getenv(SF2C_MACOS_S_LARECOMP_THREAD_QOS_8C64) || atoi(getenv(SF2C_MACOS_S_LARECOMP_THREAD_QOS_8C64)) != 0;
+    if (on < 0) on = !getenv(SF2C_MACOS_S_SF2RECOMP_THREAD_QOS_8C64) || atoi(getenv(SF2C_MACOS_S_SF2RECOMP_THREAD_QOS_8C64)) != 0;
     if (on) pthread_set_qos_class_self_np(prio <= SF2C_MACOS_N_44_71EE ? QOS_CLASS_USER_INTERACTIVE : QOS_CLASS_USER_INITIATED, 0);
 }
 

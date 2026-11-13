@@ -194,7 +194,7 @@ arrived as instrument output after the instrument's commit). Newest first.
   Matched warm Story: 49.38 -> 55.87 FPS (+13.1%); no hardware/combat performance
   claim. Details in docs/performance-notes.md; real helper/cache regression added.
 - [storage] save_directory supports validated absolute/relative runtime paths,
-  quoted spaces, and LARECOMP_SAVE_DIR precedence. Fixed nested abandoned pending
+  quoted spaces, and SF2RECOMP_SAVE_DIR precedence. Fixed nested abandoned pending
   cleanup without following directory links outside the selected mount.
 - Copied supplied unlocked save only into build/review/persistent-save. Repeated
   processes read/write the configured path; 1014 XML elements/profile ID and
@@ -298,7 +298,7 @@ arrived as instrument output after the instrument's commit). Newest first.
 ## 2026-10-30 — first visually verified menu
 
 - Working run: `build/review/software-x11/lasrecomp.log`, software Vulkan (lavapipe),
-  SDL X11, `LARECOMP_VK_NO_GMEM=1`; no unsafe boot, swallowed exceptions, null-vcall
+  SDL X11, `SF2RECOMP_VK_NO_GMEM=1`; no unsafe boot, swallowed exceptions, null-vcall
   grace, or SDK-trap grace. Captured splash at frame 13 and animated main menu at
   frames 60/120. Images inspected directly, not inferred from present counters.
 - Menu run passed 5,000 frames. It later raised a real managed NRE in

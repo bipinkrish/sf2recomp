@@ -19,7 +19,7 @@
 bool shader_seen_on(void) {
     static int v = -1;
     if (v < 0) {
-        const char *e = getenv(SF2C_SHADER_SEEN_S_LARECOMP_SHADER_SEEN_DA2E);
+        const char *e = getenv(SF2C_SHADER_SEEN_S_SF2RECOMP_SHADER_SEEN_DA2E);
         v = !(e && *e && !atoi(e));
     }
     return v;

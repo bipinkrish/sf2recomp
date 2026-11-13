@@ -557,7 +557,7 @@
 // runtime/nvn/maxwell/translate.c:883
 #define SF2C_TRANSLATE_N_0XE330000000000000ULL_622B 0xe330000000000000ull
 // runtime/nvn/maxwell/translate.c:885
-#define SF2C_TRANSLATE_S_LARECOMP_NO_DISCARD_5FB6 "LARECOMP_NO_DISCARD"
+#define SF2C_TRANSLATE_S_SF2RECOMP_NO_DISCARD_5FB6 "SF2RECOMP_NO_DISCARD"
 // runtime/nvn/maxwell/translate.c:886
 #define SF2C_TRANSLATE_S_DISCARD_FRAGMENT_N_C2EB "    discard_fragment();\n"
 // runtime/nvn/maxwell/translate.c:887
@@ -1765,7 +1765,7 @@
 // runtime/nvn/maxwell/translate.c:1902
 #define SF2C_TRANSLATE_S_EXTENSION_GL_EXT_BUFFER_REFE_B65B "#extension GL_EXT_buffer_reference : require\n"
 // runtime/nvn/maxwell/translate.c:1905
-#define SF2C_TRANSLATE_S_LARECOMP_VK_EXACT_H2F_F30C "LARECOMP_VK_EXACT_H2F"
+#define SF2C_TRANSLATE_S_SF2RECOMP_VK_EXACT_H2F_F30C "SF2RECOMP_VK_EXACT_H2F"
 // runtime/nvn/maxwell/translate.c:1914
 #define SF2C_TRANSLATE_S_LAYOUT_STD140_SET_D_BINDING__583C "layout(std140, set = %d, binding = %d) uniform CB%d { uvec4 cb%d[%u]; };\n"
 // runtime/nvn/maxwell/translate.c:1917
@@ -1973,7 +1973,7 @@
 // runtime/nvn/maxwell/translate.c:2107
 #define SF2C_TRANSLATE_S_GL_FRAGDEPTH_GL_FRAGCOORD_Z__0F18 "  gl_FragDepth = gl_FragCoord.z;\n"
 // runtime/nvn/maxwell/translate.c:2130
-#define SF2C_TRANSLATE_S_LARECOMP_BRX_ALL_LABELS_13D9 "LARECOMP_BRX_ALL_LABELS"
+#define SF2C_TRANSLATE_S_SF2RECOMP_BRX_ALL_LABELS_13D9 "SF2RECOMP_BRX_ALL_LABELS"
 // runtime/nvn/maxwell/translate.c:2142
 #define SF2C_TRANSLATE_N_0XE200000000000000ULL_E437 0xe200000000000000ull
 // runtime/nvn/maxwell/translate.c:2179
@@ -1985,7 +1985,7 @@
 // runtime/nvn/maxwell/translate.c:2189
 #define SF2C_TRANSLATE_N_65536_0F25 65536
 // runtime/nvn/maxwell/translate.c:2227
-#define SF2C_TRANSLATE_S_LARECOMP_SAVE_MSL_AF49 "LARECOMP_SAVE_MSL"
+#define SF2C_TRANSLATE_S_SF2RECOMP_SAVE_MSL_AF49 "SF2RECOMP_SAVE_MSL"
 // runtime/nvn/maxwell/translate.c:2232
 #define SF2C_TRANSLATE_S_CASE_UU_N_6520 "  case %uu:\n"
 // runtime/nvn/maxwell/translate.c:2233

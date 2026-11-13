@@ -50,7 +50,7 @@ static int import_heap_room(const ImportHeap *h, uint32_t n, uint64_t *room) {
 #define IMPORT_PROBE_BELOW (SF2C_DEVICE_N_2_D473 * HEAP_MAX)
 
 // Whether one import of the whole heap fits its system memory heap (import_heap_room), from the physical device;
-// *probe: it fits, but not by much (IMPORT_PROBE_BELOW), or LARECOMP_VK_SIM_HEAP_OOM=1 (the probe then fails).
+// *probe: it fits, but not by much (IMPORT_PROBE_BELOW), or SF2RECOMP_VK_SIM_HEAP_OOM=1 (the probe then fails).
 static bool whole_import_fits(bool budget_ext, bool *probe) {
     VkPhysicalDeviceMemoryBudgetPropertiesEXT bp = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_BUDGET_PROPERTIES_EXT};
     VkPhysicalDeviceMemoryProperties2 mp2 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2,
@@ -67,7 +67,7 @@ static bool whole_import_fits(bool budget_ext, bool *probe) {
         if (mp->memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) h[mp->memoryTypes[i].heapIndex].host_visible = true;
     uint64_t room = 0;
     int heap = import_heap_room(h, mp->memoryHeapCount, &room);
-    const char *sim = getenv(SF2C_DEVICE_S_LARECOMP_VK_SIM_HEAP_OOM_49B8);
+    const char *sim = getenv(SF2C_DEVICE_S_SF2RECOMP_VK_SIM_HEAP_OOM_49B8);
     if (heap < 0 || room >= HEAP_MAX + IMPORT_MARGIN) {
         *probe = (heap >= 0 && room < IMPORT_PROBE_BELOW) || (sim && atoi(sim));
         return true;
@@ -83,7 +83,7 @@ static bool whole_import_fits(bool budget_ext, bool *probe) {
 // span the heap (maxStorageBufferRange < HEAP_MAX: Intel, 1 GB); where the system memory heap or its budget can't hold
 // one import of the whole heap (whole_import_fits: 8 GB laptops, issue #205); and on RADV when the dma-buf heap
 // (exec.c guest_heap_dmabuf) has no cached host-visible memory type that holds it - the same test, which needs only
-// the physical device - or LARECOMP_VK_GMEM_LAZY=1 (=0: never; a GPU with a short range then gets windows of one
+// the physical device - or SF2RECOMP_VK_GMEM_LAZY=1 (=0: never; a GPU with a short range then gets windows of one
 // import, exec.c gmem_chunk_shift). Decided before the device exists because the lazy import needs buffer device
 // addresses, and on RADV enabling them puts every allocation on the driver's global BO list (amdgpu checks all of
 // them each submission): a device that imports the heap another way shouldn't pay for that.
@@ -91,9 +91,9 @@ static bool whole_import_fits(bool budget_ext, bool *probe) {
 static bool lazy_heap_predicted(bool budget_ext, bool *probe) {
     *probe = false;
     if (g_vk.managed_heap || g_vk.staged_heap) return false;
-    const char *e = getenv(SF2C_DEVICE_S_LARECOMP_VK_GMEM_LAZY_EABE);
+    const char *e = getenv(SF2C_DEVICE_S_SF2RECOMP_VK_GMEM_LAZY_EABE);
     if (e) return atoi(e) != 0;
-    if (getenv(SF2C_DEVICE_S_LARECOMP_VK_NO_GMEM_2D48)) return false;
+    if (getenv(SF2C_DEVICE_S_SF2RECOMP_VK_NO_GMEM_2D48)) return false;
     uint64_t lim = g_vk.props.limits.maxStorageBufferRange;
     if (lim && lim < HEAP_MAX) return true;  // (UHD 770 main pass: lazy 8.4 ms, 512 MB windows 8.5)
 #ifdef _WIN32
@@ -106,7 +106,7 @@ static bool lazy_heap_predicted(bool budget_ext, bool *probe) {
     if (!strstr(g_vk.props.deviceName, SF2C_DEVICE_S_RADV_6945)) return false;
     *probe = false;  // (RADV: as before - the dma-buf heap or lazy chunks, no probe)
 #ifdef __linux__
-    const char *d = getenv(SF2C_DEVICE_S_LARECOMP_VK_HEAP_DMABUF_419D);
+    const char *d = getenv(SF2C_DEVICE_S_SF2RECOMP_VK_HEAP_DMABUF_419D);
     if ((d ? atoi(d) != 0 : true) && (g_vk.dmabuf || g_vk.map_placed)) {
         VkPhysicalDeviceMemoryProperties mp;
         vkGetPhysicalDeviceMemoryProperties(g_vk.phys, &mp);
@@ -137,7 +137,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_cb(VkDebugUtilsMessageSeverityFlagBi
                                                const VkDebugUtilsMessengerCallbackDataEXT *d, void *user) {
     (void)type, (void)user;
     static atomic_uint n;
-    bool stop = sev >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT && getenv(SF2C_DEVICE_S_LARECOMP_VK_VALIDATION_STOP_43F5);
+    bool stop = sev >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT && getenv(SF2C_DEVICE_S_SF2RECOMP_VK_VALIDATION_STOP_43F5);
     if (sev >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT &&
         (stop || atomic_fetch_add_explicit(&n, 1, memory_order_relaxed) < SF2C_DEVICE_N_500_0604)) LOG(SF2C_DEVICE_S_VK_S_N_F968, d->pMessage);
     if (stop) {
@@ -148,8 +148,8 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_cb(VkDebugUtilsMessageSeverityFlagBi
     return VK_FALSE;
 }
 
-// LARECOMP_VK_VALIDATION=1: Khronos validation layer (MSYS2 package vulkan-validation-layers)
-// LARECOMP_VK_VALIDATION_STOP=1: require that layer and its callback, and exit nonzero on the first error.
+// SF2RECOMP_VK_VALIDATION=1: Khronos validation layer (MSYS2 package vulkan-validation-layers)
+// SF2RECOMP_VK_VALIDATION_STOP=1: require that layer and its callback, and exit nonzero on the first error.
 static bool validating;  // the validation layer is on (validation_exit)
 static void create_instance(void) {
     Uint32 n_sdl = 0;
@@ -157,8 +157,8 @@ static void create_instance(void) {
     const char *ext[SF2C_DEVICE_N_16_B17E];
     uint32_t n_ext = 0;
     for (Uint32 i = 0; i < n_sdl && n_ext < SF2C_DEVICE_N_14_8527; i++) ext[n_ext++] = sdl_ext[i];
-    bool strict = getenv(SF2C_DEVICE_S_LARECOMP_VK_VALIDATION_STOP_43F5) != NULL;
-    bool validate = strict || getenv(SF2C_DEVICE_S_LARECOMP_VK_VALIDATION_1BC8) != NULL;
+    bool strict = getenv(SF2C_DEVICE_S_SF2RECOMP_VK_VALIDATION_STOP_43F5) != NULL;
+    bool validate = strict || getenv(SF2C_DEVICE_S_SF2RECOMP_VK_VALIDATION_1BC8) != NULL;
 #ifdef __APPLE__
     // The Vulkan loader hides MoltenVK devices unless portability is requested.
     ext[n_ext++] = VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME;
@@ -213,14 +213,14 @@ static bool has_ext(VkExtensionProperties *e, uint32_t n, const char *name) {
     return false;
 }
 
-// Discrete GPU first (LARECOMP_GPU=<index> picks one), needs Vulkan 1.3 and a queue that can present.
+// Discrete GPU first (SF2RECOMP_GPU=<index> picks one), needs Vulkan 1.3 and a queue that can present.
 static void pick_device(void) {
     uint32_t n = 0;
     vkEnumeratePhysicalDevices(g_vk.inst, &n, NULL);
     if (!n) FATAL(SF2C_DEVICE_S_NO_VULKAN_DEVICE_N_9110);
     VkPhysicalDevice *pd = calloc(n, sizeof *pd);
     vkEnumeratePhysicalDevices(g_vk.inst, &n, pd);
-    int want = getenv(SF2C_DEVICE_S_LARECOMP_GPU_D219) ? atoi(getenv(SF2C_DEVICE_S_LARECOMP_GPU_D219)) : -1, best = -1, best_score = -1;
+    int want = getenv(SF2C_DEVICE_S_SF2RECOMP_GPU_D219) ? atoi(getenv(SF2C_DEVICE_S_SF2RECOMP_GPU_D219)) : -1, best = -1, best_score = -1;
     for (uint32_t i = 0; i < n; i++) {
         VkPhysicalDeviceProperties p;
         vkGetPhysicalDeviceProperties(pd[i], &p);
@@ -254,13 +254,13 @@ static void pick_device(void) {
     settings_resolve_defaults(g_vk.props.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU);
     // On by default on integrated GPUs only: lean usage and the SMAA stencil measured faster on an Intel UHD 770 and
     // slightly slower on an RTX 3080 Ti; skipping the per-frame target clears saved 3.7 ms on the UHD 770 (2x) with
-    // identical images. LARECOMP_VK_LEAN_USAGE / LARECOMP_VK_SMAA_STENCIL / LARECOMP_NO_FRAME_CLEAR =0 / =1 override.
+    // identical images. SF2RECOMP_VK_LEAN_USAGE / SF2RECOMP_VK_SMAA_STENCIL / SF2RECOMP_NO_FRAME_CLEAR =0 / =1 override.
     bool igpu = g_vk.props.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU;
-    const char *e = getenv(SF2C_DEVICE_S_LARECOMP_VK_LEAN_USAGE_E9A0);
+    const char *e = getenv(SF2C_DEVICE_S_SF2RECOMP_VK_LEAN_USAGE_E9A0);
     g_vk.lean_usage = e && *e ? atoi(e) != 0 : igpu;
-    e = getenv(SF2C_DEVICE_S_LARECOMP_VK_SMAA_STENCIL_B8BB);
+    e = getenv(SF2C_DEVICE_S_SF2RECOMP_VK_SMAA_STENCIL_B8BB);
     g_vk.smaa_stencil = e && *e ? atoi(e) != 0 : igpu;
-    e = getenv(SF2C_DEVICE_S_LARECOMP_NO_FRAME_CLEAR_D7F3);
+    e = getenv(SF2C_DEVICE_S_SF2RECOMP_NO_FRAME_CLEAR_D7F3);
     g_vk.no_frame_clear = e && *e ? atoi(e) != 0 : igpu;
     LOG(SF2C_DEVICE_S_VK_LEAN_USAGE_S_SMAA_STENCIL_643B, g_vk.lean_usage ? SF2C_DEVICE_S_ON_990C : SF2C_DEVICE_S_OFF_9F3B,
         g_vk.smaa_stencil ? SF2C_DEVICE_S_ON_990C : SF2C_DEVICE_S_OFF_9F3B, g_vk.no_frame_clear ? SF2C_DEVICE_S_OFF_9F3B : SF2C_DEVICE_S_ON_990C, igpu ? SF2C_DEVICE_S_INTEGRATED_4DF9 : SF2C_DEVICE_S_NOT_AN_INTEGRATED_4E00);
@@ -348,21 +348,21 @@ static void create_device(void) {
     if (g_vk.custom_border) ext[n_ext++] = VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME;
     g_vk.divisor = has_ext(ep, ne, VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME);
     if (g_vk.divisor) ext[n_ext++] = VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME;
-    const char *heap_mode = getenv(SF2C_DEVICE_S_LARECOMP_VK_GUEST_HEAP_32E0);
+    const char *heap_mode = getenv(SF2C_DEVICE_S_SF2RECOMP_VK_GUEST_HEAP_32E0);
     bool small_heap = heap_mode && !strcmp(heap_mode, SF2C_DEVICE_S_MANAGED_9C72);
     g_vk.staged_heap = heap_mode && !strcmp(heap_mode, SF2C_DEVICE_S_STAGED_B47A);
     if (heap_mode && !small_heap && !g_vk.staged_heap)
-        FATAL(SF2C_DEVICE_S_INVALID_LARECOMP_VK_GUEST_HE_BCE7, heap_mode);
-    const char *managed = getenv(SF2C_DEVICE_S_LARECOMP_VK_MANAGED_HEAP_29F9);
+        FATAL(SF2C_DEVICE_S_INVALID_SF2RECOMP_VK_GUEST_HE_BCE7, heap_mode);
+    const char *managed = getenv(SF2C_DEVICE_S_SF2RECOMP_VK_MANAGED_HEAP_29F9);
 #ifdef __linux__
     g_vk.managed_heap = managed ? atoi(managed) != 0 : strstr(g_vk.props.deviceName, SF2C_DEVICE_S_RADV_6945) != NULL;
     g_vk.managed_heap = small_heap || g_vk.managed_heap;
 #else
-    if (small_heap) FATAL(SF2C_DEVICE_S_LARECOMP_VK_GUEST_HEAP_MANAG_B46B);
+    if (small_heap) FATAL(SF2C_DEVICE_S_SF2RECOMP_VK_GUEST_HEAP_MANAG_B46B);
     g_vk.managed_heap = managed && atoi(managed) != 0;
 #endif
     g_vk.managed_heap = g_vk.managed_heap && !g_vk.staged_heap &&
-                        !getenv(SF2C_DEVICE_S_LARECOMP_VK_NO_GMEM_2D48);
+                        !getenv(SF2C_DEVICE_S_SF2RECOMP_VK_NO_GMEM_2D48);
     g_vk.host_import = !g_vk.managed_heap && !g_vk.staged_heap && has_ext(ep, ne, VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME);
     if (g_vk.managed_heap) LOG(SF2C_DEVICE_S_VK_GUEST_HEAP_DRIVER_MANAGED_03F5);
     if (g_vk.staged_heap) LOG(SF2C_DEVICE_S_VK_GUEST_HEAP_STAGED_UPLOADS_47BC);
@@ -457,11 +457,11 @@ static void create_device(void) {
             drv.driverName, drv.driverInfo, gpl, vids_ext ? (have_vids.vertexInputDynamicState ? SF2C_DEVICE_S_YES_6C76 : SF2C_DEVICE_S_NO_04A0) : SF2C_DEVICE_S_NO_EXTENSION_DF67,
             eds3);
     }
-    {   // dynamic vertex input (exec.c): fewer pipelines; LARECOMP_VK_DYN_VERTEX=0 keeps the layout in each pipeline
-        const char *e = getenv(SF2C_DEVICE_S_LARECOMP_VK_DYN_VERTEX_0922);
+    {   // dynamic vertex input (exec.c): fewer pipelines; SF2RECOMP_VK_DYN_VERTEX=0 keeps the layout in each pipeline
+        const char *e = getenv(SF2C_DEVICE_S_SF2RECOMP_VK_DYN_VERTEX_0922);
         bool off = e && *e && !atoi(e);
         // Intel's frozen Windows driver for its older integrated GPUs (UHD 630, Ice Lake...: Vulkan 1.3.215 and older)
-        // draws nothing with it - a black picture (#8, #357); LARECOMP_VK_DYN_VERTEX=1 still turns it on there
+        // draws nothing with it - a black picture (#8, #357); SF2RECOMP_VK_DYN_VERTEX=1 still turns it on there
         bool intel_legacy = false;
 #ifdef _WIN32
         intel_legacy = g_vk.props.vendorID == SF2C_DEVICE_N_0X8086_D5E6 && g_vk.props.apiVersion <= VK_MAKE_API_VERSION(0, 1, SF2C_DEVICE_N_3_4E07, SF2C_DEVICE_N_215_D865);
@@ -471,12 +471,12 @@ static void create_device(void) {
         if (g_vk.vids) ext[n_ext++] = VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME;
         else LOG(SF2C_DEVICE_S_VK_VERTEX_INPUT_IN_EACH_PIPE_BCEA,
                  intel_legacy && !(e && *e) ? SF2C_DEVICE_S_INTEL_S_OLDER_WINDOWS_DRIVER_8E1D :
-                 off ? SF2C_DEVICE_S_LARECOMP_VK_DYN_VERTEX_0_7B69 :
+                 off ? SF2C_DEVICE_S_SF2RECOMP_VK_DYN_VERTEX_0_7B69 :
                  !vids_ext ? SF2C_DEVICE_S_NO_VK_EXT_VERTEX_INPUT_DYNAM_300C : SF2C_DEVICE_S_VERTEXINPUTDYNAMICSTATE_NOT__E76B);
     }
 #ifdef VK_EXT_graphics_pipeline_library
-    {   // LARECOMP_VK_GPL_PROBE=1: library builds timed after shader preparation (exec.c gpl_probe); nothing else uses it
-        const char *e = getenv(SF2C_DEVICE_S_LARECOMP_VK_GPL_PROBE_6BED);
+    {   // SF2RECOMP_VK_GPL_PROBE=1: library builds timed after shader preparation (exec.c gpl_probe); nothing else uses it
+        const char *e = getenv(SF2C_DEVICE_S_SF2RECOMP_VK_GPL_PROBE_6BED);
         if (e && atoi(e)) {
             g_vk.gpl_probe = gpl_ext && have_gpl.graphicsPipelineLibrary;
             if (g_vk.gpl_probe) {
@@ -486,7 +486,7 @@ static void create_device(void) {
         }
     }
 #else
-    if (getenv(SF2C_DEVICE_S_LARECOMP_VK_GPL_PROBE_6BED) && atoi(getenv(SF2C_DEVICE_S_LARECOMP_VK_GPL_PROBE_6BED))) LOG(SF2C_DEVICE_S_GPL_PROBE_THIS_BUILD_S_VULKA_3E51);
+    if (getenv(SF2C_DEVICE_S_SF2RECOMP_VK_GPL_PROBE_6BED) && atoi(getenv(SF2C_DEVICE_S_SF2RECOMP_VK_GPL_PROBE_6BED))) LOG(SF2C_DEVICE_S_GPL_PROBE_THIS_BUILD_S_VULKA_3E51);
 #endif
 #if defined(__linux__) && defined(VK_EXT_map_memory_placed)
     have12.pNext = NULL;
@@ -639,8 +639,8 @@ static VkPresentModeKHR present_mode(void) {
     // MAILBOX by default: NVN presentation enforces the configured frame period, and with FIFO every submission
     // queued behind the one waiting for a window image, so the game's fence waits followed the presentation engine:
     // a throttled / captured / busy compositor slowed the whole game (4-21 fps with the GPU mostly idle; mailbox:
-    // 60). No tearing. LARECOMP_VK_PRESENT=fifo|immediate|mailbox to choose.
-    const char *e = getenv(SF2C_DEVICE_S_LARECOMP_VK_PRESENT_0D5A);
+    // 60). No tearing. SF2RECOMP_VK_PRESENT=fifo|immediate|mailbox to choose.
+    const char *e = getenv(SF2C_DEVICE_S_SF2RECOMP_VK_PRESENT_0D5A);
     VkPresentModeKHR want = !e || !strcmp(e, SF2C_DEVICE_S_MAILBOX_69E3) ? VK_PRESENT_MODE_MAILBOX_KHR
                           : !strcmp(e, SF2C_DEVICE_S_IMMEDIATE_6006) ? VK_PRESENT_MODE_IMMEDIATE_KHR : VK_PRESENT_MODE_FIFO_KHR;
     uint32_t n = 0;
@@ -721,7 +721,7 @@ static void recreate_swapchain(void) {
 // in the game's GPU counters.
 extern __thread uint64_t g_blocked_ns;  // kernel.c
 #define WAITING(x) do { uint64_t w0_ = plat_now_ns(); rq_watch(#x, 0); x; rq_watch(NULL, 0); g_blocked_ns += plat_now_ns() - w0_; } while (0)
-// the same, also counted by place (dynamic resolution's log / LARECOMP_VK_PROF: 0 frame slot, 1 acquire, 2 present)
+// the same, also counted by place (dynamic resolution's log / SF2RECOMP_VK_PROF: 0 frame slot, 1 acquire, 2 present)
 uint64_t g_vk_frame_waits[SF2C_DEVICE_N_4_4B22];
 #define WAITING_AT(i, x) do { uint64_t w0_ = plat_now_ns(); rq_watch(#x, 0); x; rq_watch(NULL, 0); uint64_t w1_ = plat_now_ns() - w0_; \
                               g_blocked_ns += w1_; g_vk_frame_waits[i] += w1_; } while (0)
@@ -772,7 +772,7 @@ bool vk_frame_begin(const float clear[SF2C_DEVICE_N_4_4B22]) {
     if (!g_vk.swapchain || (uint32_t)w != g_vk.sc_extent.width || (uint32_t)h != g_vk.sc_extent.height) recreate_swapchain();
     if (!g_vk.swapchain) return false;
     static int trace = -1;
-    if (trace < 0) trace = getenv(SF2C_DEVICE_S_LARECOMP_VK_TRACE_B60E) != NULL;
+    if (trace < 0) trace = getenv(SF2C_DEVICE_S_SF2RECOMP_VK_TRACE_B60E) != NULL;
     if (trace) LOG(SF2C_DEVICE_S_VK_FRAME_BEGIN_DX_D_SWAPCHAI_7589, w, h, g_vk.sc_extent.width, g_vk.sc_extent.height);
     slot = (slot + 1) % FRAMES;
     if (!acquire_sem[slot]) acquire_sem[slot] = binary_semaphore();
@@ -855,7 +855,7 @@ void *vk_frame_cmd(void) {
 // slot comes round after vk_frame_begin waited for the window submission three frames back, so normally that is
 // already so - which implies the recorder made that vkCmdExecuteCommands long before: the pool is this thread's alone
 // whenever it touches it. ImGui's own objects (pipeline, buffers, descriptor sets) were only ever used by this thread.
-// The recorder off, LARECOMP_VK_OVERLAY_DIRECT=1, or a second overlay in one frame: ImGui records into the window
+// The recorder off, SF2RECOMP_VK_OVERLAY_DIRECT=1, or a second overlay in one frame: ImGui records into the window
 // image's command buffer itself, after rec_drain (a no-op with the recorder off), as before.
 static VkCommandPool ov_pool[FRAMES];
 static VkCommandBuffer ov_cb[FRAMES];
@@ -886,7 +886,7 @@ static bool ov_slot_ready(void) {  // (the slot's pool and buffer exist, and the
 // vk_overlay_end with both
 void *vk_overlay_begin(void *window_cmd) {
     if (ov_direct < 0) {
-        const char *e = getenv(SF2C_DEVICE_S_LARECOMP_VK_OVERLAY_DIRECT_EFEC);
+        const char *e = getenv(SF2C_DEVICE_S_SF2RECOMP_VK_OVERLAY_DIRECT_EFEC);
         ov_direct = !rec_on() || (e && atoi(e) != 0);
         LOG(SF2C_DEVICE_S_VK_OVERLAY_S_N_AA59, ov_direct ? SF2C_DEVICE_S_RECORDED_INTO_THE_WINDOW_IMA_6C34 : SF2C_DEVICE_S_A_SECONDARY_COMMAND_BUFFER_T_EF30);
     }
@@ -1006,7 +1006,7 @@ void backend_represent(void) {
     else backend_present_now(last, frame, false);
 }
 
-// (LARECOMP_VK_PROF) the present's time by part, per frame in the fps line ("present/frame"): submit = the frame's
+// (SF2RECOMP_VK_PROF) the present's time by part, per frame in the fps line ("present/frame"): submit = the frame's
 // last work submitted, acquire = frame slot + window image (waits included), scale = output scale / widescreen /
 // dynamic resolution, blit = the game image into the window (FSR / blit / AA recording), overlay = menu_render (ImGui),
 // end = the window image's submission + vkQueuePresentKHR, rest = test hooks and the fps line
@@ -1035,7 +1035,7 @@ static const char *pp_text(void) {
 // The GPU side of a present (the render thread when it's on, rqueue.c): the present pass, the overlay, shots.
 // frame: the game frame when queued; advance is false for repeats and startup movie-only presents.
 void backend_present_now(NvnTexture *t, uint64_t frame, bool advance) {
-    if (pp_on < 0) pp_on = getenv(SF2C_DEVICE_S_LARECOMP_VK_PROF_CC43) != NULL;
+    if (pp_on < 0) pp_on = getenv(SF2C_DEVICE_S_SF2RECOMP_VK_PROF_CC43) != NULL;
     if (pp_on) pp_t = SDL_GetTicksNS();
     TexBackend *b = t ? vk_tex(t, true) : NULL;
     if (b) b->presented = true;
@@ -1064,9 +1064,9 @@ void backend_present_now(NvnTexture *t, uint64_t frame, bool advance) {
         double dw = g_vk.sc_extent.width, dh = g_vk.sc_extent.height;
         // render scale + placement in the window: runtime/nvn/output_scale.c (Video tab "Internal resolution");
         // GPU time since the last frame (exec.c's GPU timer; -1 without one: dynamic resolution goes by frame times):
-        // the game's submissions and the window image's (LARECOMP_DYNRES_COUNT_PRESENT=0: the game's only, as before)
+        // the game's submissions and the window image's (SF2RECOMP_DYNRES_COUNT_PRESENT=0: the game's only, as before)
         static int count_present = -1;
-        if (count_present < 0) count_present = !getenv(SF2C_DEVICE_S_LARECOMP_DYNRES_COUNT_PRESEN_D71E) || atoi(getenv(SF2C_DEVICE_S_LARECOMP_DYNRES_COUNT_PRESEN_D71E));
+        if (count_present < 0) count_present = !getenv(SF2C_DEVICE_S_SF2RECOMP_DYNRES_COUNT_PRESEN_D71E) || atoi(getenv(SF2C_DEVICE_S_SF2RECOMP_DYNRES_COUNT_PRESEN_D71E));
         static uint64_t sp_prev[SF2C_DEVICE_N_4_4B22], wt_prev[SF2C_DEVICE_N_4_4B22], cw_prev;
         static bool sp_have;
         uint64_t sp[SF2C_DEVICE_N_4_4B22], wt[SF2C_DEVICE_N_4_4B22];
@@ -1128,13 +1128,13 @@ void backend_present_now(NvnTexture *t, uint64_t frame, bool advance) {
         }
         pp_mark(PP_BLIT);
         static long menu_at = -1;
-        if (menu_at < 0) menu_at = getenv(SF2C_DEVICE_S_LARECOMP_MENU_AT_945C) ? atol(getenv(SF2C_DEVICE_S_LARECOMP_MENU_AT_945C)) : 0;
+        if (menu_at < 0) menu_at = getenv(SF2C_DEVICE_S_SF2RECOMP_MENU_AT_945C) ? atol(getenv(SF2C_DEVICE_S_SF2RECOMP_MENU_AT_945C)) : 0;
         if (advance && menu_at && (long)frame + 1 == menu_at) { extern void menu_test_open(void); menu_test_open(); }
         // (ImGui records through vk_overlay_begin / vk_overlay_end, when it draws anything)
         menu_render((void *)cb, g_vk.sc_extent.width, g_vk.sc_extent.height);
         pp_mark(PP_OVERLAY);
         static long win_shot = -1;
-        if (win_shot < 0) win_shot = getenv(SF2C_DEVICE_S_LARECOMP_WINDOW_SHOT_AF3A) ? atol(getenv(SF2C_DEVICE_S_LARECOMP_WINDOW_SHOT_AF3A)) : 0;
+        if (win_shot < 0) win_shot = getenv(SF2C_DEVICE_S_SF2RECOMP_WINDOW_SHOT_AF3A) ? atol(getenv(SF2C_DEVICE_S_SF2RECOMP_WINDOW_SHOT_AF3A)) : 0;
         bool shot = advance && win_shot && (long)frame + 1 == win_shot;
         vk_frame_end(shot ? SF2C_DEVICE_S_BUILD_WINDOW_PNG_58F7 : NULL);
         if (movie_guest_ready()) vk_guest_heap_preload();
@@ -1143,7 +1143,7 @@ void backend_present_now(NvnTexture *t, uint64_t frame, bool advance) {
             rec_wait_presents(rec_presents_queued());
             movie_presented();
         }
-        if (shot && getenv(SF2C_DEVICE_S_LARECOMP_EXIT_AFTER_SHOT_7B52)) exit_after_shot();
+        if (shot && getenv(SF2C_DEVICE_S_SF2RECOMP_EXIT_AFTER_SHOT_7B52)) exit_after_shot();
     } else {
         renderer_submit();
     }
@@ -1153,12 +1153,12 @@ void backend_present_now(NvnTexture *t, uint64_t frame, bool advance) {
     vk_prof_frame(frame, SDL_GetTicksNS() - t0);
     frames++;
     static long shot_every = -1;
-    if (shot_every < 0) { const char *e = getenv(SF2C_DEVICE_S_LARECOMP_SCREENSHOT_EVERY_CEF8); shot_every = e ? atol(e) : 0; }
-    {   // LARECOMP_GPUPROF_AT=<frame>[,<frame>...]: GPU time per pass of those frames ("[gpuprof]" in the log)
+    if (shot_every < 0) { const char *e = getenv(SF2C_DEVICE_S_SF2RECOMP_SCREENSHOT_EVERY_CEF8); shot_every = e ? atol(e) : 0; }
+    {   // SF2RECOMP_GPUPROF_AT=<frame>[,<frame>...]: GPU time per pass of those frames ("[gpuprof]" in the log)
         extern bool g_gpuprof_frame;
         extern void vk_gpuprof_report(void);
         if (g_gpuprof_frame) { g_gpuprof_frame = false; vk_gpuprof_report(); }
-        const char *e = getenv(SF2C_DEVICE_S_LARECOMP_GPUPROF_AT_4834);
+        const char *e = getenv(SF2C_DEVICE_S_SF2RECOMP_GPUPROF_AT_4834);
         for (const char *p = e; p && *p;) {
             long at = strtol(p, (char **)&p, SF2C_DEVICE_N_10_4A44);
             if (at == (long)frame) { g_gpuprof_frame = true; break; }
@@ -1166,13 +1166,13 @@ void backend_present_now(NvnTexture *t, uint64_t frame, bool advance) {
         }
     }
     if (advance && g_debug_frame) LOG(SF2C_DEVICE_S_DEBUG_FRAME_LLU_N_3556, (unsigned long long)frame);
-    if (advance) {   // LARECOMP_SHOT_AT=<frame>,<frame>,... (ascending): game frames -> build/frames/frame_N.png
+    if (advance) {   // SF2RECOMP_SHOT_AT=<frame>,<frame>,... (ascending): game frames -> build/frames/frame_N.png
         static const char *next;
         static int init;
-        if (!init) { init = 1; next = getenv(SF2C_DEVICE_S_LARECOMP_SHOT_AT_8756); if (next) { mkdir(SF2C_DEVICE_S_BUILD_E99A, SF2C_DEVICE_N_0755_64A5); mkdir(SF2C_DEVICE_S_BUILD_FRAMES_A0DA, SF2C_DEVICE_N_0755_64A5); } }
+        if (!init) { init = 1; next = getenv(SF2C_DEVICE_S_SF2RECOMP_SHOT_AT_8756); if (next) { mkdir(SF2C_DEVICE_S_BUILD_E99A, SF2C_DEVICE_N_0755_64A5); mkdir(SF2C_DEVICE_S_BUILD_FRAMES_A0DA, SF2C_DEVICE_N_0755_64A5); } }
         while (next && *next) {
             long at = strtol(next, (char **)&next, SF2C_DEVICE_N_10_4A44);
-            if ((long)frame < at) { while (next > getenv(SF2C_DEVICE_S_LARECOMP_SHOT_AT_8756) && next[-1] != SF2C_DEVICE_CH_EMPTY_EE1B) next--; break; }
+            if ((long)frame < at) { while (next > getenv(SF2C_DEVICE_S_SF2RECOMP_SHOT_AT_8756) && next[-1] != SF2C_DEVICE_CH_EMPTY_EE1B) next--; break; }
             if ((long)frame == at) {
                 char path[SF2C_DEVICE_N_256_51E8];
                 snprintf(path, sizeof path, SF2C_DEVICE_S_BUILD_FRAMES_FRAME_05LLU_PNG_C878, (unsigned long long)frame);
@@ -1182,7 +1182,7 @@ void backend_present_now(NvnTexture *t, uint64_t frame, bool advance) {
         }
     }
     static long shot_from = -1;
-    if (shot_from < 0) { const char *e = getenv(SF2C_DEVICE_S_LARECOMP_SCREENSHOT_FROM_32B7); shot_from = e ? atol(e) : 0; }
+    if (shot_from < 0) { const char *e = getenv(SF2C_DEVICE_S_SF2RECOMP_SCREENSHOT_FROM_32B7); shot_from = e ? atol(e) : 0; }
     if (advance && shot_every && frame % shot_every == 0 && (long)frame >= shot_from) {
         char path[SF2C_DEVICE_N_256_51E8];
         mkdir(SF2C_DEVICE_S_BUILD_E99A, SF2C_DEVICE_N_0755_64A5);
@@ -1190,15 +1190,15 @@ void backend_present_now(NvnTexture *t, uint64_t frame, bool advance) {
         snprintf(path, sizeof path, shot_from ? SF2C_DEVICE_S_BUILD_FRAMES_FRAME_05LLU_PNG_C878 : SF2C_DEVICE_S_BUILD_FRAME_05LLU_PNG_CBB4,
                  (unsigned long long)frame);
         renderer_save_texture_tex(b, path);
-        // a series (SCREENSHOT_FROM) runs on until LARECOMP_WINDOW_SHOT exits
-        if (getenv(SF2C_DEVICE_S_LARECOMP_EXIT_AFTER_SHOT_7B52) && !shot_from) exit_after_shot();
+        // a series (SCREENSHOT_FROM) runs on until SF2RECOMP_WINDOW_SHOT exits
+        if (getenv(SF2C_DEVICE_S_SF2RECOMP_EXIT_AFTER_SHOT_7B52) && !shot_from) exit_after_shot();
     }
     double now = SDL_GetTicks() / SF2C_DEVICE_N_1000_0_4250;
     static double fps_iv = -1, prev_present, max_gap;
-    if (fps_iv < 0) fps_iv = getenv(SF2C_DEVICE_S_LARECOMP_FPS_INTERVAL_D507) ? atof(getenv(SF2C_DEVICE_S_LARECOMP_FPS_INTERVAL_D507)) : SF2C_DEVICE_N_2_0_D84B;
+    if (fps_iv < 0) fps_iv = getenv(SF2C_DEVICE_S_SF2RECOMP_FPS_INTERVAL_D507) ? atof(getenv(SF2C_DEVICE_S_SF2RECOMP_FPS_INTERVAL_D507)) : SF2C_DEVICE_N_2_0_D84B;
     if (prev_present > 0 && now - prev_present > max_gap) max_gap = now - prev_present;
-    static double hitch_ms = -1;  // LARECOMP_LOG_HITCH_MS=<ms>: every present gap over that (tests: hitches per run)
-    if (hitch_ms < 0) hitch_ms = getenv(SF2C_DEVICE_S_LARECOMP_LOG_HITCH_MS_631F) ? atof(getenv(SF2C_DEVICE_S_LARECOMP_LOG_HITCH_MS_631F)) : 0;
+    static double hitch_ms = -1;  // SF2RECOMP_LOG_HITCH_MS=<ms>: every present gap over that (tests: hitches per run)
+    if (hitch_ms < 0) hitch_ms = getenv(SF2C_DEVICE_S_SF2RECOMP_LOG_HITCH_MS_631F) ? atof(getenv(SF2C_DEVICE_S_SF2RECOMP_LOG_HITCH_MS_631F)) : 0;
     if (hitch_ms > 0 && prev_present > 0 && (now - prev_present) * SF2C_DEVICE_N_1000_4051 > hitch_ms)
         LOG(SF2C_DEVICE_S_HITCH_T_2F_FRAME_LLU_GAP_0F__3F95, now, (unsigned long long)frame, (now - prev_present) * SF2C_DEVICE_N_1000_4051);
     prev_present = now;
@@ -1222,20 +1222,20 @@ static void present_hooks(void) {
     g_frame_counter++;
     extern void input_frame(uint64_t frame);
     input_frame(frame);
-    static long slow_ms = -1;  // LARECOMP_SIM_SLOW_FRAME_MS=<ms>: sleep per presented frame (simulate a slow machine)
-    if (slow_ms < 0) slow_ms = getenv(SF2C_DEVICE_S_LARECOMP_SIM_SLOW_FRAME_MS_ECED) ? atol(getenv(SF2C_DEVICE_S_LARECOMP_SIM_SLOW_FRAME_MS_ECED)) : 0;
-    static long slow_until = -1;  // LARECOMP_SLOW_FRAME_UNTIL=<frame>: the stall ends there (frame pacing recovery tests)
-    if (slow_until < 0) slow_until = getenv(SF2C_DEVICE_S_LARECOMP_SLOW_FRAME_UNTIL_0859) ? atol(getenv(SF2C_DEVICE_S_LARECOMP_SLOW_FRAME_UNTIL_0859)) : 0;
+    static long slow_ms = -1;  // SF2RECOMP_SIM_SLOW_FRAME_MS=<ms>: sleep per presented frame (simulate a slow machine)
+    if (slow_ms < 0) slow_ms = getenv(SF2C_DEVICE_S_SF2RECOMP_SIM_SLOW_FRAME_MS_ECED) ? atol(getenv(SF2C_DEVICE_S_SF2RECOMP_SIM_SLOW_FRAME_MS_ECED)) : 0;
+    static long slow_until = -1;  // SF2RECOMP_SLOW_FRAME_UNTIL=<frame>: the stall ends there (frame pacing recovery tests)
+    if (slow_until < 0) slow_until = getenv(SF2C_DEVICE_S_SF2RECOMP_SLOW_FRAME_UNTIL_0859) ? atol(getenv(SF2C_DEVICE_S_SF2RECOMP_SLOW_FRAME_UNTIL_0859)) : 0;
     if (slow_ms > 0 && frame > SF2C_DEVICE_N_2600_3A0E && (!slow_until || (long)frame < slow_until)) SDL_Delay((Uint32)slow_ms);
     extern void fnprof_frame(uint64_t frame);
     fnprof_frame(frame);
     static long debug_at = -1;
-    if (debug_at < 0) { const char *e = getenv(SF2C_DEVICE_S_LARECOMP_DEBUG_FRAME_DEA8); debug_at = e ? atol(e) : 0; }
+    if (debug_at < 0) { const char *e = getenv(SF2C_DEVICE_S_SF2RECOMP_DEBUG_FRAME_DEA8); debug_at = e ? atol(e) : 0; }
     extern volatile int g_debug_frame_request;
     if (g_debug_frame_request) { g_debug_frame_request = 0; debug_at = (long)frame + 1; }
-    // LARECOMP_DEBUG_FRAMES=<n> (with LARECOMP_DEBUG_FRAME / F9): dump n consecutive frames (build/pass_<frame>_NNN.png)
+    // SF2RECOMP_DEBUG_FRAMES=<n> (with SF2RECOMP_DEBUG_FRAME / F9): dump n consecutive frames (build/pass_<frame>_NNN.png)
     static long debug_n = -1;
-    if (debug_n < 0) { const char *e = getenv(SF2C_DEVICE_S_LARECOMP_DEBUG_FRAMES_8FB4); debug_n = e && atol(e) > 1 ? atol(e) : 1; }
+    if (debug_n < 0) { const char *e = getenv(SF2C_DEVICE_S_SF2RECOMP_DEBUG_FRAMES_8FB4); debug_n = e && atol(e) > 1 ? atol(e) : 1; }
     g_debug_frame = debug_at && frame >= (uint64_t)debug_at && frame < (uint64_t)debug_at + (uint64_t)debug_n;
 }
 
@@ -1246,7 +1246,7 @@ void backend_present(NvnTexture *t) {
     if (rq_on()) rq_present(t, frame, true);
     else backend_present_now(t, frame, true);
     uint64_t t1 = plat_now_ns();
-    g_present_ns += t1 - t0;  // (LARECOMP_LOG_PACE, pace.c)
+    g_present_ns += t1 - t0;  // (SF2RECOMP_LOG_PACE, pace.c)
     present_hooks();
     g_hooks_ns += plat_now_ns() - t1;
 }
@@ -1279,7 +1279,7 @@ static void backend_movie_present(bool dismissed) {
 void vk_exec_init(void);
 void vk_shaders_init(void);
 
-// The end of a validation run (LARECOMP_VK_VALIDATION, after backend_quit: the GPU idle, the pipeline cache kept):
+// The end of a validation run (SF2RECOMP_VK_VALIDATION, after backend_quit: the GPU idle, the pipeline cache kept):
 // the debug messenger goes, then the process ends at once - no vkDestroyDevice / vkDestroyInstance, no atexit
 // handlers, no DLL teardown. _exit() alone isn't enough on Windows: it ends in ExitProcess, which runs the layer's
 // and the driver's DLL teardown after every other thread is gone, and with the Khronos layer on NVIDIA that left the
@@ -1301,7 +1301,7 @@ static _Noreturn void validation_exit(void) {
     _Exit(0);
 }
 
-// LARECOMP_EXIT_AFTER_SHOT: the test run ends with its shot. As it always did (_exit: no cache save), except under
+// SF2RECOMP_EXIT_AFTER_SHOT: the test run ends with its shot. As it always did (_exit: no cache save), except under
 // validation: backend_quit, then validation_exit.
 static void exit_after_shot(void) {
     fflush(stderr);
@@ -1323,7 +1323,7 @@ void backend_quit(void) {
     static atomic_flag once = ATOMIC_FLAG_INIT;
     if (atomic_flag_test_and_set(&once)) return;
     static int trace = -1;
-    if (trace < 0) trace = getenv(SF2C_DEVICE_S_LARECOMP_VK_TRACE_B60E) != NULL;
+    if (trace < 0) trace = getenv(SF2C_DEVICE_S_SF2RECOMP_VK_TRACE_B60E) != NULL;
     if (trace) LOG(SF2C_DEVICE_S_VK_QUIT_STOPPING_THE_RENDER__1C80);
     rq_stop();
     if (trace) LOG(SF2C_DEVICE_S_VK_QUIT_STOPPING_THE_RECORDE_7513);
@@ -1369,13 +1369,13 @@ void ui_window_init(void) {
     movie_preload_intro();
     input_load_user_mappings();
     int win_w = SF2C_DEVICE_N_1280_6F13, win_h = SF2C_DEVICE_N_720_D829;
-    if (getenv(SF2C_DEVICE_S_LARECOMP_WINDOW_7651)) sscanf(getenv(SF2C_DEVICE_S_LARECOMP_WINDOW_7651), SF2C_DEVICE_S_DX_D_3DD6, &win_w, &win_h);
+    if (getenv(SF2C_DEVICE_S_SF2RECOMP_WINDOW_7651)) sscanf(getenv(SF2C_DEVICE_S_SF2RECOMP_WINDOW_7651), SF2C_DEVICE_S_DX_D_3DD6, &win_w, &win_h);
     SDL_WindowFlags wflags = SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
-    if (getenv(SF2C_DEVICE_S_LARECOMP_HIDDEN_AFF5)) wflags |= SDL_WINDOW_HIDDEN;
+    if (getenv(SF2C_DEVICE_S_SF2RECOMP_HIDDEN_AFF5)) wflags |= SDL_WINDOW_HIDDEN;
     {   // scripted test runs (user input ignored: runtime/hle/input.c input_user_blocked) open without taking the
         // keyboard focus from whatever the player is doing
-        const char *v = getenv(SF2C_DEVICE_S_LARECOMP_NO_USER_INPUT_EB20);
-        bool scripted = v ? atoi(v) != 0 : (getenv(SF2C_DEVICE_S_LARECOMP_INPUT_D0A3) || getenv(SF2C_DEVICE_S_LARECOMP_HOST_INPUT_8D91) || getenv(SF2C_DEVICE_S_LARECOMP_BIND_TEST_C2F2));
+        const char *v = getenv(SF2C_DEVICE_S_SF2RECOMP_NO_USER_INPUT_EB20);
+        bool scripted = v ? atoi(v) != 0 : (getenv(SF2C_DEVICE_S_SF2RECOMP_INPUT_D0A3) || getenv(SF2C_DEVICE_S_SF2RECOMP_HOST_INPUT_8D91) || getenv(SF2C_DEVICE_S_SF2RECOMP_BIND_TEST_C2F2));
         if (scripted) SDL_SetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, SF2C_DEVICE_S_0_9808);
     }
     window = SDL_CreateWindow(game_window_title(), win_w, win_h, wflags);
@@ -1398,7 +1398,7 @@ void ui_window_init(void) {
         }
     }
     // the Fullscreen setting applies from the start screen on (not only once the game runs); test windows stay windows
-    if (g_settings.fullscreen && !getenv(SF2C_DEVICE_S_LARECOMP_WINDOW_7651) && !getenv(SF2C_DEVICE_S_LARECOMP_HIDDEN_AFF5)) SDL_SetWindowFullscreen(window, true);
+    if (g_settings.fullscreen && !getenv(SF2C_DEVICE_S_SF2RECOMP_WINDOW_7651) && !getenv(SF2C_DEVICE_S_SF2RECOMP_HIDDEN_AFF5)) SDL_SetWindowFullscreen(window, true);
     create_instance();
     if (!SDL_Vulkan_CreateSurface(window, g_vk.inst, NULL, &g_vk.surface)) FATAL(SF2C_DEVICE_S_SDL_VULKAN_CREATESURFACE_S_N_5582, SDL_GetError());
     pick_device();

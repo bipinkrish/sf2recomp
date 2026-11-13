@@ -11,7 +11,7 @@
 // runtime/platform/linux.c:71
 #define SF2C_LINUX_S_PLAT_NO_PAGE_WRITE_TRACKING__6B63 "[plat] no page write tracking: %s (%s)\n"
 // runtime/platform/linux.c:88
-#define SF2C_LINUX_S_LARECOMP_WRITE_TRACKING_EF34 "LARECOMP_WRITE_TRACKING"
+#define SF2C_LINUX_S_SF2RECOMP_WRITE_TRACKING_EF34 "SF2RECOMP_WRITE_TRACKING"
 // runtime/platform/linux.c:93
 #define SF2C_LINUX_S_USERFAULTFD_6B99 "userfaultfd"
 // runtime/platform/linux.c:95
@@ -23,7 +23,7 @@
 // runtime/platform/linux.c:103
 #define SF2C_LINUX_S_PAGEMAP_SCAN_NEEDS_LINUX_6_7_C77E "PAGEMAP_SCAN needs Linux 6.7"
 // runtime/platform/linux.c:114
-#define SF2C_LINUX_S_PLAT_PAGE_WRITE_TRACKING_KEP_71B3 "[plat] page write tracking kept on (LARECOMP_WRITE_TRACKING=1): %s\n"
+#define SF2C_LINUX_S_PLAT_PAGE_WRITE_TRACKING_KEP_71B3 "[plat] page write tracking kept on (SF2RECOMP_WRITE_TRACKING=1): %s\n"
 // runtime/platform/linux.c:115
 #define SF2C_LINUX_S_PLAT_PAGE_WRITE_TRACKING_OFF_D150 "[plat] page write tracking off: %s\n"
 // runtime/platform/linux.c:138
@@ -227,7 +227,7 @@
 // runtime/platform/posix_log.h:77
 #define SF2C_POSIX_LOG_S_S_LASRECOMP_LOG_22EC "%s/lasrecomp.log"
 // runtime/platform/posix_log.h:78
-#define SF2C_POSIX_LOG_S_LASRECOMP_LOG_APPEND_A5DB "LASRECOMP_LOG_APPEND"
+#define SF2C_POSIX_LOG_S_SF2RECOMP_LOG_APPEND_A5DB "SF2RECOMP_LOG_APPEND"
 // runtime/platform/posix_log.h:80
 #define SF2C_POSIX_LOG_S_LASRECOMP_PREV_LOG_2ADB "lasrecomp.prev.log"
 // runtime/platform/posix_log.h:81
@@ -285,9 +285,9 @@
 // runtime/platform/windows.c:71
 #define SF2C_WINDOWS_S_EMPTY_5210 " "
 // runtime/platform/windows.c:77
-#define SF2C_WINDOWS_S_LARECOMP_REEXEC_WHY_6D9D "LARECOMP_REEXEC_WHY"
+#define SF2C_WINDOWS_S_SF2RECOMP_REEXEC_WHY_6D9D "SF2RECOMP_REEXEC_WHY"
 // runtime/platform/windows.c:84
-#define SF2C_WINDOWS_S_LARECOMP_WRITE_TRACKING_EF34 "LARECOMP_WRITE_TRACKING"
+#define SF2C_WINDOWS_S_SF2RECOMP_WRITE_TRACKING_EF34 "SF2RECOMP_WRITE_TRACKING"
 // runtime/platform/windows.c:106
 #define SF2C_WINDOWS_N_4096_8B92 4096
 // runtime/platform/windows.c:122
@@ -311,9 +311,9 @@
 // runtime/platform/windows.c:193
 #define SF2C_WINDOWS_N_100000_3BB7 100000
 // runtime/platform/windows.c:221
-#define SF2C_WINDOWS_S_LARECOMP_PCORE_44E2 "LARECOMP_PCORE"
+#define SF2C_WINDOWS_S_SF2RECOMP_PCORE_44E2 "SF2RECOMP_PCORE"
 // runtime/platform/windows.c:224
-#define SF2C_WINDOWS_S_PCORE_OFF_LARECOMP_PCORE_0_D_E35F "[pcore] off (LARECOMP_PCORE=0): default scheduling, thread power throttling unchanged\n"
+#define SF2C_WINDOWS_S_PCORE_OFF_SF2RECOMP_PCORE_0_D_E35F "[pcore] off (SF2RECOMP_PCORE=0): default scheduling, thread power throttling unchanged\n"
 // runtime/platform/windows.c:232
 #define SF2C_WINDOWS_S_CPU_SETS_UNAVAILABLE_B9DE " (CPU sets unavailable)"
 // runtime/platform/windows.c:233
@@ -391,7 +391,7 @@
 // runtime/platform/windows.c:390
 #define SF2C_WINDOWS_S_S_S_72BD "%s%s"
 // runtime/platform/windows.c:424
-#define SF2C_WINDOWS_S_LASRECOMP_LOG_FILE_AAE4 "LASRECOMP_LOG_FILE"
+#define SF2C_WINDOWS_S_SF2RECOMP_LOG_FILE_AAE4 "SF2RECOMP_LOG_FILE"
 // runtime/platform/windows.c:434
 #define SF2C_WINDOWS_S_SLASRECOMP_LOG_DB16 "%slasrecomp.log"
 // runtime/platform/windows.c:435
@@ -601,7 +601,7 @@
 // runtime/platform/macos.c:151
 #define SF2C_MACOS_S_PLAT_REAL_TIME_THREAD_POLICY_6CB7 "[plat] real-time thread policy refused: %d\n"
 // runtime/platform/macos.c:175
-#define SF2C_MACOS_S_LARECOMP_THREAD_QOS_8C64 "LARECOMP_THREAD_QOS"
+#define SF2C_MACOS_S_SF2RECOMP_THREAD_QOS_8C64 "SF2RECOMP_THREAD_QOS"
 // runtime/platform/macos.c:176
 #define SF2C_MACOS_N_44_71EE 44
 // runtime/platform/macos.c:209

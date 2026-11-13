@@ -89,7 +89,7 @@ int main(int argc, char **argv) {
                             "-Wl,--gc-sections", *libs, "-pthread", "-lm", "-ldl",
                             "-o", str(root / "movie")], check=True)
             subprocess.run([str(root / "movie"), str(root)], check=True, timeout=10,
-                           env={**os.environ, "LARECOMP_NO_AUDIO": "1", "LARECOMP_FFMPEG": shutil.which("ffmpeg")})
+                           env={**os.environ, "SF2RECOMP_NO_AUDIO": "1", "SF2RECOMP_FFMPEG": shutil.which("ffmpeg")})
 
     def test_skip_does_not_wait_for_startup_or_decoder_workers(self):
         source = r'''

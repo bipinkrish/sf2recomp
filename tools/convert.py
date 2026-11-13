@@ -246,7 +246,7 @@ def package_game(game, output, executable, sdl_dir, ffmpeg_dir, target=K.S_LINUX
             "Cutscene playback uses the FFmpeg decoder and source bundled in lib/ffmpeg and licenses/FFmpeg; no FFmpeg install is needed.\n"
             "Keep lib/fonts/ alongside the executable for shared-font fallback (Noto, SIL OFL 1.1).\n"
             "System requirements: Linux x86-64, Vulkan loader/driver, shaderc and C/C++ runtime libraries.\n"
-            "Software fallback: SDL_VIDEODRIVER=x11 LARECOMP_VK_NO_GMEM=1 "
+            "Software fallback: SDL_VIDEODRIVER=x11 SF2RECOMP_VK_NO_GMEM=1 "
             "VK_DRIVER_FILES=/usr/share/vulkan/icd.d/lvp_icd.json ./sf2\n"
             "Combat and hardware-driver compatibility remain incomplete.\n")
     if release:

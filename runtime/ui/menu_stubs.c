@@ -48,7 +48,7 @@ void menu_render(void *cmd, uint32_t target_w, uint32_t target_h) {
     (void)cmd; (void)target_w; (void)target_h;
 }
 
-const char *larecomp_version(void) { return SF2RECOMP_VERSION; }
+const char *sf2recomp_version(void) { return SF2RECOMP_VERSION; }
 int game_in_play(void) { return 1; }
 const char *game_level_name(void) { return SF2C_MENU_STUBS_S_EMPTY_12AE; }
 void menu_test_open(void) {}

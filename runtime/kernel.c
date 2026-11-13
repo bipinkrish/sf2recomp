@@ -82,7 +82,7 @@ uint64_t rt_ticks(void) {
     // 19.2 MHz system tick
     uint64_t ns = plat_now_ns();
     static double scale = -1;
-    if (scale < 0) scale = getenv(SF2C_KERNEL_S_LARECOMP_TICK_SCALE_2FD4) ? atof(getenv(SF2C_KERNEL_S_LARECOMP_TICK_SCALE_2FD4)) : 1.0;
+    if (scale < 0) scale = getenv(SF2C_KERNEL_S_SF2RECOMP_TICK_SCALE_2FD4) ? atof(getenv(SF2C_KERNEL_S_SF2RECOMP_TICK_SCALE_2FD4)) : 1.0;
     if (scale != 1.0) ns = (uint64_t)(ns * scale);
     return (uint64_t)((__uint128_t)ns * SF2C_KERNEL_N_192_EB3B / SF2C_KERNEL_N_10000_39E5);
 }
@@ -285,7 +285,7 @@ void kernel_run_main(KThread *t, uint64_t x0, uint64_t x1, uint64_t x2, uint64_t
     g_main_thread = t;
     pthread_mutex_unlock(&g_klock);
     static bool watching;
-    const char *e = getenv(SF2C_KERNEL_S_LARECOMP_HANG_DUMP_B06A);
+    const char *e = getenv(SF2C_KERNEL_S_SF2RECOMP_HANG_DUMP_B06A);
     uint64_t s = e ? strtoull(e, NULL, SF2C_KERNEL_N_10_4A44) : SF2C_KERNEL_N_30_624B;
     if (!watching && s) {
         watching = true;
@@ -383,7 +383,7 @@ static uint32_t block_current(int64_t timeout_ns) {
 }
 
 // (diagnostics) the last KTRACE_N condition variable (untimed waits) / mutex kernel calls, lock-free, for the [hang] dump: what each
-// thread did with which key / mutex word, and the words before and after. LARECOMP_KTRACE=0 turns it off.
+// thread did with which key / mutex word, and the words before and after. SF2RECOMP_KTRACE=0 turns it off.
 enum { KT_WAIT, KT_WAIT_END, KT_SIGNAL, KT_LOCK, KT_LOCK_END, KT_UNLOCK };
 #define KTRACE_N SF2C_KERNEL_KTRACE_N
 typedef struct { uint64_t ns, tid, addr, addr2, pc, lr; uint32_t w0, w1, w2, arg, kind; } KTrace;
@@ -391,7 +391,7 @@ static KTrace ktrace[KTRACE_N];
 static uint64_t ktrace_n;  // (__atomic builtins)
 static int ktrace_on = -1;
 static void kt(uint32_t kind, uint64_t addr, uint64_t addr2, uint32_t w0, uint32_t w1, uint32_t w2, uint32_t arg) {
-    if (ktrace_on < 0) ktrace_on = !getenv(SF2C_KERNEL_S_LARECOMP_KTRACE_A502) || atoi(getenv(SF2C_KERNEL_S_LARECOMP_KTRACE_A502)) != 0;
+    if (ktrace_on < 0) ktrace_on = !getenv(SF2C_KERNEL_S_SF2RECOMP_KTRACE_A502) || atoi(getenv(SF2C_KERNEL_S_SF2RECOMP_KTRACE_A502)) != 0;
     if (!ktrace_on) return;
     Cpu *c = kernel_current_cpu();
     KTrace *e = &ktrace[__atomic_fetch_add(&ktrace_n, 1, __ATOMIC_RELAXED) % KTRACE_N];
@@ -438,8 +438,8 @@ static uint32_t svc_arbitrate_unlock(uint64_t addr) {
 }
 
 static uint32_t svc_wait_process_wide_key(uint64_t mutex, uint64_t key, uint32_t tag, int64_t timeout) {
-    static long late_us = -1;  // (test) LARECOMP_DEBUG_CV_LATE_WAIT=<us>: every condition variable wait starts that late
-    if (late_us < 0) late_us = getenv(SF2C_KERNEL_S_LARECOMP_DEBUG_CV_LATE_WAIT_BD4A) ? atol(getenv(SF2C_KERNEL_S_LARECOMP_DEBUG_CV_LATE_WAIT_BD4A)) : 0;
+    static long late_us = -1;  // (test) SF2RECOMP_DEBUG_CV_LATE_WAIT=<us>: every condition variable wait starts that late
+    if (late_us < 0) late_us = getenv(SF2C_KERNEL_S_SF2RECOMP_DEBUG_CV_LATE_WAIT_BD4A) ? atol(getenv(SF2C_KERNEL_S_SF2RECOMP_DEBUG_CV_LATE_WAIT_BD4A)) : 0;
     if (late_us > 0) usleep((useconds_t)late_us);  // (forces notify-before-wait races in the game's code: hle/delegate_null.c)
     pthread_mutex_lock(&g_klock);
     KThread *t = t_cur;
@@ -576,7 +576,7 @@ static uint32_t svc_wait_synchronization(uint64_t handles_ptr, int32_t count, in
     KThread *t = t_cur;
     uint32_t *hs = (uint32_t *)(uintptr_t)handles_ptr;
     uint32_t r;
-    if (ENV(SF2C_KERNEL_S_LARECOMP_VSYNC_BT_9A1D)) {  // (debug) who waits for the display's vsync event: the game's frame loop
+    if (ENV(SF2C_KERNEL_S_SF2RECOMP_VSYNC_BT_9A1D)) {  // (debug) who waits for the display's vsync event: the game's frame loop
         extern uint32_t vi_vsync_handle(void);
         static int shown;
         for (int i = 0; i < count && shown < SF2C_KERNEL_N_2_D473; i++)
@@ -634,7 +634,7 @@ void rt_svc(Cpu *c, uint32_t imm, uint64_t pc) {
 }
 
 static void svc_entry(Cpu *c, uint32_t imm, uint64_t pc) {
-    if (prof_svc < 0) prof_svc = ENV(SF2C_KERNEL_S_LARECOMP_PROF_SVC_6FEB) != NULL;
+    if (prof_svc < 0) prof_svc = ENV(SF2C_KERNEL_S_SF2RECOMP_PROF_SVC_6FEB) != NULL;
     if (prof_svc && imm < SF2C_KERNEL_N_0X80_D41C) {
         uint64_t a0 = c->x[0], a1 = c->x[1], a2 = c->x[SF2C_KERNEL_N_2_D473], a3 = c->x[SF2C_KERNEL_N_3_4E07], lr = c->x[SF2C_KERNEL_N_30_624B];
         uint32_t h0 = imm == SF2C_KERNEL_N_0X18_D47C && a2 ? *(uint32_t *)(uintptr_t)a1 : 0;
@@ -667,7 +667,7 @@ static void svc_entry(Cpu *c, uint32_t imm, uint64_t pc) {
         }
         return;
     }
-    if (trace_svc < 0) trace_svc = getenv(SF2C_KERNEL_S_LARECOMP_TRACE_SVC_4E28) != NULL;
+    if (trace_svc < 0) trace_svc = getenv(SF2C_KERNEL_S_SF2RECOMP_TRACE_SVC_4E28) != NULL;
     if (!trace_svc) return svc_impl(c, imm, pc);
     uint64_t in[SF2C_KERNEL_N_4_4B22] = {c->x[0], c->x[1], c->x[SF2C_KERNEL_N_2_D473], c->x[SF2C_KERNEL_N_3_4E07]};
     svc_impl(c, imm, pc);
@@ -936,7 +936,7 @@ static void svc_impl(Cpu *c, uint32_t imm, uint64_t pc) {
         x[0] = R_OK;
         x[1] = kernel_new_handle(ev);
         x[SF2C_KERNEL_N_2_D473] = kernel_new_handle(ev);
-        if (ENV(SF2C_KERNEL_S_LARECOMP_PROF_SVC_6FEB)) LOG(SF2C_KERNEL_S_EVT_GUEST_W_LLX_R_LLX_LR_LLX_57D0, (unsigned long long)x[1], (unsigned long long)x[SF2C_KERNEL_N_2_D473], (unsigned long long)x[SF2C_KERNEL_N_30_624B]);
+        if (ENV(SF2C_KERNEL_S_SF2RECOMP_PROF_SVC_6FEB)) LOG(SF2C_KERNEL_S_EVT_GUEST_W_LLX_R_LLX_LR_LLX_57D0, (unsigned long long)x[1], (unsigned long long)x[SF2C_KERNEL_N_2_D473], (unsigned long long)x[SF2C_KERNEL_N_30_624B]);
         break;
     }
     default:
@@ -1186,7 +1186,7 @@ void kernel_dump_threads(const char *prefix) {
     if (locked) pthread_mutex_unlock(&g_klock);
 }
 
-// The hang dump, one facility for the whole runtime. LARECOMP_HANG_DUMP=<s> (default 30, 0 off), checked every
+// The hang dump, one facility for the whole runtime. SF2RECOMP_HANG_DUMP=<s> (default 30, 0 off), checked every
 // second from the main guest thread's start:
 // - the main guest thread in one kernel wait that long (startup hangs on Windows with few cores leave no other trace)
 // - the renderer's own checks (runtime/nvn/rqueue.c, kernel_hang_hooks): no frame presented twice that long after the

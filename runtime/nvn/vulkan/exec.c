@@ -48,7 +48,7 @@ static bool key_memo_on(void);
 static uint64_t prof_sets_reused, prof_sets_new;  // (VK_PROF) set reuse (allocations: record.c RecStats)
 static bool set_reuse_on(void);
 static uint64_t prof_slot_wait;  // (VK_PROF) sub(): ring slot waits (ns; GPU waits, inside "pre" when begin_pass starts a submission)
-// LARECOMP_VK_PROF=1: render-thread time per category in the fps log (exec = whole command lists, draw = draw(),
+// SF2RECOMP_VK_PROF=1: render-thread time per category in the fps log (exec = whole command lists, draw = draw(),
 // sets = descriptor sets incl. cbuf copies, vtx = index scan + vertex copies, submit = vkQueueSubmit2)
 static int prof = -1;
 static uint64_t prof_exec, prof_draw, prof_sets, prof_vtx, prof_submit, prof_pre, prof_key, prof_dyn, prof_tex, prof_up, prof_gpu;
@@ -86,7 +86,7 @@ static void ss_forget(void);
 static uint64_t submit_seq;  // last handed to the recorder (= submitted, with the recorder off)
 static pthread_mutex_t seq_lock = PTHREAD_MUTEX_INITIALIZER;
 static bool in_pass;
-static int passes_in_sub;  // render passes in the submission being recorded (LARECOMP_CHUNK_PASSES, begin_pass)
+static int passes_in_sub;  // render passes in the submission being recorded (SF2RECOMP_CHUNK_PASSES, begin_pass)
 
 // CPU / GPU overlap (as renderer.m: the Metal backend, metal-overlap). The game's frame loop submits a frame, presents
 // it, and at once waits on that frame's fence (every SyncWait is on the newest submission), so it builds frame N+1
@@ -101,7 +101,7 @@ static int passes_in_sub;  // render passes in the submission being recorded (LA
 // and the storage buffers it rewrites one frame ahead get copies (snap_storage). The timing counters are read a frame
 // before their GPU time is known: in this mode an end counter reports the latest completed frame's GPU span
 // (cq_resolve keeps it host side and no longer writes the game's memory late - the game may have reused the slot).
-// LARECOMP_GPU_OVERLAP=0: off (the wait on the fence's own submission, as before); =1: on.
+// SF2RECOMP_GPU_OVERLAP=0: off (the wait on the fence's own submission, as before); =1: on.
 #define VK_OVERLAP_DEFAULT 1  // on where the write watch can run (overlap_on: off by itself without page write tracking)
 static uint64_t deferred_seq;   // (seq_lock) the fence the game was told is done but whose submission wasn't waited for
 static uint64_t stat_deferred;  // SyncWaits returned without waiting (stats)
@@ -110,21 +110,21 @@ static uint64_t stat_snap_bytes, stat_snap_copies;  // storage copies made (snap
 // the game rewriting its light lists with the same bytes while the GPU reads them. Where the OS gives no tracking
 // (Linux over a userptr or dma-buf heap - AMD, the Steam Deck -, a kernel before 6.7 without PAGEMAP_SCAN, a
 // container without userfaultfd, a Windows window reserved without write watch) the overlap turns itself off: the
-// full fence wait as before. LARECOMP_GPU_OVERLAP=1 forces it on anyway (tests; the hash probe stands in for the
+// full fence wait as before. SF2RECOMP_GPU_OVERLAP=1 forces it on anyway (tests; the hash probe stands in for the
 // watch then), =0 turns it off.
 static int pages_cpu_written(uint64_t addr, uint64_t size, uint32_t since, uint32_t *now);  // (the page tables below)
 static const char *heap_tracking_reason(void);  // (why the heap has no page write tracking, for the log)
 static bool overlap_on(void) {
     static int on = -1;
     if (on < 0) {
-        const char *e = getenv(SF2C_EXEC_S_LARECOMP_GPU_OVERLAP_B13C), *w = getenv(SF2C_EXEC_S_LARECOMP_OVERLAP_WATCH_FEAE);
+        const char *e = getenv(SF2C_EXEC_S_SF2RECOMP_GPU_OVERLAP_B13C), *w = getenv(SF2C_EXEC_S_SF2RECOMP_OVERLAP_WATCH_FEAE);
         uint32_t g;
         bool tracked = (!w || atoi(w) != 0) && pages_cpu_written(HEAP_BASE, SF2C_EXEC_N_4096_8B92, 0, &g) >= 0;
         if (e) on = atoi(e) != 0;
         else if (VK_OVERLAP_DEFAULT && !tracked) {
             on = 0;
             LOG(SF2C_EXEC_S_VK_GPU_OVERLAP_OFF_NO_PAGE_W_0515,
-                w && atoi(w) == 0 ? SF2C_EXEC_S_LARECOMP_OVERLAP_WATCH_0_14BB : heap_tracking_reason());
+                w && atoi(w) == 0 ? SF2C_EXEC_S_SF2RECOMP_OVERLAP_WATCH_0_14BB : heap_tracking_reason());
             return on;
         } else on = VK_OVERLAP_DEFAULT;
         LOG(SF2C_EXEC_S_VK_GPU_OVERLAP_S_THE_GAME_S__C69C, on ? SF2C_EXEC_S_ON_990C : SF2C_EXEC_S_OFF_9F3B,
@@ -143,7 +143,7 @@ uint64_t vk_completed_seq(void) {
     return v;
 }
 
-// (LARECOMP_VK_PROF) waits on the GPU by cause: the caller names it in wait_why just before waiting
+// (SF2RECOMP_VK_PROF) waits on the GPU by cause: the caller names it in wait_why just before waiting
 static __thread const char *wait_why;
 static struct { const char *why; uint64_t ns, n; } wait_tab[SF2C_EXEC_N_12_6B51];
 static pthread_mutex_t wait_tab_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -212,7 +212,7 @@ uint64_t vk_pending_seq(void) { return submit_seq + 1; }
 // timestamp at its place in the command stream; once that submission is done (the game waits on its fence before
 // reading - on the Switch the GPU writes them too) the GPU time replaces the provisional host value, in the host
 // clock's terms (offset calibrated at each resolve: a timestamp can't be later than the moment its submission is seen
-// done). LARECOMP_VK_COUNTER=cpu: host clock only; =frozen: one value per presented frame (test); =legacy: the host
+// done). SF2RECOMP_VK_COUNTER=cpu: host clock only; =frozen: one value per presented frame (test); =legacy: the host
 // clock in ns instead of GPU ticks, as before (test: reproduces the locked 30).
 #define CQ_MAX SF2C_EXEC_CQ_MAX
 typedef struct { VkQueryPool pool; uint32_t n; uint64_t seq; uint64_t *out[CQ_MAX]; } CounterQ;
@@ -228,7 +228,7 @@ static uint64_t stat_counters_gpu;
 
 static int vk_counter_mode(void) {
     if (counter_mode < 0) {
-        const char *e = getenv(SF2C_EXEC_S_LARECOMP_VK_COUNTER_DD98);
+        const char *e = getenv(SF2C_EXEC_S_SF2RECOMP_VK_COUNTER_DD98);
         counter_mode = e && !strcmp(e, SF2C_EXEC_S_CPU_C4FC) ? 0 : e && !strcmp(e, SF2C_EXEC_S_FROZEN_5756) ? 1 : e && !strcmp(e, SF2C_EXEC_S_LEGACY_E4C1) ? SF2C_EXEC_N_3_4E07 : SF2C_EXEC_N_2_D473;
         if (counter_mode == SF2C_EXEC_N_2_D473 && !g_vk.props.limits.timestampComputeAndGraphics) counter_mode = 0;
     }
@@ -244,8 +244,8 @@ static void cq_resolve(int i) {  // (cq_lock held) submission slot i is done: it
         double per = g_vk.props.limits.timestampPeriod;
         int64_t cand = (int64_t)plat_now_ns() - (int64_t)((double)t[q->n - 1] * per);
         if (!cq_calibrated || cand < cq_offset) cq_offset = cand, cq_calibrated = true;
-        static int log = -1;  // LARECOMP_LOG_COUNTER=1: the host (provisional) and GPU times of each counter
-        if (log < 0) log = getenv(SF2C_EXEC_S_LARECOMP_LOG_COUNTER_8119) != NULL;
+        static int log = -1;  // SF2RECOMP_LOG_COUNTER=1: the host (provisional) and GPU times of each counter
+        if (log < 0) log = getenv(SF2C_EXEC_S_SF2RECOMP_LOG_COUNTER_8119) != NULL;
         for (uint32_t k = 0; k < q->n; k++) {
             uint64_t gpu = ns_to_gpu_ticks((uint64_t)((int64_t)((double)t[k] * per) + cq_offset));
             if (log) LOG(SF2C_EXEC_S_COUNTER_SEQ_LLU_U_AT_LLX_HOS_B703, (unsigned long long)q->seq, k,
@@ -277,7 +277,7 @@ static void cq_resolve_done(uint64_t done) {  // every slot whose submission is 
     pthread_mutex_unlock(&cq_lock);
 }
 
-// ---- GPU timer (dynamic resolution, runtime/nvn/output_scale.c; and LARECOMP_VK_PROF's "gpu"): a timestamp at the
+// ---- GPU timer (dynamic resolution, runtime/nvn/output_scale.c; and SF2RECOMP_VK_PROF's "gpu"): a timestamp at the
 // start and the end of each submission's main command buffer, read when its ring slot comes round again (so a few
 // submissions late; the controller averages half a second). Submissions overlap a little (the next one's commands
 // may start before the previous one's end): their union is counted, the time the GPU was busy.
@@ -285,7 +285,7 @@ static void cq_resolve_done(uint64_t done) {  // every slot whose submission is 
 // for the image, which can be a vsync's wait, so its start timestamp isn't its work's: it has a 3rd timestamp, written
 // after the barrier that waits for the image (vk_gpu_timer_window_start), and its time is counted from there - in a
 // total of its own (vk_gpu_split_ns): device.c adds it to what dynamic resolution sees unless
-// LARECOMP_DYNRES_COUNT_PRESENT=0. Also per frame: the span from the GPU starting the frame's first game submission
+// SF2RECOMP_DYNRES_COUNT_PRESENT=0. Also per frame: the span from the GPU starting the frame's first game submission
 // to the end of its window submission; span - game - window = the GPU idle / doing work no timestamp covers
 // (uploads ahead of a submission's main command buffer, waiting for the window image).
 static uint64_t gpu_total_ns, gpu_last_end;  // ns counted; (ticks) the latest submission end seen
@@ -433,20 +433,20 @@ void vk_full_barrier(VkCommandBuffer cb) {
 static void ring_retire(void);
 void vc_flush(void);
 
-// ---- LARECOMP_GPUPROF_AT=<frame>: GPU time per pass / dispatch / copy of that frame, logged as "[gpuprof]".
+// ---- SF2RECOMP_GPUPROF_AT=<frame>: GPU time per pass / dispatch / copy of that frame, logged as "[gpuprof]".
 // A timestamp (ALL_COMMANDS: after everything before it) at each mark; a row = the work since the previous mark.
 bool g_gpuprof_frame;
 static VkQueryPool gp_qp;
 static int gp_n;
 static char gp_label[SF2C_EXEC_N_512_94F8][SF2C_EXEC_N_112_B155];
 static uint32_t gp_draws[SF2C_EXEC_N_512_94F8];
-// LARECOMP_VK_DEVLOST_TRACE=1: the last 64 GPU operations, dumped on device loss (with LARECOMP_SYNC_SUBMIT=1 the
+// SF2RECOMP_VK_DEVLOST_TRACE=1: the last 64 GPU operations, dumped on device loss (with SF2RECOMP_SYNC_SUBMIT=1 the
 // dump ends with the command list that faulted).
 static char dl_ring[SF2C_EXEC_N_64_A68B][SF2C_EXEC_N_128_2747];
 static unsigned dl_n;
 static int dl_on = -1;
 static void dl_note(const char *fmt, ...) {
-    if (dl_on < 0) dl_on = getenv(SF2C_EXEC_S_LARECOMP_VK_DEVLOST_TRACE_28EE) ? atoi(getenv(SF2C_EXEC_S_LARECOMP_VK_DEVLOST_TRACE_28EE)) : 0;
+    if (dl_on < 0) dl_on = getenv(SF2C_EXEC_S_SF2RECOMP_VK_DEVLOST_TRACE_28EE) ? atoi(getenv(SF2C_EXEC_S_SF2RECOMP_VK_DEVLOST_TRACE_28EE)) : 0;
     if (!dl_on) return;
     va_list ap;
     va_start(ap, fmt);
@@ -656,9 +656,9 @@ static int new_chunk(uint64_t size) {
     // two 64 MB chunks took 128 of its 132 MB in use while its budget fell to 81 MB (RTX 3080 Ti), and a GTX 1060 ran
     // out (issue #45). A chunk goes there only while the window's use stays under half its budget; past that, system
     // memory (~1 ms more GPU time a frame on a 3080 Ti at 1x). The first chunks, which most frames use, stay fast.
-    // LARECOMP_VK_RING_BAR=1: no budget check.
+    // SF2RECOMP_VK_RING_BAR=1: no budget check.
     bool spill = false;
-    if (!sysmem && !getenv(SF2C_EXEC_S_LARECOMP_VK_RING_BAR_E550)) {
+    if (!sysmem && !getenv(SF2C_EXEC_S_SF2RECOMP_VK_RING_BAR_E550)) {
         uint32_t type;
         if (vmaFindMemoryTypeIndexForBufferInfo(g_vk.vma, &bi, &ai, &type) == VK_SUCCESS) {
             const VkPhysicalDeviceMemoryProperties *mp;
@@ -676,7 +676,7 @@ static int new_chunk(uint64_t size) {
             }
         }
     }
-    if (sysmem || spill || getenv(SF2C_EXEC_S_LARECOMP_VK_RING_SYSMEM_6E5D)) ai.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;  // (test: a GPU without resizable BAR)
+    if (sysmem || spill || getenv(SF2C_EXEC_S_SF2RECOMP_VK_RING_SYSMEM_6E5D)) ai.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;  // (test: a GPU without resizable BAR)
     VmaAllocationInfo info;
     VkResult r = vmaCreateBuffer(g_vk.vma, &bi, &ai, &c->buf, &c->mem, &info);
     bool moved = false;
@@ -897,7 +897,7 @@ static VkSpan guest_geometry_copy(uint64_t addr, uint64_t size) {
 
 // ================================================================== worker threads (shader / pipeline builds)
 // First-use compiles run off the render thread; draws needing them are skipped until ready (as on Metal).
-// LARECOMP_SYNC_SHADERS=1 builds on first use, blocking (deterministic tests).
+// SF2RECOMP_SYNC_SHADERS=1 builds on first use, blocking (deterministic tests).
 typedef struct Job { void (*fn)(void *); void *arg; struct Job *next; } Job;
 static Job *jobs_head, *jobs_tail;
 static pthread_mutex_t jobs_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -920,7 +920,7 @@ static void *worker(void *a) {
 
 static bool sync_shaders(void) {
     static int v = -1;
-    if (v < 0) v = getenv(SF2C_EXEC_S_LARECOMP_SYNC_SHADERS_2655) != NULL;
+    if (v < 0) v = getenv(SF2C_EXEC_S_SF2RECOMP_SYNC_SHADERS_2655) != NULL;
     return v;
 }
 
@@ -1023,7 +1023,7 @@ uint32_t nvn_window_origin(void);
 uint32_t nvn_depth_mode(void);
 bool renderer_origin_lower_left(void) { return nvn_window_origin() == 0; }
 
-// (LARECOMP_VK_PROF) called once per presented frame: frames over 50 ms are logged with where their time went.
+// (SF2RECOMP_VK_PROF) called once per presented frame: frames over 50 ms are logged with where their time went.
 // present_ns: time in backend_present's acquire/blit/present.
 void vk_prof_frame(uint64_t frame, uint64_t present_ns) {
     if (!prof) return;
@@ -1046,7 +1046,7 @@ void renderer_slow_counters(uint64_t *submits, uint64_t *gpu_wait_ns, uint64_t *
     *imports = (uint64_t)__atomic_load_n(&gc_imported, __ATOMIC_RELAXED);
 }
 
-// LARECOMP_LOG_SKIPS=1: the skipped draws and dispatches of each stats interval by reason, and the top offenders
+// SF2RECOMP_LOG_SKIPS=1: the skipped draws and dispatches of each stats interval by reason, and the top offenders
 // (shader code addresses and content hashes, as in "[shader] slow build" / shader_variants.txt, and how long they
 // have been skipped without a break). "building" for tens of seconds is a build that never finishes.
 enum { SK_NO_PROGRAM, SK_NO_STAGES, SK_PROG_BUILDING, SK_PROG_FAILED, SK_PIPE_BUILDING, SK_PIPE_FAILED, SK_CS_BUILDING,
@@ -1060,7 +1060,7 @@ static uint64_t skip_n[SK_N];
 static struct { int why; uint64_t a, b, ha, hb, n, first_ns; } skip_top[SKIP_TOP];
 static int skip_ntop;
 static void skip_note(int why, bool compute) {
-    if (log_skips < 0) log_skips = getenv(SF2C_EXEC_S_LARECOMP_LOG_SKIPS_F37B) && atoi(getenv(SF2C_EXEC_S_LARECOMP_LOG_SKIPS_F37B)) != 0;
+    if (log_skips < 0) log_skips = getenv(SF2C_EXEC_S_SF2RECOMP_LOG_SKIPS_F37B) && atoi(getenv(SF2C_EXEC_S_SF2RECOMP_LOG_SKIPS_F37B)) != 0;
     if (!log_skips) return;
     skip_n[why]++;
     const NvnProgram *p = st.program;
@@ -1294,10 +1294,10 @@ static void st_defaults(void) {
 static VkPipeline pipe_resolve(void *obj, bool wait);
 void vk_exec_init(void) {
     trace_render = getenv(SF2C_EXEC_S_SF2_TRACE_RENDER_5E88) != NULL;
-    prof = getenv(SF2C_EXEC_S_LARECOMP_VK_PROF_CC43) != NULL;
+    prof = getenv(SF2C_EXEC_S_SF2RECOMP_VK_PROF_CC43) != NULL;
     if (prof) prof_up_ns = 0;
-    // the GPU timer (LARECOMP_VK_GPU_TIMER=0: off - dynamic resolution then goes by the frame times)
-    const char *gt = getenv(SF2C_EXEC_S_LARECOMP_VK_GPU_TIMER_3DAF);
+    // the GPU timer (SF2RECOMP_VK_GPU_TIMER=0: off - dynamic resolution then goes by the frame times)
+    const char *gt = getenv(SF2C_EXEC_S_SF2RECOMP_VK_GPU_TIMER_3DAF);
     if (g_vk.ts_bits && g_vk.props.limits.timestampComputeAndGraphics && g_vk.props.limits.timestampPeriod > 0 && !(gt && !atoi(gt))) {
         VkQueryPoolCreateInfo qi = {.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO, .queryType = VK_QUERY_TYPE_TIMESTAMP, .queryCount = SUBS * SF2C_EXEC_N_3_4E07};
         if (vkCreateQueryPool(g_vk.dev, &qi, NULL, &prof_qp) != VK_SUCCESS) prof_qp = VK_NULL_HANDLE;
@@ -1356,7 +1356,7 @@ typedef struct {
 // Descriptor sets are always bound (sharing identical sets within a submission was tried: a third matched, but
 // comparing them cost more than allocating and writing them on NVIDIA; with dynamic uniform buffers most sets repeat
 // their program's previous one, which stage_set keeps: "set reuse").
-// LARECOMP_VK_STATE_FILTER=0: every draw sets everything, as before.
+// SF2RECOMP_VK_STATE_FILTER=0: every draw sets everything, as before.
 enum { SS_PIPE = 1 << 0, SS_DT = 1 << 1, SS_DW = 1 << SF2C_EXEC_N_2_D473, SS_DOP = 1 << SF2C_EXEC_N_3_4E07, SS_STEN = 1 << SF2C_EXEC_N_4_4B22, SS_SFACE0 = 1 << SF2C_EXEC_N_5_EF2D, SS_SFACE1 = 1 << SF2C_EXEC_N_6_E7F6,
        SS_BC = 1 << SF2C_EXEC_N_7_7902, SS_CULL = 1 << SF2C_EXEC_N_8_2C62, SS_FF = 1 << SF2C_EXEC_N_9_1958, SS_TOPO = 1 << SF2C_EXEC_N_10_4A44, SS_PRE = 1 << SF2C_EXEC_N_11_4FC8, SS_DBE = 1 << SF2C_EXEC_N_12_6B51, SS_DB = 1 << SF2C_EXEC_N_13_3FDB,
        SS_VP = 1 << SF2C_EXEC_N_14_8527, SS_SC = 1 << SF2C_EXEC_N_15_E629, SS_IB = 1 << SF2C_EXEC_N_16_B17E, SS_VI = 1 << SF2C_EXEC_N_17_4523 };
@@ -1380,7 +1380,7 @@ static struct {
 static int ss_on = -1;
 static void ss_forget(void) { ss.known = 0; ss.vb_known = 0; }
 static bool ss_enabled(void) {
-    if (ss_on < 0) { const char *e = getenv(SF2C_EXEC_S_LARECOMP_VK_STATE_FILTER_DE2C); ss_on = !e || atoi(e) != 0; }
+    if (ss_on < 0) { const char *e = getenv(SF2C_EXEC_S_SF2RECOMP_VK_STATE_FILTER_DE2C); ss_on = !e || atoi(e) != 0; }
     return ss_on;
 }
 // true: the state must be recorded (and is remembered as known)
@@ -1402,7 +1402,7 @@ static void vk_end_pass_at(int line) {
         char path[SF2C_EXEC_N_256_51E8];
         static uint64_t debug_pass_frame = ~SF2C_EXEC_N_0ULL_DF1B;
         static int multi = -1;
-        if (multi < 0) multi = getenv(SF2C_EXEC_S_LARECOMP_DEBUG_FRAMES_8FB4) != NULL;
+        if (multi < 0) multi = getenv(SF2C_EXEC_S_SF2RECOMP_DEBUG_FRAMES_8FB4) != NULL;
         if (multi && renderer_present_count() != debug_pass_frame) { debug_pass_frame = renderer_present_count(); debug_pass_no = 0; }
         if (multi) snprintf(path, sizeof path, SF2C_EXEC_S_BUILD_PASS_LLU_03D_PNG_DD88, (unsigned long long)debug_pass_frame, debug_pass_no++);
         else snprintf(path, sizeof path, SF2C_EXEC_S_BUILD_PASS_03D_PNG_48B9, debug_pass_no++);
@@ -1423,12 +1423,12 @@ static bool heap_whole_userptr(void);
 static void begin_pass(void) {
     if (in_pass && !st.rt_dirty) return;
     vk_end_pass();
-    if (dl_on == SF2C_EXEC_N_2_D473) renderer_flush();  // (LARECOMP_VK_DEVLOST_TRACE=2: each pass its own submission)
+    if (dl_on == SF2C_EXEC_N_2_D473) renderer_flush();  // (SF2RECOMP_VK_DEVLOST_TRACE=2: each pass its own submission)
     else {
         // Submit the frame in chunks (as Metal, renderer.m begin_pass): the game puts a whole frame in one command
         // list and waits for its fence early in the next frame, so with one submission per list the GPU sat idle
         // while the list was translated, and the game's wait covered translation + GPU time - with the render thread
-        // the translation left the game thread but came back as that wait. LARECOMP_CHUNK_PASSES=<n>: a submission
+        // the translation left the game thread but came back as that wait. SF2RECOMP_CHUNK_PASSES=<n>: a submission
         // every n render passes (0 = one per list). Default 8 with the render thread (RTX 3080 Ti + i9, Field_11C:
         // gpu wait 0.6 -> 0.25 ms, game thread busy 3.4-3.5 ms vs 4.9 without the render thread); without it,
         // off (chunks cost that thread 0.1-0.3 ms there). Also off by default while the whole heap is one userptr
@@ -1439,7 +1439,7 @@ static void begin_pass(void) {
         static bool chunk_env;
         if (chunk < 0) {
             extern bool rq_on(void);
-            const char *e = getenv(SF2C_EXEC_S_LARECOMP_CHUNK_PASSES_088B);
+            const char *e = getenv(SF2C_EXEC_S_SF2RECOMP_CHUNK_PASSES_088B);
             chunk_env = e != NULL;
             chunk = e ? atoi(e) : rq_on() ? SF2C_EXEC_N_8_2C62 : 0;
         }
@@ -1536,12 +1536,12 @@ static void begin_pass(void) {
         static bool logged_none;
         if (!logged_none) logged_none = true, LOG(SF2C_EXEC_S_VK_PASS_WITH_NO_ATTACHMENTS__8C1F, st.rt.ncolor);
     }
-    // A pass with depth / stencil but no color attachment gets a throwaway one on Intel (LARECOMP_VK_PLACEHOLDER_COLOR=0 /
+    // A pass with depth / stencil but no color attachment gets a throwaway one on Intel (SF2RECOMP_VK_PLACEHOLDER_COLOR=0 /
     // 1 overrides): the UHD 630's Windows driver (Vulkan 1.3.215) crashes in the vkCmdBeginRendering after such a pass,
     // reading near a null pointer (issues #8, #46). Pipelines and clears follow pass_ncolor / pass_color as usual.
     static int placeholder = -1;
     if (placeholder < 0) {
-        const char *e = getenv(SF2C_EXEC_S_LARECOMP_VK_PLACEHOLDER_COLO_DDE6);
+        const char *e = getenv(SF2C_EXEC_S_SF2RECOMP_VK_PLACEHOLDER_COLO_DDE6);
         placeholder = e ? atoi(e) != 0 : g_vk.props.vendorID == SF2C_EXEC_N_0X8086_D5E6;
     }
     bool placed = false;
@@ -1560,11 +1560,11 @@ static void begin_pass(void) {
     VkRenderingInfo ri = {.sType = VK_STRUCTURE_TYPE_RENDERING_INFO, .renderArea = {{0, 0}, {minw, minh}}, .layerCount = 1,
                           .colorAttachmentCount = pass_ncolor, .pColorAttachments = pass_ncolor ? ca : NULL,
                           .pDepthAttachment = has_d ? &da : NULL, .pStencilAttachment = has_s ? &sa : NULL};
-    // LARECOMP_VK_LOG_PASSES=<n> (default 300 with =1): each of the first n passes before it begins - an Intel crash
+    // SF2RECOMP_VK_LOG_PASSES=<n> (default 300 with =1): each of the first n passes before it begins - an Intel crash
     // inside vkCmdBeginRendering (issues #8, #46) ends the log on the pass the driver choked on
     static long log_passes = -1;
     if (log_passes < 0) {
-        log_passes = getenv(SF2C_EXEC_S_LARECOMP_VK_LOG_PASSES_B952) ? atol(getenv(SF2C_EXEC_S_LARECOMP_VK_LOG_PASSES_B952)) : 0;
+        log_passes = getenv(SF2C_EXEC_S_SF2RECOMP_VK_LOG_PASSES_B952) ? atol(getenv(SF2C_EXEC_S_SF2RECOMP_VK_LOG_PASSES_B952)) : 0;
         if (log_passes == 1) log_passes = SF2C_EXEC_N_300_983B;
     }
     if (log_passes > 0) {
@@ -1821,7 +1821,7 @@ typedef struct {
     VkPipelineLayout layout;
     bool vs_uses_vid;
     _Atomic int state;  // 0 building, 1 ready, 2 failed
-    uint64_t prep_vh, prep_fh;  // (prepared programs: their code hashes, for LARECOMP_PREP_CHECK)
+    uint64_t prep_vh, prep_fh;  // (prepared programs: their code hashes, for SF2RECOMP_PREP_CHECK)
     ShaderFp fp[SF2C_EXEC_N_2_D473];             // (stale-program detector, shader_prep.h; compute: [0]; touched by the replay only)
     struct PipeMemo *pmemo;     // (render thread) draw_'s pipeline key memo for this program
     bool reuse;                 // set reuse (stage_set): some uniform buffers are dynamic, sets are kept while their contents repeat
@@ -1836,11 +1836,11 @@ typedef struct {
 // set of each program and set index and binds it again while what it would write is identical. A kept set belongs to
 // the pending submission (its pools are reset with the slot) and to the current view generation; buffers bound in
 // sets are destroyed deferred (after the submissions using them), or at a reboot (ds_gen).
-// LARECOMP_VK_NO_SET_REUSE=1: no dynamic buffers, a new set per draw, as before.
+// SF2RECOMP_VK_NO_SET_REUSE=1: no dynamic buffers, a new set per draw, as before.
 static int set_reuse = -1;
 static uint32_t ds_gen;  // bumped when a buffer bound in sets may be destroyed at once (reboot)
 static bool set_reuse_on(void) {
-    if (set_reuse < 0) set_reuse = getenv(SF2C_EXEC_S_LARECOMP_VK_NO_SET_REUSE_7972) == NULL;
+    if (set_reuse < 0) set_reuse = getenv(SF2C_EXEC_S_SF2RECOMP_VK_NO_SET_REUSE_7972) == NULL;
     return set_reuse;
 }
 static bool is_ubo(VkDescriptorType t) { return t == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER || t == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC; }
@@ -1884,7 +1884,7 @@ static VkPipelineLayout make_layout(Prog *p, int nsets, VkShaderStageFlags s0, V
 }
 
 static void save_glsl(const char *src, uint64_t addr, const char *suffix) {
-    if (!getenv(SF2C_EXEC_S_LARECOMP_SAVE_MSL_AF49)) return;
+    if (!getenv(SF2C_EXEC_S_SF2RECOMP_SAVE_MSL_AF49)) return;
     mkdir(SF2C_EXEC_S_BUILD_GLSL_6A40, SF2C_EXEC_N_0755_64A5);
     char path[SF2C_EXEC_N_256_51E8];
     snprintf(path, sizeof path, SF2C_EXEC_S_BUILD_GLSL_LLX_S_GLSL_B1A8, (unsigned long long)addr, suffix);
@@ -2048,11 +2048,11 @@ static void prog_fp_check(Prog *p, NvnProgram *np) {  // (the lookups below are 
 // program lookup with the previous lookup's, and those of the pipeline lookup with the last ones of that program
 // (plain compares of everything the keys are made from), and reuses the answer instead of hashing the program key
 // byte by byte and filling + hashing the ~700-byte PipeKey. The answers are the objects the tables give. key_gen:
-// bumped by vk_exec_reset (tables cleared). LARECOMP_VK_NO_KEY_MEMO=1: off.
+// bumped by vk_exec_reset (tables cleared). SF2RECOMP_VK_NO_KEY_MEMO=1: off.
 static int key_memo = -1;
 static uint32_t key_gen = 1;
 static bool key_memo_on(void) {
-    if (key_memo < 0) key_memo = getenv(SF2C_EXEC_S_LARECOMP_VK_NO_KEY_MEMO_ED46) == NULL;
+    if (key_memo < 0) key_memo = getenv(SF2C_EXEC_S_SF2RECOMP_VK_NO_KEY_MEMO_ED46) == NULL;
     return key_memo;
 }
 
@@ -2622,10 +2622,10 @@ static void debug_save_depth(TexBackend *b, const char *path) {
     LOG(SF2C_EXEC_S_VK_SAVED_S_UX_U_DEPTH_6F_6F__EB88, path, b->width, b->height, lo, hi);
 }
 
-// (debug) LARECOMP_COPY_TRACE=<frame>: draws' attachments / sampled textures, copies and snapshots of that frame ("[ct]")
+// (debug) SF2RECOMP_COPY_TRACE=<frame>: draws' attachments / sampled textures, copies and snapshots of that frame ("[ct]")
 static bool ct_on(void) {
     static const char *e = (const char *)1;
-    if (e == (const char *)1) e = getenv(SF2C_EXEC_S_LARECOMP_COPY_TRACE_ACED);
+    if (e == (const char *)1) e = getenv(SF2C_EXEC_S_SF2RECOMP_COPY_TRACE_ACED);
     if (!e) return false;
     static uint64_t memo_f = ~SF2C_EXEC_N_0ULL_DF1B;
     static bool memo;
@@ -2668,7 +2668,7 @@ static void ct_draw(Prog *pr, const char *what) {
 //   - anything else (a draw writing depth / stencil, a partial clear, a copy or upload into either, the
 //     destination bound as an attachment, a texture freed or reallocated): the real copy is made first.
 // Only same-size, same-format, single-level, single-sample depth/stencil images, whole-image copies.
-// LARECOMP_VK_COPY_OPT=0: always copy (the old behaviour).
+// SF2RECOMP_VK_COPY_OPT=0: always copy (the old behaviour).
 typedef struct { NvnTexture *src, *dst; VkImage simg, dimg; } CopyAlias;
 extern uint32_t vk_view_gen;
 static CopyAlias aliases[SF2C_EXEC_N_8_2C62];
@@ -2677,7 +2677,7 @@ static uint64_t stat_alias_made, stat_alias_renamed, stat_alias_partial, stat_al
 
 static int copy_opt(void) {
     static int on = -1;
-    if (on < 0) { const char *e = getenv(SF2C_EXEC_S_LARECOMP_VK_COPY_OPT_AFEA); on = e && *e ? atoi(e) : 1; }
+    if (on < 0) { const char *e = getenv(SF2C_EXEC_S_SF2RECOMP_VK_COPY_OPT_AFEA); on = e && *e ? atoi(e) : 1; }
     return on;
 }
 
@@ -2715,7 +2715,7 @@ static void alias_before_write(NvnTexture *t, VkImageAspectFlags full, const cha
         CopyAlias *a = &aliases[i];
         if (!alias_valid(a)) { alias_drop(i); continue; }
         if (a->dst != t) continue;
-        // (LARECOMP_VK_COPY_OPT=2: all aspects even then - for comparing the stencil-only copy's cost)
+        // (SF2RECOMP_VK_COPY_OPT=2: all aspects even then - for comparing the stencil-only copy's cost)
         alias_copy(a, ((TexBackend *)t->backend)->aspect & (copy_opt() == SF2C_EXEC_N_2_D473 ? ~SF2C_EXEC_N_0U_86B4 : ~full), why);
         alias_drop(i);
     }
@@ -2809,7 +2809,7 @@ static void alias_draw_check(void) {
 static void resolve_feedback(Prog *pr) {
     nfeedback = 0;
     static int off = -1;
-    if (off < 0) off = getenv(SF2C_EXEC_S_LARECOMP_NO_FEEDBACK_AC2E) != NULL;
+    if (off < 0) off = getenv(SF2C_EXEC_S_SF2RECOMP_NO_FEEDBACK_AC2E) != NULL;
     if (off) return;
     ShaderInfo *infos[SF2C_EXEC_N_2_D473] = {pr->vi, pr->fi};
     for (int sg = 0; sg < SF2C_EXEC_N_2_D473; sg++)
@@ -2820,7 +2820,7 @@ static void resolve_feedback(Prog *pr) {
             for (int k = 0; k < nfeedback; k++) have |= feedback_tex[k] == t;
             if (have || nfeedback == SF2C_EXEC_N_4_4B22) continue;
             static int nosnap = -1;
-            if (nosnap < 0) nosnap = getenv(SF2C_EXEC_S_LARECOMP_NO_SNAPSHOT_REUSE_E42A) != NULL;
+            if (nosnap < 0) nosnap = getenv(SF2C_EXEC_S_SF2RECOMP_NO_SNAPSHOT_REUSE_E42A) != NULL;
             int si = -1;
             for (int k = 0; k < SF2C_EXEC_N_8_2C62; k++) if (snap_tex[k] == t) si = k;
             bool self_write = t == st.rt.depth && st.ds[0] && st.ds[1];
@@ -2870,10 +2870,10 @@ static VkDescriptorBufferInfo ubo_span(VkSpan s, uint64_t size) {
 // Lean constant blocks: the scale table (66 rows, 1 KB) and the driver constants (up to 2 KB) were zero-filled in
 // full and compared in full per stage and draw, although only a few rows / entries carry anything. These build and
 // compare only those (the scale table's rows 0..ntex and 65; the driver constants' storage buffer entries below the
-// size the shader reads) and write the same bytes as before. LARECOMP_VK_NO_CBUF_LEAN=1: the full blocks, as before.
+// size the shader reads) and write the same bytes as before. SF2RECOMP_VK_NO_CBUF_LEAN=1: the full blocks, as before.
 static int cbuf_lean_v = -1;
 static bool cbuf_lean(void) {
-    if (cbuf_lean_v < 0) cbuf_lean_v = getenv(SF2C_EXEC_S_LARECOMP_VK_NO_CBUF_LEAN_6E8F) == NULL;
+    if (cbuf_lean_v < 0) cbuf_lean_v = getenv(SF2C_EXEC_S_SF2RECOMP_VK_NO_CBUF_LEAN_6E8F) == NULL;
     return cbuf_lean_v;
 }
 // The scale table of a graphics stage: rows 0..nt are set, the rest are zero (not read from rs).
@@ -2924,7 +2924,7 @@ static VkSpan rscale_dedupe(int sg, const float rs[SF2C_EXEC_N_65_108C][SF2C_EXE
 // copies stay where they are across switches (the allocator walks past them; rs_copy_make), so the GPU's own writes
 // into a copy survive; a copy unused for 10 s is released. At ~100 KB a frame that wait is long satisfied; a half
 // filling within one submission (not a real case) binds the original for that draw.
-// LARECOMP_OVERLAP_SNAP=0: off (everything in place, as before: shows the race).
+// SF2RECOMP_OVERLAP_SNAP=0: off (everything in place, as before: shows the race).
 #define SNAP_HALF (SF2C_EXEC_N_8ULL_682F << SF2C_EXEC_N_20_F5CA)
 #define SNAP_RING (SF2C_EXEC_N_2_D473 * SNAP_HALF)
 enum { RS_PROBE, RS_COPY, RS_PLACE };
@@ -2955,7 +2955,7 @@ static bool snap_on(void) {
     if (snap_state >= 0) return snap_state;
     uint64_t heap = kernel_heap_size();
     if (!heap) return false;  // (not decided yet)
-    const char *e = getenv(SF2C_EXEC_S_LARECOMP_OVERLAP_SNAP_4B30);
+    const char *e = getenv(SF2C_EXEC_S_SF2RECOMP_OVERLAP_SNAP_4B30);
     snap_state = (!e || atoi(e) != 0) && overlap_on();
     if (snap_state) {
         snap_base = (heap + SF2C_EXEC_N_0XFFFF_F51F) & ~SF2C_EXEC_N_0XFFFFULL_2BD3;  // (minImportedHostPointerAlignment: 64 KB at most)
@@ -3055,7 +3055,7 @@ static uint64_t rs_copy_make(RangeState *e, uint64_t h) {
         if (kept) {
             static int n;
             extern uint64_t renderer_exec_frame(void);
-            if (n++ < SF2C_EXEC_N_20_F5CA || getenv(SF2C_EXEC_S_LARECOMP_LOG_BINDS_8A9A))
+            if (n++ < SF2C_EXEC_N_20_F5CA || getenv(SF2C_EXEC_S_SF2RECOMP_LOG_BINDS_8A9A))
                 LOG(SF2C_EXEC_S_SNAP_LLX_LLU_REMADE_LLU_BYTE_DB50, (unsigned long long)e->addr,
                     (unsigned long long)e->size, (unsigned long long)kept, (unsigned long long)renderer_exec_frame());
         }
@@ -3090,21 +3090,21 @@ static void rs_release_unused(uint64_t f) {  // (every 600 frames) copies of ent
 // Page granularity (4 KB; 16 KB and 64 KB kernels on arm64 Linux as the kernel reports): a store into a neighbour on
 // the same page marks the range too (the lists share a page) - copied, the safe side - except a page shared with a
 // small parameter block (watch_check), and a single write (an initialisation) doesn't copy (snap_storage).
-// LARECOMP_OVERLAP_WATCH=0: off (compute-only ranges get the one-frame hash probe, as before).
+// SF2RECOMP_OVERLAP_WATCH=0: off (compute-only ranges get the one-frame hash probe, as before).
 static bool heap_is_userptr(void);  // (with the heap import below)
 static int pages_cpu_written(uint64_t addr, uint64_t size, uint32_t since, uint32_t *now);  // (the page tables below)
 #define WATCH_PAGE SF2C_EXEC_N_4096ULL_F12B  // (the page tables' page, VC_PAGE below)
 static bool watch_on(void) {
     static int on = -1;
     if (on < 0) {
-        const char *e = getenv(SF2C_EXEC_S_LARECOMP_OVERLAP_WATCH_FEAE);
+        const char *e = getenv(SF2C_EXEC_S_SF2RECOMP_OVERLAP_WATCH_FEAE);
         uint32_t g;
         on = !e || atoi(e) != 0;
         if (on && pages_cpu_written(HEAP_BASE, SF2C_EXEC_N_4096_8B92, 0, &g) < 0) {
             on = 0;
             LOG(SF2C_EXEC_S_VK_STORAGE_WRITE_WATCH_OFF_N_7718, heap_is_userptr() ? SF2C_EXEC_S_OVER_A_USERPTR_HEAP_IMPORT_43F2 : SF2C_EXEC_S_EMPTY_12AE);
         } else LOG(SF2C_EXEC_S_VK_STORAGE_WRITE_WATCH_S_COM_0106,
-                   on ? SF2C_EXEC_S_ON_990C : SF2C_EXEC_S_OFF_LARECOMP_OVERLAP_WATCH_0_557F);
+                   on ? SF2C_EXEC_S_ON_990C : SF2C_EXEC_S_OFF_SF2RECOMP_OVERLAP_WATCH_0_557F);
     }
     return on;
 }
@@ -3262,13 +3262,13 @@ static uint64_t snap_storage(uint64_t addr, uint64_t size, bool cs_slot) {
     return c ? c : addr;
 }
 
-// (debug) LARECOMP_LOG_BINDS=1: guest memory the GPU reads in place, per frame (bytes bound; distinct ranges once),
+// (debug) SF2RECOMP_LOG_BINDS=1: guest memory the GPU reads in place, per frame (bytes bound; distinct ranges once),
 // and the ranges of the previous frame whose contents the game rewrote by the time this frame is translated: with
 // the frame fence deferred (overlap) the GPU may still read them - the racing data. kind: 0 vertex, 1 index,
 // 2 storage (a draw's read), 3 compute slot.
 static void bind_note(int kind, uint64_t addr, uint64_t size) {
     static int on = -1;
-    if (on < 0) on = getenv(SF2C_EXEC_S_LARECOMP_LOG_BINDS_8A9A) != NULL;
+    if (on < 0) on = getenv(SF2C_EXEC_S_SF2RECOMP_LOG_BINDS_8A9A) != NULL;
     if (!on || addr < HEAP_BASE || addr - HEAP_BASE + size > HEAP_MAX || size < SF2C_EXEC_N_8_2C62) return;
     extern int nvn_pool_flags_at(uint64_t addr);
     enum { REC = SF2C_EXEC_N_8192_864A };
@@ -3405,10 +3405,10 @@ static VkDescriptorBufferInfo cbuf_info(int stage, ShaderInfo *si, int k, uint32
     // snapshot: later CPU writes must not leak in. Shared by the draws of one submission binding the same range:
     // within a command list nothing writes guest memory (no inline UpdateUniformBuffer: that writes through below
     // and drops the shared copies).
-    // (lazy heap chunks) pointers in it import their chunks: scanned once per shared copy (LARECOMP_VK_NO_SCAN_ONCE=1:
+    // (lazy heap chunks) pointers in it import their chunks: scanned once per shared copy (SF2RECOMP_VK_NO_SCAN_ONCE=1:
     // at every draw, as before)
     static int scan_once = -1;
-    if (scan_once < 0) scan_once = getenv(SF2C_EXEC_S_LARECOMP_VK_NO_SCAN_ONCE_88EA) == NULL;
+    if (scan_once < 0) scan_once = getenv(SF2C_EXEC_S_SF2RECOMP_VK_NO_SCAN_ONCE_88EA) == NULL;
     if (gc_lazy && si->uses_gmem && scan_once) return ubo_span(guest_copy_ex(r.addr, size, true), size);
     if (gc_lazy && si->uses_gmem) gc_scan_pointers((const uint32_t *)(uintptr_t)r.addr, size);
     return ubo_span(guest_copy(r.addr, size), size);
@@ -3417,7 +3417,7 @@ static VkDescriptorBufferInfo cbuf_info(int stage, ShaderInfo *si, int k, uint32
 // Global memory (shader LDG/STG, maxwell_gmem_base = HEAP_BASE): the guest heap imported as a GPU buffer
 // (VK_EXT_external_memory_host), zero-copy like metal.m's g_guest_buffer, so compute results land in guest
 // memory. The import pins its pages, so it covers only the heap the game set up (SetHeapSize), made on first use.
-// LARECOMP_VK_NO_GMEM=1: no import, reads return zero.
+// SF2RECOMP_VK_NO_GMEM=1: no import, reads return zero.
 static VkBuffer gmem_buf;
 static VkDeviceMemory gmem_mem;
 static uint64_t gmem_size;
@@ -3488,10 +3488,10 @@ static bool host_import(uint64_t off, uint64_t size, VkBuffer *out_buf, VkDevice
 // the first submission), and the heap is imported in lazy chunks instead - decided here, at device creation (vk_exec_init),
 // before any shader is translated or the game starts. Costs: the import pins HEAP_MAX of RAM for a moment (well under a
 // second). Any other failure: logged, and the heap is imported as one buffer as before.
-// LARECOMP_VK_SIM_HEAP_OOM=1: the probe runs, then reports out of memory (tests the fallback on any GPU).
+// SF2RECOMP_VK_SIM_HEAP_OOM=1: the probe runs, then reports out of memory (tests the fallback on any GPU).
 static bool whole_import_probe_oom(void) {
     const uint64_t size = HEAP_MAX, align = SF2C_EXEC_N_64_A68B << SF2C_EXEC_N_10_4A44;  // (minImportedHostPointerAlignment: 4 KB here, 64 KB at most)
-    const char *sim = getenv(SF2C_EXEC_S_LARECOMP_VK_SIM_HEAP_OOM_49B8);
+    const char *sim = getenv(SF2C_EXEC_S_SF2RECOMP_VK_SIM_HEAP_OOM_49B8);
     rec_drain();  // (the queue below is the recorder's: idle and empty while this runs)
     uint64_t t0 = plat_now_ns();
     VkResult r = VK_ERROR_OUT_OF_HOST_MEMORY;
@@ -3540,7 +3540,7 @@ static bool whole_import_probe_oom(void) {
     if (mem) vkFreeMemory(g_vk.dev, mem, NULL);
     free(raw);
     bool oom = r == VK_ERROR_OUT_OF_DEVICE_MEMORY || r == VK_ERROR_OUT_OF_HOST_MEMORY;
-    if (r == VK_SUCCESS && sim && atoi(sim)) { oom = true; r = VK_ERROR_OUT_OF_DEVICE_MEMORY; step = SF2C_EXEC_S_SIMULATED_LARECOMP_VK_SIM_HE_EDBD; }
+    if (r == VK_SUCCESS && sim && atoi(sim)) { oom = true; r = VK_ERROR_OUT_OF_DEVICE_MEMORY; step = SF2C_EXEC_S_SIMULATED_SF2RECOMP_VK_SIM_HE_EDBD; }
     unsigned ms = (unsigned)((plat_now_ns() - t0) / SF2C_EXEC_N_1000000_6CCE);
     if (oom)
         LOG(SF2C_EXEC_S_VK_GUEST_HEAP_ONE_IMPORT_OF__CA8E
@@ -3604,7 +3604,7 @@ static bool gmem_preload_take(uint64_t size, VkBuffer *buf, VkDeviceMemory *mem)
 
 void vk_guest_heap_preload(void) {
     if (gmem_preload.attempted || gmem_buf || !g_vk.host_import ||
-        g_vk.managed_heap || getenv(SF2C_EXEC_S_LARECOMP_VK_NO_GMEM_2D48)) return;
+        g_vk.managed_heap || getenv(SF2C_EXEC_S_SF2RECOMP_VK_NO_GMEM_2D48)) return;
     gmem_chunk_shift();
     if (gc_lazy) return;  // lazy chunks retain their demand-based memory policy
     uint64_t size = gmem_heap_size();
@@ -3643,8 +3643,8 @@ static bool gmem_import(uint64_t size) {
 // itself, through its own DRM file as for any vkMapMemory. Else the memory is exported as a dma-buf and that is
 // mmapped there - which some systems refuse (issue #92: RX 6800 XT, Mesa 25.0.7, "Permission denied"), and then
 // the whole heap was a userptr import again.
-// Default on for RADV; LARECOMP_VK_HEAP_DMABUF=0 off, =1 on any Linux driver with dma-buf export or placed maps.
-// LARECOMP_VK_HEAP_PLACED=0: the dma-buf mapping even where placed maps exist (tests).
+// Default on for RADV; SF2RECOMP_VK_HEAP_DMABUF=0 off, =1 on any Linux driver with dma-buf export or placed maps.
+// SF2RECOMP_VK_HEAP_PLACED=0: the dma-buf mapping even where placed maps exist (tests).
 #ifdef __linux__
 static bool gmem_dmabuf;  // the heap is the driver's memory mapped at HEAP_BASE
 static bool gmem_placed;  // ... by the driver (vkMapMemory2KHR, placed): unmapped through it at a reboot
@@ -3696,8 +3696,8 @@ static void heap_unmap_placed(void) {
 }
 
 static bool guest_heap_dmabuf(uint64_t size) {
-    if (gmem_buf || !g_vk.dev || !(g_vk.dmabuf || g_vk.map_placed) || getenv(SF2C_EXEC_S_LARECOMP_VK_NO_GMEM_2D48)) return false;
-    const char *e = getenv(SF2C_EXEC_S_LARECOMP_VK_HEAP_DMABUF_419D);
+    if (gmem_buf || !g_vk.dev || !(g_vk.dmabuf || g_vk.map_placed) || getenv(SF2C_EXEC_S_SF2RECOMP_VK_NO_GMEM_2D48)) return false;
+    const char *e = getenv(SF2C_EXEC_S_SF2RECOMP_VK_HEAP_DMABUF_419D);
     if (!g_vk.managed_heap && (e ? !atoi(e) : !strstr(g_vk.props.deviceName, SF2C_EXEC_S_RADV_6945))) return false;
     VkPhysicalDeviceMemoryProperties mp;
     vkGetPhysicalDeviceMemoryProperties(g_vk.phys, &mp);
@@ -3723,7 +3723,7 @@ static bool guest_heap_dmabuf(uint64_t size) {
     VkBufferCreateInfo bi = {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, .pNext = &eb, .size = size,
                              .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
                                       VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT};
-    const char *pe = getenv(SF2C_EXEC_S_LARECOMP_VK_HEAP_PLACED_F170);
+    const char *pe = getenv(SF2C_EXEC_S_SF2RECOMP_VK_HEAP_PLACED_F170);
     bool placed = g_vk.map_placed && (!pe || atoi(pe));
     if (!placed && !g_vk.dmabuf) { LOG(SF2C_EXEC_S_VK_HEAP_AS_DRIVER_MEMORY_NO__1874); return false; }
     bi.pNext = placed ? NULL : &eb;  // (an exportable buffer only for the dma-buf mapping)
@@ -3829,7 +3829,7 @@ mapped:;
 // submission (amdgpu; the CPU and GPU stop overlapping - Steam Deck, issue #181: 30 fps on Beta 4, 20 with tracking
 // over the whole-heap import). Chunks only make the re-check smaller, not the wait. So with any userptr import,
 // tracking is off, as on Beta 4 (the vertex cache and the texture checks go without it). NVIDIA's own driver pins
-// the pages instead and keeps it. Decided here, at boot, before any query protected a page. LARECOMP_WRITE_TRACKING=1:
+// the pages instead and keeps it. Decided here, at boot, before any query protected a page. SF2RECOMP_WRITE_TRACKING=1:
 // on anyway.
 static bool gmem_userptr;  // the heap is imported by host pointer: userptr (vertex cache default, vcache_lookup)
 static bool heap_is_userptr(void) { return gmem_userptr; }  // (the storage write watch: off over a userptr import)
@@ -3864,7 +3864,7 @@ void backend_guest_heap_prepare(void) {
     // driver memory: write tracking can't watch that mapping (its queries over the heap would fail; PAGEMAP_SCAN
     // refuses a range without userfaultfd write protection), so it's off there too
     if (gmem_dmabuf) { plat_write_tracking_off(SF2C_EXEC_S_THE_GUEST_HEAP_IS_DRIVER_MEM_6720); return; }
-    if (!g_vk.host_import || getenv(SF2C_EXEC_S_LARECOMP_VK_NO_GMEM_2D48) || g_vk.props.vendorID == SF2C_EXEC_N_0X10DE_112D) return;
+    if (!g_vk.host_import || getenv(SF2C_EXEC_S_SF2RECOMP_VK_NO_GMEM_2D48) || g_vk.props.vendorID == SF2C_EXEC_N_0X10DE_112D) return;
     gmem_userptr = true;
     plat_write_tracking_off(gc_lazy ? SF2C_EXEC_S_THE_GUEST_HEAP_IS_IMPORTED_I_A089 : SF2C_EXEC_S_THE_GUEST_HEAP_IS_A_USERPTR__E393);
 #endif
@@ -3874,7 +3874,7 @@ static uint64_t gmem_tried;  // heap size the import was last attempted for (gme
 
 static VkDescriptorBufferInfo gmem_info(void) {
     static int off = -1;
-    if (off < 0) off = getenv(SF2C_EXEC_S_LARECOMP_VK_NO_GMEM_2D48) != NULL || !g_vk.host_import || gc_lazy;  // (lazy: chunks instead)
+    if (off < 0) off = getenv(SF2C_EXEC_S_SF2RECOMP_VK_NO_GMEM_2D48) != NULL || !g_vk.host_import || gc_lazy;  // (lazy: chunks instead)
     uint64_t want = gmem_heap_size();
     if (!off && want > gmem_size && !gmem_import(want)) {
         LOG(SF2C_EXEC_S_VK_GUEST_HEAP_IMPORT_FAILED__2726, (unsigned long long)(want >> SF2C_EXEC_N_20_F5CA));
@@ -3891,7 +3891,7 @@ static VkDescriptorBufferInfo gmem_info(void) {
 // - a GPU whose storage buffers can't span HEAP_MAX (maxStorageBufferRange: 1 GB on Intel): binding one range past
 //   that limit is out of spec, and the UHD 630's driver then read garbage beyond 1 GB: dark lighting, black objects
 //   (issue #8). Lazy chunks as below (device.c lazy_heap_predicted); where they aren't possible (or with
-//   LARECOMP_VK_GMEM_LAZY=0), windows of the one imported heap, one binding each;
+//   SF2RECOMP_VK_GMEM_LAZY=0), windows of the one imported heap, one binding each;
 // - lazy import (gmem_lazy): on Linux/AMD the import is a userptr buffer and amdgpu checks every page of such a buffer
 //   again on each submission - 3.2 GB of heap, ~45 ms of driver time a frame (issues #40, #51). The dma-buf heap
 //   (guest_heap_dmabuf) avoids that, but needs a cached host-visible memory type that can hold HEAP_MAX, and APUs
@@ -3910,9 +3910,9 @@ static VkDescriptorBufferInfo gmem_info(void) {
 //   they put every allocation on the driver's global BO list.
 //   Default on RADV when the dma-buf heap doesn't apply, wherever one storage buffer can't span the heap and where the
 //   system memory heap (or its budget) can't hold one import of it (8 GB laptops: issue #205), and where one import
-//   was tried at the start and ran out of memory (whole_import_probe_oom; LARECOMP_VK_SIM_HEAP_OOM=1 simulates it);
-//   LARECOMP_VK_GMEM_LAZY=1 anywhere (tests), =0 off.
-// LARECOMP_VK_GMEM_CHUNK_MB=<n> forces chunks of n MB (a power of two, 1 GB at most), =0 one buffer.
+//   was tried at the start and ran out of memory (whole_import_probe_oom; SF2RECOMP_VK_SIM_HEAP_OOM=1 simulates it);
+//   SF2RECOMP_VK_GMEM_LAZY=1 anywhere (tests), =0 off.
+// SF2RECOMP_VK_GMEM_CHUNK_MB=<n> forces chunks of n MB (a power of two, 1 GB at most), =0 one buffer.
 #define GC_MAX GMEM_CHUNKS_MAX
 static struct {
     VkBuffer buf;
@@ -3974,7 +3974,7 @@ static bool gmem_lazy(void) {
     static int lazy = -1;
     if (lazy >= 0) return lazy;
     lazy = g_vk.lazy_heap;
-    if (!lazy && g_vk.heap_probe && !getenv(SF2C_EXEC_S_LARECOMP_VK_NO_GMEM_2D48)) lazy = whole_import_probe_oom();
+    if (!lazy && g_vk.heap_probe && !getenv(SF2C_EXEC_S_SF2RECOMP_VK_NO_GMEM_2D48)) lazy = whole_import_probe_oom();
     if (lazy && (!g_vk.host_import || !g_vk.bda || !g_vk.ssbo_chunks)) {
         LOG(SF2C_EXEC_S_VK_LAZY_HEAP_IMPORT_NOT_POSS_E18A, !g_vk.host_import ? SF2C_EXEC_S_NO_HOST_MEMORY_IMPORT_6FD9 : !g_vk.bda ? SF2C_EXEC_S_NO_BUFFER_DEVICE_ADDRESSES_AD4D : SF2C_EXEC_S_NO_STORES_FROM_FRAGMENT_VERT_7E67);
         lazy = 0;
@@ -3995,7 +3995,7 @@ static uint32_t gmem_chunk_shift(void) {
 static void gmem_chunk_decide(void) {
     if (g_vk.staged_heap) return;
     int shift;
-    const char *e = getenv(SF2C_EXEC_S_LARECOMP_VK_GMEM_CHUNK_MB_B29B);
+    const char *e = getenv(SF2C_EXEC_S_SF2RECOMP_VK_GMEM_CHUNK_MB_B29B);
     uint64_t lim = g_vk.props.limits.maxStorageBufferRange;
     uint64_t capacity = backend_guest_heap_capacity();
     gc_lazy = gmem_lazy();
@@ -4028,7 +4028,7 @@ static void gmem_chunk_decide(void) {
     gc_shift = (uint32_t)shift;
     gc_n = shift ? n : 0;
     maxwell_gmem_lazy = gc_lazy;
-    maxwell_gmem_fs_miss = gc_lazy && getenv(SF2C_EXEC_S_LARECOMP_VK_GMEM_FS_MISS_999B) && atoi(getenv(SF2C_EXEC_S_LARECOMP_VK_GMEM_FS_MISS_999B)) != 0;
+    maxwell_gmem_fs_miss = gc_lazy && getenv(SF2C_EXEC_S_SF2RECOMP_VK_GMEM_FS_MISS_999B) && atoi(getenv(SF2C_EXEC_S_SF2RECOMP_VK_GMEM_FS_MISS_999B)) != 0;
     if (maxwell_gmem_fs_miss) LOG(SF2C_EXEC_S_VK_LAZY_CHUNKS_EVERY_FRAGMEN_6FE6);
     if (shift) LOG(SF2C_EXEC_S_VK_GUEST_HEAP_BOUND_TO_SHADE_B153,
                    (unsigned long long)(SF2C_EXEC_N_1ULL_622E << shift) >> SF2C_EXEC_N_20_F5CA, gc_lazy ? SF2C_EXEC_S_CHUNKS_IMPORTED_AS_THE_GAME__E3A9 : SF2C_EXEC_S_WINDOWS_E294, (unsigned long long)lim >> SF2C_EXEC_N_20_F5CA);
@@ -4261,11 +4261,11 @@ static VkDescriptorSet gmem_chunk_set(const int dk[GMEM_DIRECT_MAX]) {
 // Lazy mode, a draw: the imported chunks under its vertex / fragment storage buffers, in slot order (shader.h
 // GMEM_DIRECT_MAX): gd[] for the shaders' GDirect push constants (the range each GDir<k> covers), dk[] the chunks for
 // the set's GDir<k> bindings. A range over two chunks gives both. Accesses there are storage buffer loads, not the table.
-// LARECOMP_VK_GMEM_DIRECT=0: none (every access through the table, as before; no shader change).
+// SF2RECOMP_VK_GMEM_DIRECT=0: none (every access through the table, as before; no shader change).
 static void gmem_direct_pick(uint32_t stages, uint32_t gd[GMEM_DIRECT_MAX * SF2C_EXEC_N_4_4B22], int dk[GMEM_DIRECT_MAX]) {
     static int on = -1;
     if (on < 0) {
-        on = !getenv(SF2C_EXEC_S_LARECOMP_VK_GMEM_DIRECT_5127) || atoi(getenv(SF2C_EXEC_S_LARECOMP_VK_GMEM_DIRECT_5127)) != 0;
+        on = !getenv(SF2C_EXEC_S_SF2RECOMP_VK_GMEM_DIRECT_5127) || atoi(getenv(SF2C_EXEC_S_SF2RECOMP_VK_GMEM_DIRECT_5127)) != 0;
         if (!on) LOG(SF2C_EXEC_S_VK_LAZY_CHUNKS_STORAGE_BUFFE_9506);
     }
     memset(gd, 0, sizeof(uint32_t) * GMEM_DIRECT_MAX * SF2C_EXEC_N_4_4B22);
@@ -4297,8 +4297,8 @@ static void gmem_direct_pick(uint32_t stages, uint32_t gd[GMEM_DIRECT_MAX * SF2C
 // Binds the chunk set for a draw / dispatch whose shaders (stages: a mask of 1 << stage) use global memory: their storage
 // buffers' chunks first.
 static void gmem_chunk_bind(VkCommandBuffer cb, VkPipelineBindPoint bp, VkPipelineLayout layout, uint32_t set_index, uint32_t stages) {
-    static int log_sb = -1;  // LARECOMP_LOG_GMEM_SBUF=1: each distinct storage buffer bound to a gmem shader, once
-    if (log_sb < 0) log_sb = getenv(SF2C_EXEC_S_LARECOMP_LOG_GMEM_SBUF_407A) != NULL;
+    static int log_sb = -1;  // SF2RECOMP_LOG_GMEM_SBUF=1: each distinct storage buffer bound to a gmem shader, once
+    if (log_sb < 0) log_sb = getenv(SF2C_EXEC_S_SF2RECOMP_LOG_GMEM_SBUF_407A) != NULL;
     for (int stage = 0; stage < SF2C_EXEC_N_6_E7F6; stage++) {
         if (!(stages & (SF2C_EXEC_N_1U_B8E6 << stage))) continue;
         for (int i = 0; i < SF2C_EXEC_N_16_B17E; i++) {
@@ -4381,7 +4381,7 @@ static bool gmem_covers(uint64_t off, uint64_t size) {
 // (binding GMAP_BUFFER_INDEX) tells the shader (translate.c, GLSL compute) where each range sits, loads and stores
 // inside them use that copy, and a shader that stores gets the ranges copied back to the heap right after it (the
 // game alternates its buffer sets per frame: the CPU isn't writing them meanwhile). Accesses outside the table use
-// the heap as before. LARECOMP_VK_GMEM_FAST=0: no copy (empty table: everything goes to the heap, the old behaviour).
+// the heap as before. SF2RECOMP_VK_GMEM_FAST=0: no copy (empty table: everything goes to the heap, the old behaviour).
 #define GFAST_SIZE (SF2C_EXEC_N_32ULL_6898 << SF2C_EXEC_N_20_F5CA)
 static VkBuffer gfast_buf;
 static VmaAllocation gfast_mem;
@@ -4402,7 +4402,7 @@ static VkDescriptorBufferInfo gfast_info(void) {
 
 static void gfast_prepare(VkCommandBuffer cb) {
     static int on = -1;
-    if (on < 0) { const char *e = getenv(SF2C_EXEC_S_LARECOMP_VK_GMEM_FAST_4C7B); on = !e || atoi(e) != 0; }
+    if (on < 0) { const char *e = getenv(SF2C_EXEC_S_SF2RECOMP_VK_GMEM_FAST_4C7B); on = !e || atoi(e) != 0; }
     memset(gmap_tab, 0, sizeof gmap_tab);
     gfast_n = 0;
     if (!gc_lazy) gmem_info();  // (the heap import, made on first use)
@@ -4436,9 +4436,9 @@ static void gfast_prepare(VkCommandBuffer cb) {
         off += (len + SF2C_EXEC_N_255_9556) & ~SF2C_EXEC_N_255ULL_DE76;
     }
     if (!m) return;
-    if (getenv(SF2C_EXEC_S_LARECOMP_LOG_GFAST_6943)) {  // (debug) =<shader code address hex>: that shader's first tables
+    if (getenv(SF2C_EXEC_S_SF2RECOMP_LOG_GFAST_6943)) {  // (debug) =<shader code address hex>: that shader's first tables
         static int nlog;
-        if (st.program->stages[SF2C_EXEC_N_5_EF2D].code_addr == strtoull(getenv(SF2C_EXEC_S_LARECOMP_LOG_GFAST_6943), NULL, SF2C_EXEC_N_16_B17E) && nlog++ < SF2C_EXEC_N_40_D59E) {
+        if (st.program->stages[SF2C_EXEC_N_5_EF2D].code_addr == strtoull(getenv(SF2C_EXEC_S_SF2RECOMP_LOG_GFAST_6943), NULL, SF2C_EXEC_N_16_B17E) && nlog++ < SF2C_EXEC_N_40_D59E) {
             LOG(SF2C_EXEC_S_GFAST_CS_LLX_D_RANGES_LLU_KB_26A0, (unsigned long long)st.program->stages[SF2C_EXEC_N_5_EF2D].code_addr, m, (unsigned long long)(off >> SF2C_EXEC_N_10_4A44));
             for (int i = 0; i < m; i++) LOG(SF2C_EXEC_S_LLX_LLX_0B1D, (unsigned long long)(r[i].lo + HEAP_BASE), (unsigned long long)(r[i].hi - r[i].lo));
             LOG(SF2C_EXEC_S_N_D7A5);
@@ -4470,7 +4470,7 @@ static void gfast_finish(VkCommandBuffer cb) {
 // sequential GPU copy of the written pages in the submission's upload buffer (which completes before its draws) instead
 // of fetches across the bus. Overlapping ranges are separate entries; the per-page generation keeps them all current.
 // Pages the GPU writes itself (a compute dispatch's copy-back, gfast_finish) are never cached: draws over them read the
-// heap in place as before, and so does everything when the OS gives no write tracking. LARECOMP_VK_VCACHE=0: off.
+// heap in place as before, and so does everything when the OS gives no write tracking. SF2RECOMP_VK_VCACHE=0: off.
 #define VC_PAGE SF2C_EXEC_VC_PAGE
 #define VC_TAB SF2C_EXEC_N_8192_864A                   // entries (open addressing)
 #define VC_MAX_RANGE (SF2C_EXEC_N_64ULL_DE1A << SF2C_EXEC_N_20_F5CA)    // larger bound ranges: read in place
@@ -4568,10 +4568,10 @@ static void vc_mark_sbufs(int stage) {
 
 static bool vcache_lookup(uint64_t addr, uint64_t size, VkBuffer *buf, VkDeviceSize *off) {
     if (vc_on < 0) {
-        const char *e = getenv(SF2C_EXEC_S_LARECOMP_VK_VCACHE_1A22);
+        const char *e = getenv(SF2C_EXEC_S_SF2RECOMP_VK_VCACHE_1A22);
         vc_on = !e || atoi(e) != 0;
-        // integrated GPU with a userptr heap (only with LARECOMP_WRITE_TRACKING=1: tracking is off there otherwise): the
-        // heap already is the GPU's memory, no bus to save - the copies would only cost. LARECOMP_VK_VCACHE=1: on.
+        // integrated GPU with a userptr heap (only with SF2RECOMP_WRITE_TRACKING=1: tracking is off there otherwise): the
+        // heap already is the GPU's memory, no bus to save - the copies would only cost. SF2RECOMP_VK_VCACHE=1: on.
         if (vc_on && !e && gmem_userptr && g_vk.props.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) {
             LOG(SF2C_EXEC_S_VK_VERTEX_CACHE_OFF_INTEGRAT_329B);
             vc_on = 0;
@@ -4682,12 +4682,12 @@ void vc_flush(void) {
 
 // Vertex / index data from the imported guest heap (renderer.m bind_guest reads g_guest_buffer the same way): the
 // device-local cache above, else read in place - no per-draw copy, no index scan for the copy size. The game fences its
-// CPU writes as on the Switch. Falls back to copies outside the heap or without the import; LARECOMP_VK_COPY_VERTICES=1
+// CPU writes as on the Switch. Falls back to copies outside the heap or without the import; SF2RECOMP_VK_COPY_VERTICES=1
 // forces copies.
 static bool guest_direct(int kind, uint64_t addr, uint64_t size, VkBuffer *buf, VkDeviceSize *off) {  // kind: 0 vertex, 1 index (bind_note)
     if (g_vk.staged_heap) return false;
     static int copy = -1;
-    if (copy < 0) copy = getenv(SF2C_EXEC_S_LARECOMP_VK_COPY_VERTICES_BDEF) != NULL;
+    if (copy < 0) copy = getenv(SF2C_EXEC_S_SF2RECOMP_VK_COPY_VERTICES_BDEF) != NULL;
     if (copy || addr < HEAP_BASE) return false;
     bind_note(kind, addr, size);
     if (gc_lazy) {
@@ -4764,7 +4764,7 @@ void vk_exec_reset(void) {
 
 // Shadow (sampler*Shadow) slots need a depth view whose format can be compared (VUID-vkCmdDrawIndexed-None-06479):
 // the colour dummy or a colour texture there is replaced by a 1x1 depth dummy at 1.0 (lit, textures.c). Each cause is
-// logged once (LARECOMP_SHADOW_SLOT_LOG=1: every change of cause / handle, up to 200 lines), with the texture's
+// logged once (SF2RECOMP_SHADOW_SLOT_LOG=1: every change of cause / handle, up to 200 lines), with the texture's
 // address, size and format, so a run shows why the slot had nothing usable.
 static void shadow_slot_check(int stage, const ShaderTexture *st_, int i, uint64_t h, uint32_t tic, const NvnTexEntry *e,
                               NvnTexture *t, VkImageView *view) {
@@ -4790,7 +4790,7 @@ static void shadow_slot_check(int stage, const ShaderTexture *st_, int i, uint64
     static bool logged[NCAUSE];
     static int last_why = -1;
     static uint64_t last_h;
-    if (verbose < 0) verbose = getenv(SF2C_EXEC_S_LARECOMP_SHADOW_SLOT_LOG_6907) != NULL;
+    if (verbose < 0) verbose = getenv(SF2C_EXEC_S_SF2RECOMP_SHADOW_SLOT_LOG_6907) != NULL;
     bool log = !logged[why] || (verbose && nverbose < SF2C_EXEC_N_200_27BA && (why != last_why || h != last_h));
     if (log) {
         logged[why] = true;
@@ -4827,11 +4827,11 @@ static void texture_info(int stage, ShaderInfo *si, int i, VkDescriptorImageInfo
         if (e->tex) {
             // Per-frame memo: ~2400 lookups per overworld frame recomputed the view (format / range math, cache
             // probe). The first lookup of a frame still runs vk_view (upload check); a view that may have been
-            // destroyed (eviction, image re-created) bumps vk_view_gen. LARECOMP_VK_NO_TEX_MEMO=1 disables.
+            // destroyed (eviction, image re-created) bumps vk_view_gen. SF2RECOMP_VK_NO_TEX_MEMO=1 disables.
             extern uint32_t vk_view_gen;
             extern uint64_t vk_frame_counter(void);
             static int nomemo = -1;
-            if (nomemo < 0) nomemo = getenv(SF2C_EXEC_S_LARECOMP_VK_NO_TEX_MEMO_FD78) != NULL;
+            if (nomemo < 0) nomemo = getenv(SF2C_EXEC_S_SF2RECOMP_VK_NO_TEX_MEMO_FD78) != NULL;
             static struct { NvnTexture *tex; uint64_t vh, frame; uint32_t gen; uint8_t type, has_view; VkImageView view; } memo[SF2C_EXEC_N_1024_E39E];
             uint64_t vh = e->has_view ? hash_words(0, &e->view, sizeof e->view) : 0, frame = vk_frame_counter();
             uint32_t ms = (uint32_t)((((uintptr_t)e->tex >> SF2C_EXEC_N_4_4B22) ^ vh ^ (uint64_t)st_->type * SF2C_EXEC_N_0X9E3779B97F4A7C15ULL_8CC5) & SF2C_EXEC_N_1023_6629);
@@ -5207,7 +5207,7 @@ bool renderer_prepare(const ShaderRec *r, const ShaderBlob *vsb, const ShaderBlo
 }
 
 // ================================================================== graphics pipeline library probe (measurement only)
-// LARECOMP_VK_GPL_PROBE=1 (or =<N>): after shader preparation, the first N prepared pipelines (20; in the order the
+// SF2RECOMP_VK_GPL_PROBE=1 (or =<N>): after shader preparation, the first N prepared pipelines (20; in the order the
 // list's records built them) are built again three ways and timed, on the preparing thread, one at a time:
 //   full:      one vkCreateGraphicsPipelines, as the game builds them;
 //   libraries: the four VK_EXT_graphics_pipeline_library parts (vertex input, pre-rasterization with the vertex shader,
@@ -5284,7 +5284,7 @@ out:
 }
 
 static void gpl_probe(void) {
-    const char *e = getenv(SF2C_EXEC_S_LARECOMP_VK_GPL_PROBE_6BED);
+    const char *e = getenv(SF2C_EXEC_S_SF2RECOMP_VK_GPL_PROBE_6BED);
     int want = e && atoi(e) > 1 ? atoi(e) : SF2C_EXEC_N_20_F5CA;
     if (want > GPL_PROBE_MAX) want = GPL_PROBE_MAX;
     pthread_mutex_lock(&prep_lock);
@@ -5323,7 +5323,7 @@ static void gpl_probe(void) {}
 static void require_shader_heap(const ShaderInfo *si, int stage, uint64_t code) {
     if (g_vk.staged_heap && si->uses_gmem)
         FATAL(SF2C_EXEC_S_STAGED_VULKAN_MEMORY_CANNOT__3851
-              SF2C_EXEC_S_RELAUNCH_WITH_LARECOMP_VK_GU_D353, (unsigned long long)code, stage);
+              SF2C_EXEC_S_RELAUNCH_WITH_SF2RECOMP_VK_GU_D353, (unsigned long long)code, stage);
 }
 
 static void dispatch_compute(uint32_t gx, uint32_t gy, uint32_t gz) {
@@ -5332,12 +5332,12 @@ static void dispatch_compute(uint32_t gx, uint32_t gy, uint32_t gz) {
     CsProg *cp = compute_program(st.program);
     if (!cp || atomic_load(&cp->p.state) != 1) { SKIP_CS(!cp ? SK_NO_STAGES : atomic_load(&cp->p.state) == SF2C_EXEC_N_2_D473 ? SK_CS_FAILED : SK_CS_BUILDING); return; }
     require_shader_heap(cp->si, STAGE_COMPUTE, cp->code);
-    {   // LARECOMP_SKIP_CS=<code address hex> (debug): skip that compute shader's dispatches, to see what it does
+    {   // SF2RECOMP_SKIP_CS=<code address hex> (debug): skip that compute shader's dispatches, to see what it does
         static uint64_t skip = ~SF2C_EXEC_N_0ULL_DF1B;
-        if (skip == ~SF2C_EXEC_N_0ULL_DF1B) { const char *e = getenv(SF2C_EXEC_S_LARECOMP_SKIP_CS_863B); skip = e ? strtoull(e, NULL, SF2C_EXEC_N_16_B17E) : 0; }
+        if (skip == ~SF2C_EXEC_N_0ULL_DF1B) { const char *e = getenv(SF2C_EXEC_S_SF2RECOMP_SKIP_CS_863B); skip = e ? strtoull(e, NULL, SF2C_EXEC_N_16_B17E) : 0; }
         if (skip && st.program->stages[SF2C_EXEC_N_5_EF2D].code_addr == skip) { SKIP_CS(SK_DEBUG_SKIP); return; }
     }
-    if (cp->si->uses_gmem && getenv(SF2C_EXEC_S_LARECOMP_LOG_CS_SBUF_F2E3)) {  // (debug) the storage buffers bound to gmem dispatches
+    if (cp->si->uses_gmem && getenv(SF2C_EXEC_S_SF2RECOMP_LOG_CS_SBUF_F2E3)) {  // (debug) the storage buffers bound to gmem dispatches
         static uint64_t seen_cs[SF2C_EXEC_N_16_B17E];
         static int seen_n[SF2C_EXEC_N_16_B17E];
         int k = 0;
@@ -5444,11 +5444,11 @@ static void rec_from_state(ShaderRec *r, uint32_t mode) {
     r->poly_fill = st.poly[SF2C_EXEC_N_2_D473] != 1;
 }
 
-// LARECOMP_PREP_CHECK=1 (diagnostics): a pipeline the game builds although its shaders were prepared - logs the
+// SF2RECOMP_PREP_CHECK=1 (diagnostics): a pipeline the game builds although its shaders were prepared - logs the
 // fields its key differs in from the closest prepared pipeline of the same shaders (and the draw's variant record)
 static bool prep_check_on(void) {
     static int v = -1;
-    if (v < 0) v = getenv(SF2C_EXEC_S_LARECOMP_PREP_CHECK_8074) && atoi(getenv(SF2C_EXEC_S_LARECOMP_PREP_CHECK_8074));
+    if (v < 0) v = getenv(SF2C_EXEC_S_SF2RECOMP_PREP_CHECK_8074) && atoi(getenv(SF2C_EXEC_S_SF2RECOMP_PREP_CHECK_8074));
     return v;
 }
 
@@ -5553,13 +5553,13 @@ static void draw_(CmdRec *r, bool indexed) {
         static int nskip = -1;
         if (nskip < 0) {
             nskip = 0;
-            for (const char *p = getenv(SF2C_EXEC_S_LARECOMP_SKIP_FSHASH_2C3B); p && *p && nskip < SF2C_EXEC_N_16_B17E;) {
+            for (const char *p = getenv(SF2C_EXEC_S_SF2RECOMP_SKIP_FSHASH_2C3B); p && *p && nskip < SF2C_EXEC_N_16_B17E;) {
                 skip[nskip++] = strtoull(p, (char **)&p, SF2C_EXEC_N_16_B17E);
                 while (*p == SF2C_EXEC_CH_EMPTY_EE1B) p++;
             }
         }
         for (int i = 0; i < nskip; i++) if (last_hash == skip[i]) { SKIP(SK_DEBUG_SKIP); return; }
-        if (g_debug_frame && getenv(SF2C_EXEC_S_LARECOMP_LOG_FSHASH_1DF5)) LOG(SF2C_EXEC_S_FSHASH_FS_LLX_HASH_016LLX_N_392C, (unsigned long long)fs, (unsigned long long)last_hash);
+        if (g_debug_frame && getenv(SF2C_EXEC_S_SF2RECOMP_LOG_FSHASH_1DF5)) LOG(SF2C_EXEC_S_FSHASH_FS_LLX_HASH_016LLX_N_392C, (unsigned long long)fs, (unsigned long long)last_hash);
         g_cur_fs_hash = last_hash;
 
     }
@@ -5648,7 +5648,7 @@ static void draw_(CmdRec *r, bool indexed) {
         }
     }
     {   // a pipeline still building: the draw is skipped (as on Metal), unless the recorder waits for it at the bind
-        // (LARECOMP_VK_RECORDER_WAIT_PIPES=1, record.c: pipe_resolve); one that failed is always skipped
+        // (SF2RECOMP_VK_RECORDER_WAIT_PIPES=1, record.c: pipe_resolve); one that failed is always skipped
         int ps = atomic_load(&pp->state);
         if (ps == SF2C_EXEC_N_2_D473) { SKIP(SK_PIPE_FAILED); return; }
         if (ps != 1 && !rec_wait_pipes()) { SKIP(SK_PIPE_BUILDING); return; }
@@ -5662,7 +5662,7 @@ static void draw_(CmdRec *r, bool indexed) {
 
     // ---- depth / stencil (dynamic)
     static int nodt = -1;
-    if (nodt < 0) nodt = getenv(SF2C_EXEC_S_LARECOMP_NO_DEPTH_TEST_509A) != NULL;
+    if (nodt < 0) nodt = getenv(SF2C_EXEC_S_SF2RECOMP_NO_DEPTH_TEST_509A) != NULL;
     bool dt = st.ds[0] && !nodt && pass_depth;
     if (ss_need(SS_DT, ss.dt == (VkBool32)dt)) { ss.dt = dt; rec_CmdSetDepthTestEnable(cb, dt); }
     VkBool32 dw = dt && st.ds[1];
@@ -5670,11 +5670,11 @@ static void draw_(CmdRec *r, bool indexed) {
     VkCompareOp dop = dt ? compare_fn(st.ds[SF2C_EXEC_N_2_D473]) : VK_COMPARE_OP_ALWAYS;
     // EQUAL against a depth pre-pass written by a different vertex shader (foliage, trees) needs both shaders to land
     // on identical depths. They do since the translator stopped using unpackHalf2x16 (NVIDIA ran the half math after
-    // it in fp16, differently per shader: black slashes in foliage). LARECOMP_VK_EQUAL_TOL=1 brings back the old
+    // it in fp16, differently per shader: black slashes in foliage). SF2RECOMP_VK_EQUAL_TOL=1 brings back the old
     // workaround: LESS_OR_EQUAL with a few ulps of bias towards the camera, which also let walls paint over the
     // plants stuck flat on them (beach) - so it is off.
     static int tol = -1;
-    if (tol < 0) tol = getenv(SF2C_EXEC_S_LARECOMP_VK_EQUAL_TOL_3D17) != NULL;
+    if (tol < 0) tol = getenv(SF2C_EXEC_S_SF2RECOMP_VK_EQUAL_TOL_3D17) != NULL;
     bool equal_tol = dop == VK_COMPARE_OP_EQUAL && tol;
     if (equal_tol) dop = VK_COMPARE_OP_LESS_OR_EQUAL;
     if (ss_need(SS_DOP, ss.dop == dop)) { ss.dop = dop; rec_CmdSetDepthCompareOp(cb, dop); }
@@ -5703,8 +5703,8 @@ static void draw_(CmdRec *r, bool indexed) {
     VkCullModeFlags cm = cull == 1 ? VK_CULL_MODE_FRONT_BIT : cull == SF2C_EXEC_N_2_D473 ? VK_CULL_MODE_BACK_BIT : VK_CULL_MODE_NONE;
     if (ss_need(SS_CULL, ss.cull == cm)) { ss.cull = cm; rec_CmdSetCullMode(cb, cm); }
     bool ccw = st.poly[1] == 1;
-    static int flipw = -1;  // LARECOMP_VK_FLIP_WINDING: invert the front-face mapping (A/B against Metal)
-    if (flipw < 0) flipw = getenv(SF2C_EXEC_S_LARECOMP_VK_FLIP_WINDING_6897) != NULL;
+    static int flipw = -1;  // SF2RECOMP_VK_FLIP_WINDING: invert the front-face mapping (A/B against Metal)
+    if (flipw < 0) flipw = getenv(SF2C_EXEC_S_SF2RECOMP_VK_FLIP_WINDING_6897) != NULL;
     bool front_ccw = (ccw != vkey.flip_y) != (flipw != 0);
     VkFrontFace ff = front_ccw ? VK_FRONT_FACE_COUNTER_CLOCKWISE : VK_FRONT_FACE_CLOCKWISE;
     if (ss_need(SS_FF, ss.ff == ff)) { ss.ff = ff; rec_CmdSetFrontFace(cb, ff); }
@@ -5715,7 +5715,7 @@ static void draw_(CmdRec *r, bool indexed) {
     {
         float f[SF2C_EXEC_N_3_4E07] = {0, 0, 0};
         static int off = -1;
-        if (off < 0) off = getenv(SF2C_EXEC_S_LARECOMP_NO_DEPTH_BIAS_7DA7) != NULL;
+        if (off < 0) off = getenv(SF2C_EXEC_S_SF2RECOMP_NO_DEPTH_BIAS_7DA7) != NULL;
         bool on = (st.poly[SF2C_EXEC_N_3_4E07] & SF2C_EXEC_N_4_4B22) && !off;
         if (on) memcpy(f, st.poly_offset, sizeof f);
         if (equal_tol) { f[1] -= SF2C_EXEC_N_8_2C62; on = true; }  // (see the EQUAL comment above: a few depth ulps nearer)
@@ -5948,7 +5948,7 @@ static void debug_draw(Prog *pr, CmdRec *r, bool indexed) {
     LOG(SF2C_EXEC_S_VP_0F_0F_0F_0F_ATTRS_X_BLEND_DF54, st.viewport[0][0], st.viewport[0][1],
         st.viewport[0][SF2C_EXEC_N_2_D473], st.viewport[0][SF2C_EXEC_N_3_4E07], pr->vi->attr_mask, st.color_state[0], st.ds[0], st.ds[1], st.ds[SF2C_EXEC_N_2_D473], st.poly[0], st.poly[1],
         st.channel_mask);
-    if (getenv(SF2C_EXEC_S_LARECOMP_DEBUG_DATA_5C9F)) {  // vertex streams 0-1 and fragment cbufs: the first floats
+    if (getenv(SF2C_EXEC_S_SF2RECOMP_DEBUG_DATA_5C9F)) {  // vertex streams 0-1 and fragment cbufs: the first floats
         for (int s = 0; s < SF2C_EXEC_N_2_D473; s++) {
             if (!st.vbuf[s].addr) continue;
             const float *v = (const float *)(uintptr_t)st.vbuf[s].addr;
@@ -6103,7 +6103,7 @@ static void copy_texture_to_buffer(const TexRefRec *src, uint64_t dst) {
 // The scratch buffer and images are sized by the source and destination *levels* (not the regions, which follow the
 // render scale), so a changing scale doesn't regrow them; outgrown ones are destroyed once the submissions that may
 // use them are done. All of it (and depth_blit_ok's table) belongs to the translating thread: the render thread, or
-// the game's GPU thread with LARECOMP_RENDER_THREAD=0 - copy_texture runs nowhere else.
+// the game's GPU thread with SF2RECOMP_RENDER_THREAD=0 - copy_texture runs nowhere else.
 static bool depth_blit_ok(VkFormat f) {
     static VkFormat known[SF2C_EXEC_N_8_2C62];
     static bool ok[SF2C_EXEC_N_8_2C62];
@@ -6197,7 +6197,7 @@ static void copy_texture(const TexRefRec *src, const TexRefRec *dst, uint64_t fl
     NvnTexture *st_ = (NvnTexture *)(uintptr_t)src->tex, *dt = (NvnTexture *)(uintptr_t)dst->tex;
     if (!st_ || !dt) return;
     vk_end_pass();
-    if (dl_on == SF2C_EXEC_N_2_D473) renderer_flush();  // (LARECOMP_VK_DEVLOST_TRACE=2: each copy its own submission, waited on)
+    if (dl_on == SF2C_EXEC_N_2_D473) renderer_flush();  // (SF2RECOMP_VK_DEVLOST_TRACE=2: each copy its own submission, waited on)
     gp_mark(vk_cmd(), SF2C_EXEC_S_COPY_TEXTURE_UX_U_UX_U_34B4, st_->width, st_->height, dt->width, dt->height);
     dl_note(SF2C_EXEC_S_COPY_TEXTURE_UX_U_F_X_UX_U_F_C1A7, st_->width, st_->height, st_->format, dt->width, dt->height,
             dt->format, (void *)st_, (void *)dt);
@@ -6272,8 +6272,8 @@ static void copy_texture(const TexRefRec *src, const TexRefRec *dst, uint64_t fl
     // scaled / converting copy: the game builds its depth pyramid this way (nearest), colour copies filter if asked
     bool depth = (sa | da) & (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
     if (depth && s->format != d->format) return;
-    static int via_color = -1;  // LARECOMP_VK_DEPTH_BLIT_VIA_COLOR=1: always (tests on GPUs that can blit depth)
-    if (via_color < 0) via_color = getenv(SF2C_EXEC_S_LARECOMP_VK_DEPTH_BLIT_VIA_C_E867) ? atoi(getenv(SF2C_EXEC_S_LARECOMP_VK_DEPTH_BLIT_VIA_C_E867)) : 0;
+    static int via_color = -1;  // SF2RECOMP_VK_DEPTH_BLIT_VIA_COLOR=1: always (tests on GPUs that can blit depth)
+    if (via_color < 0) via_color = getenv(SF2C_EXEC_S_SF2RECOMP_VK_DEPTH_BLIT_VIA_C_E867) ? atoi(getenv(SF2C_EXEC_S_SF2RECOMP_VK_DEPTH_BLIT_VIA_C_E867)) : 0;
     if (depth && (sa & da & VK_IMAGE_ASPECT_DEPTH_BIT) && (via_color || !depth_blit_ok(d->format) || !depth_blit_ok(s->format))) {
         dl_note(SF2C_EXEC_S_DEPTH_BLIT_VIA_COLOUR_P_LV_U_C335, (void *)s->image, slv, sx0, sy0, sw, sh,
                 (void *)d->image, dlv, dx0, dy0, dw, dh);
@@ -6893,12 +6893,12 @@ static const char *op_names[CMD_COUNT] = {
 static void exec_list(uint64_t handle, int depth) {
     uint64_t p = handle;
     // Early stall note (the later system hang dump fires only when presenting stopped 30 s, by which time a driver
-    // block may already be unrecoverable): if this exec stands still for LARECOMP_EXEC_STALL=<ms> (0 = every call,
+    // block may already be unrecoverable): if this exec stands still for SF2RECOMP_EXEC_STALL=<ms> (0 = every call,
     // 5 s default), print the stack and the command it sits on, once per exec.
     uint64_t stall_ns = UINT64_MAX;
     { static long stall_ms = -1;
       if (stall_ms < 0) {
-          const char *e = getenv(SF2C_EXEC_S_LARECOMP_EXEC_STALL_F300);
+          const char *e = getenv(SF2C_EXEC_S_SF2RECOMP_EXEC_STALL_F300);
           stall_ms = e ? atol(e) : depth == 0 ? SF2C_EXEC_N_5000_0F8E : 0;  // (nested execs of one frame are one logical call)
       }
       stall_ns = depth == 0 ? (uint64_t)(stall_ms > 0 ? stall_ms : UINT64_MAX / SF2C_EXEC_N_2_D473) * SF2C_EXEC_N_1000000ULL_6C52 : UINT64_MAX;
@@ -6921,7 +6921,7 @@ static void exec_list(uint64_t handle, int depth) {
         }
         if (r->op < CMD_COUNT) op_counts[r->op]++;
         static int log_exec = -1;
-        if (log_exec < 0) log_exec = getenv(SF2C_EXEC_S_LARECOMP_LOG_EXEC_695F) ? 1 : 0;
+        if (log_exec < 0) log_exec = getenv(SF2C_EXEC_S_SF2RECOMP_LOG_EXEC_695F) ? 1 : 0;
         if (log_exec) {
             const char *name = (r->op < CMD_COUNT && op_names[r->op]) ? op_names[r->op] : SF2C_EXEC_S_UNKNOWN_0F15;
             LOG(SF2C_EXEC_S_EXEC_LIST_P_LLX_OP_U_S_SIZE__C7A1, (unsigned long long)p, r->op, name, r->size);
@@ -7008,7 +7008,7 @@ static void exec_list(uint64_t handle, int depth) {
             st.rt.dview = rt->dview;
             st.rt.has_dview = rt->has_dview;
             static int always = -1;
-            if (always < 0) always = getenv(SF2C_EXEC_S_LARECOMP_VK_PASS_RESTART_632A) != NULL;
+            if (always < 0) always = getenv(SF2C_EXEC_S_SF2RECOMP_VK_PASS_RESTART_632A) != NULL;
             if (always || memcmp(&prev, &st.rt, sizeof prev)) st.rt_dirty = true;
             break;
         }
@@ -7038,7 +7038,7 @@ static void exec_list(uint64_t handle, int depth) {
         case CMD_CLEAR_COLOR: {
             snap_reason = SF2C_EXEC_S_CLEAR_COLOR_289C; snapshots_invalidate(NULL);
             int index = (int)r->x[0];
-            if (getenv(SF2C_EXEC_S_LARECOMP_LOG_CLEARS_EE39) && index < st.rt.ncolor && st.rt.color[index])
+            if (getenv(SF2C_EXEC_S_SF2RECOMP_LOG_CLEARS_EE39) && index < st.rt.ncolor && st.rt.color[index])
                 LOG(SF2C_EXEC_S_CCLEAR_FRAME_LLU_IDX_D_UX_U__575C, (unsigned long long)renderer_present_count(), index,
                     st.rt.color[index]->width, st.rt.color[index]->height, st.rt.color[index]->format, (uint32_t)r->x[SF2C_EXEC_N_2_D473]);
             if (ct_on() && index < st.rt.ncolor && st.rt.color[index])
@@ -7111,7 +7111,7 @@ static void exec_list(uint64_t handle, int depth) {
             break;
         case CMD_FENCE_SYNC: {
             static int fence_flush = -1;
-            if (fence_flush < 0) fence_flush = getenv(SF2C_EXEC_S_LARECOMP_FENCE_FLUSH_8086) ? 1 : 0;
+            if (fence_flush < 0) fence_flush = getenv(SF2C_EXEC_S_SF2RECOMP_FENCE_FLUSH_8086) ? 1 : 0;
             if (fence_flush) renderer_flush();
             extern void nvn_sync_set_seq(uint64_t guest, uint64_t seq);
             if (r->x[1]) nvn_sync_set_seq(r->x[1], renderer_fence_seq());
@@ -7136,10 +7136,10 @@ static void exec_list(uint64_t handle, int depth) {
             // completed pair's GPU span after this pair's start (the frame before, as a frame-late measurement)
             if (mode == SF2C_EXEC_N_2_D473 && overlap_on() && prev_out && out - prev_out == SF2C_EXEC_N_2_D473) out[1] = prev_out[1] + atomic_load(&g_last_gpu_frame_ticks);
             prev_out = out;
-            {   // (test) LARECOMP_TEST_COUNTER_DELAY_MS=<ms>: stall the host after a frame's first counter - a slow CPU
+            {   // (test) SF2RECOMP_TEST_COUNTER_DELAY_MS=<ms>: stall the host after a frame's first counter - a slow CPU
                 static double delay = -1;
                 static uint64_t delayed_frame = ~SF2C_EXEC_N_0ULL_DF1B;
-                if (delay < 0) delay = getenv(SF2C_EXEC_S_LARECOMP_TEST_COUNTER_DELAY__C285) ? atof(getenv(SF2C_EXEC_S_LARECOMP_TEST_COUNTER_DELAY__C285)) : 0;
+                if (delay < 0) delay = getenv(SF2C_EXEC_S_SF2RECOMP_TEST_COUNTER_DELAY__C285) ? atof(getenv(SF2C_EXEC_S_SF2RECOMP_TEST_COUNTER_DELAY__C285)) : 0;
                 if (delay > 0 && vk_frame_counter() != delayed_frame) {
                     delayed_frame = vk_frame_counter();
                     SDL_DelayPrecise((Uint64)(delay * SF2C_EXEC_N_1E6_8C96));
@@ -7168,7 +7168,7 @@ static void exec_list(uint64_t handle, int depth) {
     }
 }
 
-// The exec-stall watchdog: if an exec runs longer than LARECOMP_EXEC_STALL=<ms> (default 2000) without finishing,
+// The exec-stall watchdog: if an exec runs longer than SF2RECOMP_EXEC_STALL=<ms> (default 2000) without finishing,
 // capture the executing thread's stack with a signal (a block inside one command is invisible to exec_list's own
 // loop check above). One line of frames per stall, every stall_ms until the exec finishes.
 static volatile int wd_done = 1;  // (plain int: the handler handshake, single writer pairs)
@@ -7197,7 +7197,7 @@ static void *exec_wd_run(void *arg) {
 void backend_execute(uint64_t handle) {
     if (trace_render) LOG(SF2C_EXEC_S_EXEC_BACKEND_EXECUTE_HANDLE__CA79, (unsigned long long)handle);
     if (!wd_interval_ms) {
-        const char *e = getenv(SF2C_EXEC_S_LARECOMP_EXEC_STALL_F300);
+        const char *e = getenv(SF2C_EXEC_S_SF2RECOMP_EXEC_STALL_F300);
         wd_interval_ms = e ? atol(e) : SF2C_EXEC_N_2000_81A8;
     }
     pthread_t wd;
@@ -7214,7 +7214,7 @@ void backend_execute(uint64_t handle) {
     PROF_ADD(prof_exec);
     if (prof) cum_exec += SDL_GetTicksNS() - prof_t0_;
     static int sync_submit = -1;
-    if (sync_submit < 0) sync_submit = getenv(SF2C_EXEC_S_LARECOMP_SYNC_SUBMIT_C965) ? 1 : 0;
+    if (sync_submit < 0) sync_submit = getenv(SF2C_EXEC_S_SF2RECOMP_SYNC_SUBMIT_C965) ? 1 : 0;
     if (sync_submit) renderer_flush();
     else renderer_submit();
     if (trace_render) LOG(SF2C_EXEC_S_EXEC_BACKEND_EXECUTE_RENDERE_941D);

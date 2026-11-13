@@ -789,7 +789,7 @@
 // runtime/hle/hooks.c:212
 #define SF2C_HOOKS_N_10000_39E5 10000
 // runtime/hle/hooks.c:226
-#define SF2C_HOOKS_S_LARECOMP_MOUSE_TRACE_86DC "LARECOMP_MOUSE_TRACE"
+#define SF2C_HOOKS_S_SF2RECOMP_MOUSE_TRACE_86DC "SF2RECOMP_MOUSE_TRACE"
 // runtime/hle/hooks.c:228
 #define SF2C_HOOKS_S_MOUSE_SCREEN_UX_U_POINTER_1F_26D7 "[mouse] screen %ux%u pointer %.1f/%.1f held=%x down=%x up=%x\n"
 // runtime/hle/hooks.c:232
@@ -917,17 +917,17 @@
 // runtime/hle/input.c:222
 #define SF2C_INPUT_N_3ULL_BD3E 3ull
 // runtime/hle/input.c:268
-#define SF2C_INPUT_S_LARECOMP_NO_USER_INPUT_EB20 "LARECOMP_NO_USER_INPUT"
+#define SF2C_INPUT_S_SF2RECOMP_NO_USER_INPUT_EB20 "SF2RECOMP_NO_USER_INPUT"
 // runtime/hle/input.c:269
-#define SF2C_INPUT_S_LARECOMP_INPUT_D0A3 "LARECOMP_INPUT"
+#define SF2C_INPUT_S_SF2RECOMP_INPUT_D0A3 "SF2RECOMP_INPUT"
 // runtime/hle/input.c:269
-#define SF2C_INPUT_S_LARECOMP_DOORJUMP_TEST_AF02 "LARECOMP_DOORJUMP_TEST"
+#define SF2C_INPUT_S_SF2RECOMP_DOORJUMP_TEST_AF02 "SF2RECOMP_DOORJUMP_TEST"
 // runtime/hle/input.c:269
-#define SF2C_INPUT_S_LARECOMP_PLACE_61F0 "LARECOMP_PLACE"
+#define SF2C_INPUT_S_SF2RECOMP_PLACE_61F0 "SF2RECOMP_PLACE"
 // runtime/hle/input.c:270
-#define SF2C_INPUT_S_LARECOMP_HOST_INPUT_8D91 "LARECOMP_HOST_INPUT"
+#define SF2C_INPUT_S_SF2RECOMP_HOST_INPUT_8D91 "SF2RECOMP_HOST_INPUT"
 // runtime/hle/input.c:270
-#define SF2C_INPUT_S_LARECOMP_BIND_TEST_C2F2 "LARECOMP_BIND_TEST"
+#define SF2C_INPUT_S_SF2RECOMP_BIND_TEST_C2F2 "SF2RECOMP_BIND_TEST"
 // runtime/hle/input.c:271
 #define SF2C_INPUT_S_INPUT_SCRIPTED_RUN_KEYBOARD__420D "[input] scripted run: keyboard, mouse and controllers ignored\n"
 // runtime/hle/input.c:302
@@ -965,7 +965,7 @@
 // runtime/hle/input.c:363
 #define SF2C_INPUT_S_NINTENDO_853F "Nintendo"
 // runtime/hle/input.c:369
-#define SF2C_INPUT_S_LARECOMP_PAD_TYPE_2AEC "LARECOMP_PAD_TYPE"
+#define SF2C_INPUT_S_SF2RECOMP_PAD_TYPE_2AEC "SF2RECOMP_PAD_TYPE"
 // runtime/hle/input.c:370
 #define SF2C_INPUT_S_XBOX_76AE "xbox"
 // runtime/hle/input.c:370
@@ -1023,7 +1023,7 @@
 // runtime/hle/input.c:640
 #define SF2C_INPUT_N_0X7F_0AFB 0x7f
 // runtime/hle/input.c:658
-#define SF2C_INPUT_S_LARECOMP_HOST_INPUT_FILE_D436 "LARECOMP_HOST_INPUT_FILE"
+#define SF2C_INPUT_S_SF2RECOMP_HOST_INPUT_FILE_D436 "SF2RECOMP_HOST_INPUT_FILE"
 // runtime/hle/input.c:660
 #define SF2C_INPUT_N_65537_D572 65537
 // runtime/hle/input.c:661
@@ -1065,7 +1065,7 @@
 // runtime/hle/input.c:718
 #define SF2C_INPUT_S_ESC_5BAB "esc"
 // runtime/hle/input.c:743
-#define SF2C_INPUT_S_LARECOMP_DUMP_PAD_10A5 "LARECOMP_DUMP_PAD"
+#define SF2C_INPUT_S_SF2RECOMP_DUMP_PAD_10A5 "SF2RECOMP_DUMP_PAD"
 // runtime/hle/input.c:743
 #define SF2C_INPUT_N_600_284B 600
 // runtime/hle/input.c:744
@@ -1517,7 +1517,7 @@
 // runtime/hle/lan_ui_hooks.inc:498
 #define SF2C_LAN_UI_HOOKS_N_0X7000E44AA0ULL_2848 0x7000e44aa0ull
 // runtime/hle/lan_ui_hooks.inc:499
-#define SF2C_LAN_UI_HOOKS_S_LARECOMP_LAN_UI_TRACE_DC31 "LARECOMP_LAN_UI_TRACE"
+#define SF2C_LAN_UI_HOOKS_S_SF2RECOMP_LAN_UI_TRACE_DC31 "SF2RECOMP_LAN_UI_TRACE"
 // runtime/hle/lan_ui_hooks.inc:499
 #define SF2C_LAN_UI_HOOKS_S_LAN_UI_APPLY_MENU_PLAYER_U_M_E9B9 "[lan-ui] apply menu player %u module %u event %u down %u id %u\n"
 // runtime/hle/lan_ui_hooks.inc:517
@@ -1611,7 +1611,7 @@
 // runtime/hle/movie.c:142
 #define SF2C_MOVIE_N_10_4A44 10
 // runtime/hle/movie.c:168
-#define SF2C_MOVIE_S_LARECOMP_FFMPEG_0C2D "LARECOMP_FFMPEG"
+#define SF2C_MOVIE_S_SF2RECOMP_FFMPEG_0C2D "SF2RECOMP_FFMPEG"
 // runtime/hle/movie.c:179
 #define SF2C_MOVIE_S_S_LIB_FFMPEG_BIN_FFMPEG_EBA8 "%s/lib/ffmpeg/bin/ffmpeg"
 // runtime/hle/movie.c:181
@@ -1727,13 +1727,13 @@
 // runtime/hle/movie.c:656
 #define SF2C_MOVIE_S_MOVIE_CANNOT_ALLOCATE_FRAME__8895 "[movie] cannot allocate frame queue\n"
 // runtime/hle/movie.c:665
-#define SF2C_MOVIE_S_MOVIE_DECODER_STARTUP_FAILED_FDD3 "[movie] decoder startup failed for %s (rebuild the app package or set LARECOMP_FFMPEG)\n"
+#define SF2C_MOVIE_S_MOVIE_DECODER_STARTUP_FAILED_FDD3 "[movie] decoder startup failed for %s (rebuild the app package or set SF2RECOMP_FFMPEG)\n"
 // runtime/hle/movie.c:671
-#define SF2C_MOVIE_S_LARECOMP_NO_AUDIO_8230 "LARECOMP_NO_AUDIO"
+#define SF2C_MOVIE_S_SF2RECOMP_NO_AUDIO_8230 "SF2RECOMP_NO_AUDIO"
 // runtime/hle/movie.c:671
 #define SF2C_MOVIE_S_0_9808 "0"
 // runtime/hle/movie.c:678
-#define SF2C_MOVIE_S_LARECOMP_AUDIO_GAIN_1F0B "LARECOMP_AUDIO_GAIN"
+#define SF2C_MOVIE_S_SF2RECOMP_AUDIO_GAIN_1F0B "SF2RECOMP_AUDIO_GAIN"
 // runtime/hle/movie.c:682
 #define SF2C_MOVIE_S_MOVIE_AUDIO_DEVICE_UNAVAILAB_895B "[movie] audio device unavailable: %s (video will use the system clock)\n"
 // runtime/hle/movie.c:685

@@ -299,12 +299,12 @@ volume = 0
 [storage]
 save_directory = save
 ''')
-        env = {k: v for k, v in os.environ.items() if not k.startswith((K.S_LARECOMP_B959, K.S_SF2_REPLAY_DA3E, K.S_SF2_LAN_17C4))}
-        env.update(SF2_CONFIG=str(config), LARECOMP_DATA_ROOT=str(run), LARECOMP_DATA_HOME=str(run),
-                   LARECOMP_HIDDEN=K.S_1_9A76, LARECOMP_NO_USER_INPUT=K.S_1_9A76, LARECOMP_HOST_INPUT=K.S_EMPTY_6F49,
-                   LARECOMP_RENDER_THREAD=str(args.render_thread), LARECOMP_WINDOW=K.S_960X540_9D0F, SF2_REPLAY_TRACE=str(run / K.S_TRACE_JSONL_FB9A),
+        env = {k: v for k, v in os.environ.items() if not k.startswith((K.S_SF2RECOMP_B959, K.S_SF2_REPLAY_DA3E, K.S_SF2_LAN_17C4))}
+        env.update(SF2_CONFIG=str(config), SF2RECOMP_DATA_ROOT=str(run), SF2RECOMP_DATA_HOME=str(run),
+                   SF2RECOMP_HIDDEN=K.S_1_9A76, SF2RECOMP_NO_USER_INPUT=K.S_1_9A76, SF2RECOMP_HOST_INPUT=K.S_EMPTY_6F49,
+                   SF2RECOMP_RENDER_THREAD=str(args.render_thread), SF2RECOMP_WINDOW=K.S_960X540_9D0F, SF2_REPLAY_TRACE=str(run / K.S_TRACE_JSONL_FB9A),
                    SF2_REPLAY_INPUT=str(tape), SF2_REPLAY_TICKS=str(args.ticks), SF2_REPLAY_MATCH=K.S_17_18_13_2495,
-                   LARECOMP_INPUT=K.S_EMPTY_EE1B.join(f'{round(t * fps / K.N_60_39FA)}:{key}:{max(K.N_2_D473, round(K.N_8_2C62 * fps / K.N_60_39FA))}' for t, key in MENU))
+                   SF2RECOMP_INPUT=K.S_EMPTY_EE1B.join(f'{round(t * fps / K.N_60_39FA)}:{key}:{max(K.N_2_D473, round(K.N_8_2C62 * fps / K.N_60_39FA))}' for t, key in MENU))
         if args.seed is not None:
             env[K.S_SF2_REPLAY_SEED_6AB9] = str(args.seed)
         if args.icd:
@@ -312,7 +312,7 @@ save_directory = save
         if K.S_NVIDIA_7F25 in env.get(K.S_VK_DRIVER_FILES_B081, K.S_EMPTY_6F49):
             env[K.S_NV_PRIME_RENDER_OFFLOAD_E67F] = K.S_1_9A76
         (run / K.S_ENVIRONMENT_JSON_64EE).write_text(json.dumps({k: v for k, v in env.items()
-            if k.startswith((K.S_SF2_8749, K.S_LARECOMP_B959, K.S_VK_6B79, K.S_SDL_8FFE))}, indent=K.N_2_D473) + K.S_N_AD65)
+            if k.startswith((K.S_SF2_8749, K.S_SF2RECOMP_B959, K.S_VK_6B79, K.S_SDL_8FFE))}, indent=K.N_2_D473) + K.S_N_AD65)
         print(f'Running {name}: {fps} FPS, {aspect}, {resolution}, {upscaler}, {aa}', flush=True)
         started = time.monotonic()
         with (run / K.S_RUNTIME_LOG_DDBF).open(K.S_W_780F) as log:

@@ -81,7 +81,7 @@ static void session_log_open(const char *dir, char *path_out, size_t n) {
         path_out[0] = 0;
         return;
     }
-    bool append = getenv(SF2C_POSIX_LOG_S_LASRECOMP_LOG_APPEND_A5DB) != NULL;
+    bool append = getenv(SF2C_POSIX_LOG_S_SF2RECOMP_LOG_APPEND_A5DB) != NULL;
     if (!append) {
         session_log_backup(logs, SF2C_POSIX_LOG_S_SHADOW_FIGHT_2_LOG_6C33);
         session_log_prune(logs);
@@ -89,7 +89,7 @@ static void session_log_open(const char *dir, char *path_out, size_t n) {
     if (!freopen(path_out, SF2C_POSIX_LOG_S_A_AC8D, stderr)) { path_out[0] = 0; return; }
     setvbuf(stderr, NULL, _IONBF, 0);
     dup2(STDERR_FILENO, STDOUT_FILENO);
-    setenv(SF2C_POSIX_LOG_S_LASRECOMP_LOG_APPEND_A5DB, SF2C_POSIX_LOG_S_1_3915, 1);
+    setenv(SF2C_POSIX_LOG_S_SF2RECOMP_LOG_APPEND_A5DB, SF2C_POSIX_LOG_S_1_3915, 1);
     // (a first line: an empty log then means writing failed - e.g. a full disk - not another start; its pid names
     // the backup later)
     time_t now = time(NULL);

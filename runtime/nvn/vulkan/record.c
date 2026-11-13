@@ -84,7 +84,7 @@ static int wait_pipes = -1;
 
 bool rec_on(void) { return on > 0; }
 bool rec_wait_pipes(void) {
-    if (wait_pipes < 0) wait_pipes = getenv(SF2C_RECORD_S_LARECOMP_VK_RECORDER_WAIT_PI_72CE) && atoi(getenv(SF2C_RECORD_S_LARECOMP_VK_RECORDER_WAIT_PI_72CE)) != 0;
+    if (wait_pipes < 0) wait_pipes = getenv(SF2C_RECORD_S_SF2RECOMP_VK_RECORDER_WAIT_PI_72CE) && atoi(getenv(SF2C_RECORD_S_SF2RECOMP_VK_RECORDER_WAIT_PI_72CE)) != 0;
     return wait_pipes;
 }
 void rec_set_pipe_resolver(RecPipeResolve f) { pipe_resolve = f; }
@@ -194,15 +194,15 @@ static void stats_init(void);
 void rec_init(bool prof_on) {
     if (on >= 0) return;
     prof = prof_on;
-    const char *e = getenv(SF2C_RECORD_S_LARECOMP_VK_RECORDER_C9B7);
+    const char *e = getenv(SF2C_RECORD_S_SF2RECOMP_VK_RECORDER_C9B7);
     int want = !e || atoi(e) != 0;
     // ARM's Mali drivers: the GPU was lost a few seconds into the title screen with the recorder thread on (Mali-G610,
-    // #358) and ran fine with it off; LARECOMP_VK_RECORDER=1 still turns it on there
+    // #358) and ran fine with it off; SF2RECOMP_VK_RECORDER=1 still turns it on there
     bool mali = g_vk.props.vendorID == SF2C_RECORD_N_0X13B5_EC9F;
     if (mali && !e) want = 0;
     on = 0;
     if (want) {
-        const char *mb = getenv(SF2C_RECORD_S_LARECOMP_VK_RECORDER_MB_204D);
+        const char *mb = getenv(SF2C_RECORD_S_SF2RECOMP_VK_RECORDER_MB_204D);
         uint64_t cap = (uint64_t)(mb && atoi(mb) > 0 ? atoi(mb) : SF2C_RECORD_N_16_B17E) << SF2C_RECORD_N_20_F5CA;
         while (cap & (cap - 1)) cap &= cap - 1;  // (a power of two)
         ring = malloc(cap);
@@ -331,10 +331,10 @@ void rec_stats_take(RecStats *o) {
 #define ENQ_END() do { if (prof) st_t.enqueue_ns += NOW() - enq_t0_; } while (0)
 
 // ================================================================== descriptor pools (per submission slot)
-// Sets are allocated in batches per layout (LARECOMP_VK_NO_SET_BATCH=1: one per call, as before): a layout's batch
+// Sets are allocated in batches per layout (SF2RECOMP_VK_NO_SET_BATCH=1: one per call, as before): a layout's batch
 // grows with the sets it holds so far (1, 1, 2, 4 ... 32 a call), so at most about half goes unused, at most 31 sets
 // once it allocates 32 at a time.
-// Set recycling (LARECOMP_VK_NO_SET_RECYCLE=1: off): resetting a slot's pools at every submission cost the Intel UHD
+// Set recycling (SF2RECOMP_VK_NO_SET_RECYCLE=1: off): resetting a slot's pools at every submission cost the Intel UHD
 // 770's Windows driver ~0.2 ms each (6-7 a frame). Once the slot's previous submission is done (rec_reset_pools comes
 // after the slot's GPU wait, in order with the commands), its sets are handed out again instead (every set is written
 // in full before it is bound, as a new one), and the pools are reset only when the stock outgrew the slot's first
@@ -365,11 +365,11 @@ static bool alloc_sets(Pools *s, VkDescriptorSetLayout layout, uint32_t count, V
                 FATAL(SF2C_RECORD_S_DESCRIPTOR_POOLS_EXHAUSTED_N_F2ED);
             }
             // exec.c's set reuse moves most uniform buffers to the dynamic type: the pool then holds 8192 static + 16384
-            // dynamic instead of 32768 static. Without it (LARECOMP_VK_NO_SET_REUSE=1), the pool is as in beta_5: no
+            // dynamic instead of 32768 static. Without it (SF2RECOMP_VK_NO_SET_REUSE=1), the pool is as in beta_5: no
             // dynamic descriptors (a pool's size costs on some drivers: the Intel UHD 770's Windows driver spent ~0.4 ms
             // more a frame with 32768 more of them). A pool that runs out of a type is followed by another.
             static int dynp = -1;
-            if (dynp < 0) dynp = getenv(SF2C_RECORD_S_LARECOMP_VK_NO_SET_REUSE_7972) == NULL;  // (as exec.c set_reuse_on)
+            if (dynp < 0) dynp = getenv(SF2C_RECORD_S_SF2RECOMP_VK_NO_SET_REUSE_7972) == NULL;  // (as exec.c set_reuse_on)
             VkDescriptorPoolSize sizes[] = {{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, dynp ? SF2C_RECORD_N_8192_864A : SF2C_RECORD_N_32768_D196}, {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, SF2C_RECORD_N_4096_8B92},
                                             {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, SF2C_RECORD_N_32768_D196},
                                             {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, SF2C_RECORD_N_1024_E39E}, {VK_DESCRIPTOR_TYPE_SAMPLER, SF2C_RECORD_N_1024_E39E},
@@ -388,8 +388,8 @@ static bool alloc_sets(Pools *s, VkDescriptorSetLayout layout, uint32_t count, V
 }
 
 static VkDescriptorSet pools_alloc(Pools *s, VkDescriptorSetLayout layout) {
-    if (set_batch < 0) set_batch = getenv(SF2C_RECORD_S_LARECOMP_VK_NO_SET_BATCH_A810) == NULL;
-    if (set_recycle < 0) set_recycle = getenv(SF2C_RECORD_S_LARECOMP_VK_NO_SET_RECYCLE_B2D9) == NULL;
+    if (set_batch < 0) set_batch = getenv(SF2C_RECORD_S_SF2RECOMP_VK_NO_SET_BATCH_A810) == NULL;
+    if (set_recycle < 0) set_recycle = getenv(SF2C_RECORD_S_SF2RECOMP_VK_NO_SET_RECYCLE_B2D9) == NULL;
     ADD(r_set_allocs, 1);
     struct SetStock *e = NULL;
     if (set_batch || set_recycle) {
@@ -427,17 +427,17 @@ static VkDescriptorSet pools_alloc(Pools *s, VkDescriptorSetLayout layout) {
 }
 
 bool rec_set_batch(void) {
-    if (set_batch < 0) set_batch = getenv(SF2C_RECORD_S_LARECOMP_VK_NO_SET_BATCH_A810) == NULL;
+    if (set_batch < 0) set_batch = getenv(SF2C_RECORD_S_SF2RECOMP_VK_NO_SET_BATCH_A810) == NULL;
     return set_batch;
 }
 
 bool rec_set_recycle(void) {
-    if (set_recycle < 0) set_recycle = getenv(SF2C_RECORD_S_LARECOMP_VK_NO_SET_RECYCLE_B2D9) == NULL;
+    if (set_recycle < 0) set_recycle = getenv(SF2C_RECORD_S_SF2RECOMP_VK_NO_SET_RECYCLE_B2D9) == NULL;
     return set_recycle;
 }
 
 static void pools_reset(Pools *s) {  // (the slot's previous submission is done)
-    if (set_recycle < 0) set_recycle = getenv(SF2C_RECORD_S_LARECOMP_VK_NO_SET_RECYCLE_B2D9) == NULL;
+    if (set_recycle < 0) set_recycle = getenv(SF2C_RECORD_S_SF2RECOMP_VK_NO_SET_RECYCLE_B2D9) == NULL;
     bool full = !set_recycle || s->cur_pool > 0 || s->sets_untracked || s->nstock_used > STOCK_TAB * SF2C_RECORD_N_3_4E07 / SF2C_RECORD_N_4_4B22;
     if (!full) {
         for (int i = 0; i < s->nstock_used; i++) s->stock[s->stock_used[i]].next = 0;

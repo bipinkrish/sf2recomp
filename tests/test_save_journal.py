@@ -184,11 +184,11 @@ int main(int argc, char **argv) {
 
     def invoke(self, folder, config, mode, save_override=None):
         env = os.environ.copy()
-        for key in ("LARECOMP_SAVE_DIR", "LARECOMP_LANG", "LARECOMP_VOLUME", "LARECOMP_REVERB"):
+        for key in ("SF2RECOMP_SAVE_DIR", "SF2RECOMP_LANG", "SF2RECOMP_VOLUME", "SF2RECOMP_REVERB"):
             env.pop(key, None)
-        env["LARECOMP_LOG_FILES"] = "1"
+        env["SF2RECOMP_LOG_FILES"] = "1"
         if save_override is not None:
-            env["LARECOMP_SAVE_DIR"] = str(save_override)
+            env["SF2RECOMP_SAVE_DIR"] = str(save_override)
         result = subprocess.run([str(self.binary), str(config), mode], cwd=folder, env=env,
                                 capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

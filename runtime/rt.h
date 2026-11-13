@@ -65,7 +65,7 @@ void dispatch_init(void);
 GuestFn dispatch_lookup(uint64_t addr);
 uint64_t hle_register(const char *name, HostFn fn);  // returns fake guest address
 HostFn hle_lookup_impl(const char *name);
-void watch_arm(void);  // optional LARECOMP_WATCH_ADDR diagnostic
+void watch_arm(void);  // optional SF2RECOMP_WATCH_ADDR diagnostic
 bool rt_probe_u64(uint64_t a, uint64_t *v);                     // safe guest-memory read for probes
 bool rt_probe_u32(uint64_t a, uint32_t *v);
 void rt_fatal_trace(void) __attribute__((noreturn));

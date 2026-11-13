@@ -1,6 +1,6 @@
 // The render thread (runtime/nvn/rqueue.c): command lists the game submits are translated and run by a thread of
 // our own, so the game's GPU thread goes on with the next frame while this one translates. Off (every call below
-// runs the backend directly on the calling thread): LARECOMP_RENDER_THREAD=0.
+// runs the backend directly on the calling thread): SF2RECOMP_RENDER_THREAD=0.
 #pragma once
 #include <stdbool.h>
 #include <stdint.h>
@@ -23,7 +23,7 @@ void rq_upload(NvnTexture *t, int kind, void *data, uint32_t w, uint32_t h, uint
 // backend's submission number to wait on for the GPU side (renderer_wait_seq).
 uint64_t rq_wait_item(uint64_t q);
 uint64_t rq_fence_seq(void);  // the item a fence placed now belongs to (the last one queued)
-// (LARECOMP_LOG_PACE) item q's place: items queued after it, not translated yet; true: in the frame being recorded
+// (SF2RECOMP_LOG_PACE) item q's place: items queued after it, not translated yet; true: in the frame being recorded
 bool rq_fence_info(uint64_t q, uint64_t *behind, bool *untranslated);
 uint64_t rq_current_item(void);  // on the render thread: the item being run; elsewhere 0
 // On the render thread: the number of the frame whose work it runs (the presents it has done), as the game thread's
@@ -33,7 +33,7 @@ uint64_t rq_current_item(void);  // on the render thread: the item being run; el
 // renderer_present_count() stays the game thread's (the HLE hooks compare frames against it).
 uint64_t rq_frame(void);
 void rq_drain(void);   // every queued item done (QueueFinish; reboot)
-void rq_flush(void);   // drain, then the backend's full flush, on the render thread (nvnSyncWait with LARECOMP_SYNC_FLUSH)
+void rq_flush(void);   // drain, then the backend's full flush, on the render thread (nvnSyncWait with SF2RECOMP_SYNC_FLUSH)
 // Quitting (the window closed, exit()): the render thread stops after the item it runs; true from then on (the
 // backends present nothing more). backend_quit: rq_stop, the GPU idle, caches saved - before exit(); idempotent.
 void rq_stop(void);
@@ -56,7 +56,7 @@ void rq_watch(const char *what, uint64_t arg);
 // arms the hang dump's renderer checks (kernel.c's "[hang]"): nvnDeviceInitialize; once (the render thread's start too)
 void rq_hang_watch_start(void);
 
-// (pace.c, LARECOMP_LOG_PACE) per thread, since start: time in rq_wait_item / rq_drain (the game thread waiting for
+// (pace.c, SF2RECOMP_LOG_PACE) per thread, since start: time in rq_wait_item / rq_drain (the game thread waiting for
 // translation), waiting for the queue's lock, and the frontend's split of the presenting thread's frame (objects.c,
 // the backends' present): in nvnQueueSubmitCommands, in GPU waits (nvnSyncWait / QueueFinish after the queue
 // part), in backend_present (without the per-frame hooks), in the per-frame hooks.

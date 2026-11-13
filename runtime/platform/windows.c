@@ -28,7 +28,7 @@ static bool lazy_commit(uint64_t a) {
     MEMORY_BASIC_INFORMATION mi;
     if (!VirtualQuery((void *)(uintptr_t)a, &mi, sizeof mi)) return false;
     // Two threads touching the same uncommitted chunk: the second faulted before the first committed it and now finds
-    // it committed - retry the access. (A page protected on purpose, plat_protect / LARECOMP_WATCH, isn't plain
+    // it committed - retry the access. (A page protected on purpose, plat_protect / SF2RECOMP_WATCH, isn't plain
     // read-write and still goes on to the fault watch.) Fix from letsgo-recomp.
     if (mi.State == MEM_COMMIT) return (mi.Protect & SF2C_WINDOWS_N_0XFF_7312) == PAGE_READWRITE && !(mi.Protect & PAGE_GUARD);
     if (mi.State != MEM_RESERVE) return false;
@@ -53,7 +53,7 @@ static LONG CALLBACK vectored_handler(EXCEPTION_POINTERS *ep) {
 static bool g_write_watch;
 
 // (the reservation failed: main.c starts the process again) what holds part of the range, for the new process's log
-// (main.c, LARECOMP_REEXEC_WHY: this one can't log yet). Windows places heaps, stacks and DLLs' allocations at random
+// (main.c, SF2RECOMP_REEXEC_WHY: this one can't log yet). Windows places heaps, stacks and DLLs' allocations at random
 // addresses in the lower terabyte (high-entropy ASLR), so now and then one lands in the guest's 12.5 GB.
 static void note_guest_conflict(uint64_t lo, uint64_t hi) {
     char why[SF2C_WINDOWS_N_200_27BA];
@@ -74,14 +74,14 @@ static void note_guest_conflict(uint64_t lo, uint64_t hi) {
         if (end <= a) break;
         a = end;
     }
-    _putenv_s(SF2C_WINDOWS_S_LARECOMP_REEXEC_WHY_6D9D, why);
+    _putenv_s(SF2C_WINDOWS_S_SF2RECOMP_REEXEC_WHY_6D9D, why);
 }
 
 bool plat_reserve_guest(uint64_t lo, uint64_t hi) {
     SYSTEM_INFO sys;
     GetSystemInfo(&sys);
     if (hi <= lo || lo % sys.dwAllocationGranularity || hi % sys.dwPageSize) return false;
-    const char *watch = getenv(SF2C_WINDOWS_S_LARECOMP_WRITE_TRACKING_EF34);
+    const char *watch = getenv(SF2C_WINDOWS_S_SF2RECOMP_WRITE_TRACKING_EF34);
     bool tracking = !watch || atoi(watch) != 0;
     void *p = tracking ? VirtualAlloc((void *)(uintptr_t)lo, hi - lo, MEM_RESERVE | MEM_WRITE_WATCH, PAGE_READWRITE) : NULL;
     if (p == (void *)(uintptr_t)lo) g_write_watch = true;
@@ -209,7 +209,7 @@ void plat_thread_guest(int prio) { (void)prio; }  // (the OS's default schedulin
 // CPU sets of the faster cores (EfficiencyClass above the lowest). Selected CPU sets are a soft preference, never a
 // hard pin, and they are only the cores the process affinity allows: when the affinity already excludes the E-cores
 // (or the P-cores), nothing is selected, so an affinity-limited run (e.g. 0xF) schedules exactly as before.
-// Not hybrid: no CPU sets. LARECOMP_PCORE=0: none of this (the process-wide opt-out in plat_init stays).
+// Not hybrid: no CPU sets. SF2RECOMP_PCORE=0: none of this (the process-wide opt-out in plat_init stays).
 static INIT_ONCE pcore_once = INIT_ONCE_STATIC_INIT;
 static bool pcore_off;
 static ULONG *pcore_ids;  // the selected CPU set ids (NULL: no selection)
@@ -218,10 +218,10 @@ static const char *pcore_how = SF2C_WINDOWS_S_EMPTY_12AE;
 
 static BOOL CALLBACK pcore_init(PINIT_ONCE o, PVOID p, PVOID *c) {
     (void)o, (void)p, (void)c;
-    const char *e = getenv(SF2C_WINDOWS_S_LARECOMP_PCORE_44E2);
+    const char *e = getenv(SF2C_WINDOWS_S_SF2RECOMP_PCORE_44E2);
     if (e && *e && atoi(e) == 0) {
         pcore_off = true;
-        fprintf(stderr, SF2C_WINDOWS_S_PCORE_OFF_LARECOMP_PCORE_0_D_E35F);
+        fprintf(stderr, SF2C_WINDOWS_S_PCORE_OFF_SF2RECOMP_PCORE_0_D_E35F);
         return TRUE;
     }
     ULONG len = 0;
@@ -430,7 +430,7 @@ static void publish_log(void) {
 static void open_game_log(void) {
     // Keep diagnostic commands on their caller's streams. The converter's --play requests a game log.
     // A relaunched game joins its existing session.
-    const char *inherited = getenv(SF2C_WINDOWS_S_LASRECOMP_LOG_FILE_AAE4);
+    const char *inherited = getenv(SF2C_WINDOWS_S_SF2RECOMP_LOG_FILE_AAE4);
     bool fresh = !inherited || !*inherited;
     HANDLE err = GetStdHandle(STD_ERROR_HANDLE);
     if (fresh && !getenv(SF2C_WINDOWS_S_SF2_GAME_LOG_74EB) && err && err != INVALID_HANDLE_VALUE &&
@@ -482,7 +482,7 @@ static void open_game_log(void) {
     _close(fd);
     setvbuf(stderr, NULL, _IONBF, 0);
     _dup2(_fileno(stderr), _fileno(stdout));
-    _putenv_s(SF2C_WINDOWS_S_LASRECOMP_LOG_FILE_AAE4, g_log_path);
+    _putenv_s(SF2C_WINDOWS_S_SF2RECOMP_LOG_FILE_AAE4, g_log_path);
     if (fresh) {
         fputs(g_log_tag, stderr);
         keep_legacy_log(dir);
@@ -596,7 +596,7 @@ void plat_system_info(PlatSysInfo *si) {
     si->threads = (int)GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
     MEMORYSTATUSEX m = {.dwLength = sizeof m};
     if (GlobalMemoryStatusEx(&m)) si->ram = m.ullTotalPhys;
-#ifdef LARECOMP_ZIP_BUILD
+#ifdef SF2RECOMP_ZIP_BUILD
     si->package = SF2C_WINDOWS_S_ZIP_732D;  // (make dist: the release zip)
 #endif
 }

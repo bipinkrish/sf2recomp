@@ -334,10 +334,10 @@ NVN(nvnCommandBufferClearTextureui) { clear_texture(c, SF2C_CMDBUF_N_2_D473); }
 PLAIN(nvnCommandBufferClearBuffer, CMD_CLEAR_BUFFER)
 // DiscardColor(cmdbuf, index): the target's contents become undefined. On the Switch a discarded (compressed)
 // target reads back cleared; areas the game then leaves undrawn (e.g. a pit after a floor tile falls away) stay
-// black there. Treated as a clear to (0,0,0,0) (LARECOMP_KEEP_DISCARD=1: old no-op behaviour).
+// black there. Treated as a clear to (0,0,0,0) (SF2RECOMP_KEEP_DISCARD=1: old no-op behaviour).
 NVN(nvnCommandBufferDiscardColor) {
     static int keep = -1, logged;
-    if (keep < 0) keep = getenv(SF2C_CMDBUF_S_LARECOMP_KEEP_DISCARD_3335) != NULL;
+    if (keep < 0) keep = getenv(SF2C_CMDBUF_S_SF2RECOMP_KEEP_DISCARD_3335) != NULL;
     if (logged < SF2C_CMDBUF_N_5_EF2D) { logged++; LOG(SF2C_CMDBUF_S_NVN_DISCARDCOLOR_INDEX_LLU_S_0AB6, (unsigned long long)c->x[1], keep ? SF2C_CMDBUF_S_KEPT_F05B : SF2C_CMDBUF_S_CLEAR_5F40); }
     if (keep) return;
     Snap s = snap(c);
@@ -356,11 +356,11 @@ NVN(nvnCommandBufferDrawArraysInstanced) {
     static int ndraw; if (ndraw++ < SF2C_CMDBUF_N_20_F5CA) LOG(SF2C_CMDBUF_S_CMDBUF_DRAWARRAYSINSTANCED_C_E045, (unsigned long long)c->x[SF2C_CMDBUF_N_3_4E07]);
     Snap s = snap(c); record(c, CMD_DRAW_ARRAYS, 0, &s);
 }
-// Debug: LARECOMP_TRACE_COUNT=<n> logs the guest call chain of indexed draws with n indices.
+// Debug: SF2RECOMP_TRACE_COUNT=<n> logs the guest call chain of indexed draws with n indices.
 static void trace_draw(Cpu *c, uint64_t count) {
     static int ndraw; if (ndraw++ < SF2C_CMDBUF_N_20_F5CA) LOG(SF2C_CMDBUF_S_CMDBUF_DRAWELEMENTS_COUNT_LL_FC3A, (unsigned long long)count, (unsigned long long)c->x[SF2C_CMDBUF_N_30_624B]);
     static long want = -SF2C_CMDBUF_N_2_D473;
-    if (want == -SF2C_CMDBUF_N_2_D473) want = getenv(SF2C_CMDBUF_S_LARECOMP_TRACE_COUNT_D3AB) ? atol(getenv(SF2C_CMDBUF_S_LARECOMP_TRACE_COUNT_D3AB)) : -1;
+    if (want == -SF2C_CMDBUF_N_2_D473) want = getenv(SF2C_CMDBUF_S_SF2RECOMP_TRACE_COUNT_D3AB) ? atol(getenv(SF2C_CMDBUF_S_SF2RECOMP_TRACE_COUNT_D3AB)) : -1;
     if (want < 0 || (long)count != want) return;
     static int n;
     if (n++ > SF2C_CMDBUF_N_40_D59E) return;
