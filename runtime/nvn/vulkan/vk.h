@@ -39,6 +39,8 @@ typedef struct {
     VkCommandPool pool;        // render thread only
     bool custom_border, divisor, host_import, dmabuf;
     bool managed_heap;  // driver-owned guest heap; never fall back to pinning anonymous guest pages
+    bool staged_heap;   // CPU guest heap with explicit uploads and no shader access to guest addresses
+    uint64_t managed_heap_size;
     // VK_EXT_vertex_input_dynamic_state (exec.c): the vertex layout is set per draw (vkCmdSetVertexInputEXT), not
     // baked into each pipeline - fewer pipelines. Off: no extension / feature, or LARECOMP_VK_DYN_VERTEX=0.
     bool vids;
@@ -64,6 +66,9 @@ typedef struct {
     VkImage sc_images[SF2C_VK_N_8_2C62];
     VkImageView sc_views[SF2C_VK_N_8_2C62];
 } VkG;
+// A tested smaller backing for drivers whose cached host-visible heap cannot hold HEAP_MAX.
+#define VK_MANAGED_HEAP_SMALL SF2C_VK_MANAGED_HEAP_SMALL
+#define VK_MANAGED_HEAP_FLAGS (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT)
 void vk_log_memory(const char *why);  // (device.c: per-heap budget and use, at start and on allocation failures)
 extern VkG g_vk;
 

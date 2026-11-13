@@ -680,14 +680,14 @@ static void svc_impl(Cpu *c, uint32_t imm, uint64_t pc) {
     switch (imm) {
     case SF2C_KERNEL_N_0X01_B51C: {  // SetHeapSize
         uint64_t size = x[1];
-        LOG(SF2C_KERNEL_S_KERNEL_SETHEAPSIZE_SIZE_LLX__91EC, size, (uint64_t)HEAP_MAX);
-        if (size > HEAP_MAX) { x[0] = R_OUT_OF_RESOURCE; break; }
+        uint64_t capacity = backend_guest_heap_capacity();
+        LOG(SF2C_KERNEL_S_KERNEL_SETHEAPSIZE_SIZE_LLX__91EC, size, capacity);
+        if (size > capacity) { x[0] = R_OUT_OF_RESOURCE; break; }
         uint64_t previous_size = heap_size;
         heap_size = size;
         if (size && !previous_size) {
             // Select/map the renderer's heap before any guest allocations exist.
             // This avoids importing live anonymous memory through AMD's HMM path.
-            extern void backend_guest_heap_prepare(void);
             backend_guest_heap_prepare();
         }
         region_remove(HEAP_BASE);
@@ -862,8 +862,11 @@ static void svc_impl(Cpu *c, uint32_t imm, uint64_t pc) {
         case SF2C_KERNEL_N_2_D473: v = ALIAS_BASE; break;
         case SF2C_KERNEL_N_3_4E07: v = ALIAS_SIZE; break;
         case SF2C_KERNEL_N_4_4B22: v = HEAP_BASE; break;
-        case SF2C_KERNEL_N_5_EF2D: v = HEAP_MAX; break;
-        case SF2C_KERNEL_N_6_E7F6: case SF2C_KERNEL_N_21_6F4B: v = SF2C_KERNEL_N_0XCD500000ULL_1FE5; break;  // application memory (3.2 GB, as on hardware)
+        case SF2C_KERNEL_N_5_EF2D: v = HEAP_MAX; break;  // virtual address range
+        case SF2C_KERNEL_N_6_E7F6: case SF2C_KERNEL_N_21_6F4B:
+            v = backend_guest_heap_capacity();
+            if (v > SF2C_KERNEL_N_0XCD500000ULL_1FE5) v = SF2C_KERNEL_N_0XCD500000ULL_1FE5;
+            break;
         case SF2C_KERNEL_N_7_7902: case SF2C_KERNEL_N_22_785F: v = heap_size + SF2C_KERNEL_N_0X4000000_329B; break;
         case SF2C_KERNEL_N_8_2C62: v = 0; break;
         case SF2C_KERNEL_N_9_1958: v = 0; break;

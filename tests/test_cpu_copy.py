@@ -40,7 +40,7 @@ class CpuCopyTests(unittest.TestCase):
         }
         '''
         start = source.index("#define GCOPY_TAB")
-        end = source.index("// scan:", start)
+        end = source.index("\n", source.index("static void guest_copy_flush(", start))
         code = prelude + source[start:end]
         code += function("static VkSpan guest_copy_ex(")
         code += function("static void copy_buffer_to_buffer(")

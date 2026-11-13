@@ -82,3 +82,5 @@ void kernel_dump_threads(const char *prefix);
 // check fills why and returns true when it sees a hang (limit_ns: LARECOMP_HANG_DUMP); state logs its side.
 void kernel_hang_hooks(bool (*check)(uint64_t limit_ns, char *why, size_t n), void (*state)(const char *prefix));
 uint64_t kernel_heap_size(void);  // bytes from HEAP_BASE set by SetHeapSize
+uint64_t backend_guest_heap_capacity(void);
+void backend_guest_heap_prepare(void);

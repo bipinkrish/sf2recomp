@@ -17,8 +17,12 @@ VK_DRIVER_FILES=/usr/share/vulkan/icd.d/radeon_icd.json tools/run_linux.sh
 `tools/run_linux.sh --software` selects lavapipe. On Linux RADV, the default
 driver-managed heap shares coherent driver-allocated memory directly with the
 CPU, preserving shader global-memory reads and writes without importing anonymous
-guest pages. Allocation/mapping failure stops boot instead of silently using
-userptr imports. `LARECOMP_VK_MANAGED_HEAP=0` restores the legacy path for developer
+guest pages. It selects the 2,560 MiB backing on drivers that cannot hold the
+3,328 MiB allocation. Allocation or mapping failure stops boot.
+`LARECOMP_VK_GUEST_HEAP=staged` uses anonymous guest memory and explicit uploads,
+with a check for shaders that access the guest heap directly.
+`LARECOMP_VK_GUEST_HEAP=managed` selects the 2,560 MiB backing explicitly on Linux.
+`LARECOMP_VK_MANAGED_HEAP=0` restores the legacy path for developer
 diagnostics; that path previously triggered AMD kernel faults on this machine.
 Do not carry `LARECOMP_VK_NO_GMEM=1` or a software ICD override into a hardware test.
 

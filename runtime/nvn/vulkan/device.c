@@ -90,7 +90,7 @@ static bool whole_import_fits(bool budget_ext, bool *probe) {
 // *probe: one import is to be tried first (whole_import_fits), lazy chunks if it runs out of memory.
 static bool lazy_heap_predicted(bool budget_ext, bool *probe) {
     *probe = false;
-    if (g_vk.managed_heap) return false;  // windows of driver memory, never userptr chunks or their probe
+    if (g_vk.managed_heap || g_vk.staged_heap) return false;
     const char *e = getenv(SF2C_DEVICE_S_LARECOMP_VK_GMEM_LAZY_EABE);
     if (e) return atoi(e) != 0;
     if (getenv(SF2C_DEVICE_S_LARECOMP_VK_NO_GMEM_2D48)) return false;
@@ -117,6 +117,17 @@ static bool lazy_heap_predicted(bool budget_ext, bool *probe) {
 #endif
     return true;
 }
+
+#ifdef __linux__
+static uint64_t managed_heap_size(const VkPhysicalDeviceMemoryProperties *mp, bool small) {
+    if (!small)
+        for (uint32_t i = 0; i < mp->memoryTypeCount; i++)
+            if ((mp->memoryTypes[i].propertyFlags & VK_MANAGED_HEAP_FLAGS) == VK_MANAGED_HEAP_FLAGS &&
+                mp->memoryHeaps[mp->memoryTypes[i].heapIndex].size >= HEAP_MAX)
+                return HEAP_MAX;
+    return VK_MANAGED_HEAP_SMALL;
+}
+#endif
 static atomic_bool ui_ready;
 static VkDebugUtilsMessengerEXT messenger;
 static void exit_after_shot(void);  // (UI thread section)
@@ -337,15 +348,24 @@ static void create_device(void) {
     if (g_vk.custom_border) ext[n_ext++] = VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME;
     g_vk.divisor = has_ext(ep, ne, VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME);
     if (g_vk.divisor) ext[n_ext++] = VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME;
+    const char *heap_mode = getenv(SF2C_DEVICE_S_LARECOMP_VK_GUEST_HEAP_32E0);
+    bool small_heap = heap_mode && !strcmp(heap_mode, SF2C_DEVICE_S_MANAGED_9C72);
+    g_vk.staged_heap = heap_mode && !strcmp(heap_mode, SF2C_DEVICE_S_STAGED_B47A);
+    if (heap_mode && !small_heap && !g_vk.staged_heap)
+        FATAL(SF2C_DEVICE_S_INVALID_LARECOMP_VK_GUEST_HE_BCE7, heap_mode);
     const char *managed = getenv(SF2C_DEVICE_S_LARECOMP_VK_MANAGED_HEAP_29F9);
 #ifdef __linux__
     g_vk.managed_heap = managed ? atoi(managed) != 0 : strstr(g_vk.props.deviceName, SF2C_DEVICE_S_RADV_6945) != NULL;
+    g_vk.managed_heap = small_heap || g_vk.managed_heap;
 #else
+    if (small_heap) FATAL(SF2C_DEVICE_S_LARECOMP_VK_GUEST_HEAP_MANAG_B46B);
     g_vk.managed_heap = managed && atoi(managed) != 0;
 #endif
-    if (getenv(SF2C_DEVICE_S_LARECOMP_VK_NO_GMEM_2D48)) g_vk.managed_heap = false;
-    g_vk.host_import = !g_vk.managed_heap && has_ext(ep, ne, VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME);
+    g_vk.managed_heap = g_vk.managed_heap && !g_vk.staged_heap &&
+                        !getenv(SF2C_DEVICE_S_LARECOMP_VK_NO_GMEM_2D48);
+    g_vk.host_import = !g_vk.managed_heap && !g_vk.staged_heap && has_ext(ep, ne, VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME);
     if (g_vk.managed_heap) LOG(SF2C_DEVICE_S_VK_GUEST_HEAP_DRIVER_MANAGED_03F5);
+    if (g_vk.staged_heap) LOG(SF2C_DEVICE_S_VK_GUEST_HEAP_STAGED_UPLOADS_47BC);
     if (g_vk.host_import) ext[n_ext++] = VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME;
     bool fault = has_ext(ep, ne, VK_EXT_DEVICE_FAULT_EXTENSION_NAME);  // device-lost diagnostics (vk_device_fault_report)
     if (fault) ext[n_ext++] = VK_EXT_DEVICE_FAULT_EXTENSION_NAME;
@@ -363,7 +383,12 @@ static void create_device(void) {
 #endif
 #ifdef __linux__
     // the guest heap as driver memory mapped at HEAP_BASE (exec.c backend_guest_heap_prepare)
-    g_vk.dmabuf = has_ext(ep, ne, VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME) &&
+    if (g_vk.managed_heap) {
+        VkPhysicalDeviceMemoryProperties mp;
+        vkGetPhysicalDeviceMemoryProperties(g_vk.phys, &mp);
+        g_vk.managed_heap_size = managed_heap_size(&mp, small_heap);
+    }
+    g_vk.dmabuf = !g_vk.staged_heap && has_ext(ep, ne, VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME) &&
                   has_ext(ep, ne, VK_EXT_EXTERNAL_MEMORY_DMA_BUF_EXTENSION_NAME);
     if (g_vk.dmabuf) {
         ext[n_ext++] = VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME;
@@ -372,7 +397,8 @@ static void create_device(void) {
     // ... mapped there by the driver itself (its own DRM file, as every vkMapMemory), not through the dma-buf (issue #92)
     // (older Vulkan headers, e.g. a distro's, lack it: then the dma-buf mapping only)
 #ifdef VK_EXT_map_memory_placed
-    bool placed_ext = has_ext(ep, ne, VK_EXT_MAP_MEMORY_PLACED_EXTENSION_NAME) && has_ext(ep, ne, VK_KHR_MAP_MEMORY_2_EXTENSION_NAME);
+    bool placed_ext = !g_vk.staged_heap && has_ext(ep, ne, VK_EXT_MAP_MEMORY_PLACED_EXTENSION_NAME) &&
+                      has_ext(ep, ne, VK_KHR_MAP_MEMORY_2_EXTENSION_NAME);
 #endif
 #endif
     free(ep);

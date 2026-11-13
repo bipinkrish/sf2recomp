@@ -445,6 +445,23 @@ requests 60 FPS in several startup paths, so this setting overrides those reques
 Set the host display to a matching refresh rate separately. Higher targets need
 enough CPU and GPU headroom to finish each frame in time.
 
+## Vulkan memory on Linux
+
+On RADV, SF2Recomp uses a driver-managed guest heap by default. If the driver's
+cached system heap is smaller than 3,328 MiB, SF2Recomp uses a 2,560 MiB backing
+allocation and reports that lower memory budget to the game.
+
+To try the staged path on Steam Deck, set this in the game's Steam launch options:
+
+```text
+LARECOMP_VK_GUEST_HEAP=staged %command%
+```
+
+Staging keeps the original guest memory budget and uploads the data needed for
+each draw. It checks for shaders that require direct access to guest memory.
+If the log reports such a shader, use `LARECOMP_VK_GUEST_HEAP=managed %command%`
+to select the 2,560 MiB compatibility mode on Linux.
+
 ## Software Vulkan fallback
 
 From the converted output folder:

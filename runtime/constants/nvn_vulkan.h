@@ -1,5 +1,9 @@
 // Fixed values for this subsystem. Edit definitions here.
 #pragma once
+#define SF2C_VK_MANAGED_HEAP_SMALL (2560ull << 20)
+#define SF2C_EXEC_STAGED_BUFFER_CACHE_BYTES (64ull << 20)
+#define SF2C_EXEC_STAGED_BUFFER_CACHE_RANGE (2ull << 20)
+#define SF2C_EXEC_STAGED_BUFFER_CACHE_ENTRIES 256
 // runtime/nvn/vulkan/device.c:45
 #define SF2C_DEVICE_N_256ULL_3175 256ull
 // runtime/nvn/vulkan/device.c:45
@@ -2818,3 +2822,19 @@
 #define SF2C_VK_N_2_D473 2
 
 #define SF2C_DEVICE_FRAMES 3
+// runtime/nvn/vulkan/device.c:351
+#define SF2C_DEVICE_S_LARECOMP_VK_GUEST_HEAP_32E0 "LARECOMP_VK_GUEST_HEAP"
+// runtime/nvn/vulkan/device.c:352
+#define SF2C_DEVICE_S_MANAGED_9C72 "managed"
+// runtime/nvn/vulkan/device.c:353
+#define SF2C_DEVICE_S_STAGED_B47A "staged"
+// runtime/nvn/vulkan/device.c:355
+#define SF2C_DEVICE_S_INVALID_LARECOMP_VK_GUEST_HE_BCE7 "Invalid LARECOMP_VK_GUEST_HEAP value '%s'. Use staged or managed.\n"
+// runtime/nvn/vulkan/device.c:361
+#define SF2C_DEVICE_S_LARECOMP_VK_GUEST_HEAP_MANAG_B46B "LARECOMP_VK_GUEST_HEAP=managed requires Linux.\n"
+// runtime/nvn/vulkan/device.c:368
+#define SF2C_DEVICE_S_VK_GUEST_HEAP_STAGED_UPLOADS_47BC "[vk] guest heap: staged uploads from demand-paged CPU memory\n"
+// runtime/nvn/vulkan/exec.c:5323
+#define SF2C_EXEC_S_STAGED_VULKAN_MEMORY_CANNOT__3851 "Staged Vulkan memory cannot run shader %llx (stage %d), which accesses guest memory directly. "
+// runtime/nvn/vulkan/exec.c:5324
+#define SF2C_EXEC_S_RELAUNCH_WITH_LARECOMP_VK_GU_D353 "Relaunch with LARECOMP_VK_GUEST_HEAP=managed on Linux.\n"

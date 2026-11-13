@@ -789,6 +789,80 @@ static VkSpan copy_dedupe(int slot, const void *data, uint64_t size, uint64_t al
 static struct { uint64_t addr, size, seq; VkSpan span; uint64_t scanned; } gcopy[GCOPY_TAB];  // (scanned: heap size then, 0 not)
 static uint64_t gcopy_gen;  // bumped to drop every shared copy (guest memory written mid-list)
 static void guest_copy_flush(void) { gcopy_gen++; }
+
+// Reuse staged geometry when its bytes still match. A changed range gets a new
+// snapshot while any queued draw can still read the previous one.
+#define GEOMETRY_CACHE_ENTRIES SF2C_EXEC_STAGED_BUFFER_CACHE_ENTRIES
+typedef struct {
+    VkBuffer buf;
+    VmaAllocation mem;
+    void *ptr;
+    uint64_t addr, size, seq;
+} GeometryCopy;
+static GeometryCopy geometry_cache[GEOMETRY_CACHE_ENTRIES];
+static uint64_t geometry_cache_bytes;
+
+static VkSpan geometry_copy(uint64_t addr, uint64_t size, uint64_t hash, uint64_t pending) {
+    if (size > SF2C_EXEC_STAGED_BUFFER_CACHE_RANGE) return (VkSpan){0};
+    const void *src = (const void *)(uintptr_t)addr;
+    uint64_t completed = 0;
+    bool queried = false;
+    GeometryCopy *replace = NULL;
+    for (unsigned i = 0; i < SF2C_EXEC_N_4_4B22; i++) {
+        GeometryCopy *e = &geometry_cache[(hash + i) & (GEOMETRY_CACHE_ENTRIES - 1)];
+        if (e->size == size && e->addr == addr && !memcmp(e->ptr, src, size)) {
+            e->seq = pending;
+            return (VkSpan){e->buf, 0, NULL};
+        }
+        if (!e->buf) {
+            replace = e;
+        } else if (e->seq < pending && (!replace || (replace->buf && e->seq < replace->seq))) {
+            replace = e;
+        }
+    }
+    if (!replace) return (VkSpan){0};
+    if (replace->buf) {
+        completed = vk_completed_seq();
+        queried = true;
+        if (replace->seq > completed) return (VkSpan){0};
+    }
+    if (replace->size != size) {
+        if (geometry_cache_bytes - replace->size + size > SF2C_EXEC_STAGED_BUFFER_CACHE_BYTES) {
+            // Old entries elsewhere in the table may own the available budget.
+            if (!queried) completed = vk_completed_seq();
+            for (unsigned i = 0; i < GEOMETRY_CACHE_ENTRIES; i++) {
+                GeometryCopy *e = &geometry_cache[i];
+                if (geometry_cache_bytes - replace->size + size <= SF2C_EXEC_STAGED_BUFFER_CACHE_BYTES) break;
+                if (e == replace || !e->buf || e->seq > completed) continue;
+                vmaDestroyBuffer(g_vk.vma, e->buf, e->mem);
+                geometry_cache_bytes -= e->size;
+                *e = (GeometryCopy){0};
+            }
+            if (geometry_cache_bytes - replace->size + size > SF2C_EXEC_STAGED_BUFFER_CACHE_BYTES) return (VkSpan){0};
+        }
+        if (replace->buf) {
+            vmaDestroyBuffer(g_vk.vma, replace->buf, replace->mem);
+            geometry_cache_bytes -= replace->size;
+            *replace = (GeometryCopy){0};
+        }
+        VkBufferCreateInfo bi = {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, .size = size,
+                                 .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT};
+        VmaAllocationCreateInfo ai = {.usage = VMA_MEMORY_USAGE_AUTO,
+            .flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT,
+            .requiredFlags = VK_MANAGED_HEAP_FLAGS};
+        VmaAllocationInfo info;
+        if (vmaCreateBuffer(g_vk.vma, &bi, &ai, &replace->buf, &replace->mem, &info) != VK_SUCCESS) return (VkSpan){0};
+        replace->ptr = info.pMappedData;
+        replace->size = size;
+        geometry_cache_bytes += size;
+    }
+    memcpy(replace->ptr, src, size);
+    replace->addr = addr;
+    replace->seq = pending;
+    stat_upload_bytes += size;
+    return (VkSpan){replace->buf, 0, NULL};
+}
+
 // scan: (lazy heap chunks, a uniform buffer of a shader with global memory) the range is also scanned for heap
 // pointers (gc_scan_pointers), once per shared copy: its contents can't change while the copy is shared (again if the
 // heap grew since: pointers past its end were passed over).
@@ -813,6 +887,13 @@ static VkSpan guest_copy_ex(uint64_t addr, uint64_t size, bool scan) {
     return s;
 }
 static VkSpan guest_copy(uint64_t addr, uint64_t size) { return guest_copy_ex(addr, size, false); }
+
+static VkSpan guest_geometry_copy(uint64_t addr, uint64_t size) {
+    if (!g_vk.staged_heap || !size) return guest_copy(addr, size);
+    uint64_t hash = (addr * SF2C_EXEC_N_0X9E3779B97F4A7C15ULL_8CC5) ^ (size * SF2C_EXEC_N_0XC2B2AE3D27D4EB4FULL_ACE8);
+    VkSpan span = geometry_copy(addr, size, hash ^ (hash >> SF2C_EXEC_N_32_E29C), vk_pending_seq());
+    return span.buf ? span : guest_copy(addr, size);
+}
 
 // ================================================================== worker threads (shader / pipeline builds)
 // First-use compiles run off the render thread; draws needing them are skipped until ready (as on Metal).
@@ -1875,7 +1956,7 @@ static void compile_program(void *arg) {
 // Translates both stages (false: failed, logged). Holds the translator for the whole program.
 static bool translate_program_now(Prog *p) {
     maxwell_gmem_base = HEAP_BASE;
-    maxwell_gmem_size = HEAP_MAX;
+    maxwell_gmem_size = backend_guest_heap_capacity();
     maxwell_gmem_chunk_shift = gmem_chunk_shift();
     pthread_mutex_lock(&translate_lock);
     p->vi = maxwell_translate((const uint8_t *)(uintptr_t)p->code[0], p->cmax[0], STAGE_VERTEX, &p->vkey);
@@ -2870,6 +2951,7 @@ static uint64_t range_hash(uint64_t addr, uint64_t size) {
 static void snap_ring_import_tail(void);  // (with the lazy chunks below)
 // Decided once the game's heap is set up (SetHeapSize), which is before anything is drawn: the ring follows the heap.
 static bool snap_on(void) {
+    if (g_vk.staged_heap) return false;
     if (snap_state >= 0) return snap_state;
     uint64_t heap = kernel_heap_size();
     if (!heap) return false;  // (not decided yet)
@@ -2877,7 +2959,7 @@ static bool snap_on(void) {
     snap_state = (!e || atoi(e) != 0) && overlap_on();
     if (snap_state) {
         snap_base = (heap + SF2C_EXEC_N_0XFFFF_F51F) & ~SF2C_EXEC_N_0XFFFFULL_2BD3;  // (minImportedHostPointerAlignment: 64 KB at most)
-        if (snap_base + SNAP_RING > HEAP_MAX) {
+        if (snap_base + SNAP_RING > backend_guest_heap_capacity()) {
             snap_state = 0;
             LOG(SF2C_EXEC_S_VK_STORAGE_SNAPSHOTS_OFF_THE_7386);
         } else {
@@ -3567,11 +3649,12 @@ static bool gmem_import(uint64_t size) {
 static bool gmem_dmabuf;  // the heap is the driver's memory mapped at HEAP_BASE
 static bool gmem_placed;  // ... by the driver (vkMapMemory2KHR, placed): unmapped through it at a reboot
 
-// The driver maps `mem` (HEAP_MAX, one allocation) at HEAP_BASE. NULL, or why not; HEAP_BASE is ordinary guest
+// The driver maps `mem` at HEAP_BASE. NULL, or why not; HEAP_BASE is ordinary guest
 // memory again after a failure.
-static const char *heap_map_placed(VkDeviceMemory mem) {
+static const char *heap_map_placed(VkDeviceMemory mem, uint64_t size) {
 #ifndef VK_EXT_map_memory_placed
     (void)mem;
+    (void)size;
     return SF2C_EXEC_S_BUILT_WITHOUT_VK_EXT_MAP_MEM_1663;  // (g_vk.map_placed is never set then)
 #else
     PFN_vkMapMemory2KHR map2 = (PFN_vkMapMemory2KHR)vkGetDeviceProcAddr(g_vk.dev, SF2C_EXEC_S_VKMAPMEMORY2KHR_74A8);
@@ -3592,7 +3675,7 @@ static const char *heap_map_placed(VkDeviceMemory mem) {
     if (r == VK_SUCCESS && p == (void *)(uintptr_t)HEAP_BASE) return NULL;
     if (r == VK_SUCCESS) unmap2(g_vk.dev, &ui);
     // (the old mapping may be gone: plain zeroed memory again, registered for write tracking like a reboot's)
-    if (!plat_reset_guest(HEAP_BASE, HEAP_BASE + HEAP_MAX)) FATAL(SF2C_EXEC_S_CANNOT_RESTORE_THE_GUEST_HEA_BF54);
+    if (!plat_reset_guest(HEAP_BASE, HEAP_BASE + size)) FATAL(SF2C_EXEC_S_CANNOT_RESTORE_THE_GUEST_HEA_BF54);
     return SF2C_EXEC_S_THE_DRIVER_S_PLACED_MAPPING__FFA7;
 #endif
 }
@@ -3612,11 +3695,10 @@ static void heap_unmap_placed(void) {
     gmem_placed = false;
 }
 
-static bool guest_heap_dmabuf(void) {
+static bool guest_heap_dmabuf(uint64_t size) {
     if (gmem_buf || !g_vk.dev || !(g_vk.dmabuf || g_vk.map_placed) || getenv(SF2C_EXEC_S_LARECOMP_VK_NO_GMEM_2D48)) return false;
     const char *e = getenv(SF2C_EXEC_S_LARECOMP_VK_HEAP_DMABUF_419D);
     if (!g_vk.managed_heap && (e ? !atoi(e) : !strstr(g_vk.props.deviceName, SF2C_EXEC_S_RADV_6945))) return false;
-    const uint64_t size = HEAP_MAX;
     VkPhysicalDeviceMemoryProperties mp;
     vkGetPhysicalDeviceMemoryProperties(g_vk.phys, &mp);
     const VkMemoryPropertyFlags want = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
@@ -3681,7 +3763,7 @@ static bool guest_heap_dmabuf(void) {
     // be applied to the driver-owned heap, nor survive into a userptr fallback after a partial failure.
     plat_write_tracking_off(SF2C_EXEC_S_PREPARING_THE_DRIVER_MANAGED_7DEF);
     if (placed) {
-        why = heap_map_placed(mem);
+        why = heap_map_placed(mem, size);
         if (why) {
             LOG(SF2C_EXEC_S_VK_HEAP_AS_DRIVER_MEMORY_PLA_14B1,
                 (unsigned long long)HEAP_BASE, why);
@@ -3763,10 +3845,15 @@ static const char *heap_tracking_reason(void) {  // (overlap_on: why there is no
 // The whole heap as one userptr import (not chunks) on AMD: each submission has amdgpu check all of its pages
 static bool heap_whole_userptr(void) { return gmem_userptr && !gc_lazy && g_vk.props.vendorID == SF2C_EXEC_N_0X1002_D106; }
 
+uint64_t backend_guest_heap_capacity(void) {
+    return g_vk.managed_heap_size ? g_vk.managed_heap_size : HEAP_MAX;
+}
+
 void backend_guest_heap_prepare(void) {
     gmem_userptr = false;
+    if (g_vk.staged_heap) return;
 #ifdef __linux__
-    guest_heap_dmabuf();
+    guest_heap_dmabuf(backend_guest_heap_capacity());
     if (g_vk.managed_heap && !gmem_dmabuf)
         FATAL(SF2C_EXEC_S_CANNOT_ALLOCATE_MAP_THE_DRIV_1484
               SF2C_EXEC_S_USE_TOOLS_RUN_LINUX_SH_SOFTW_6D0D);
@@ -3906,14 +3993,16 @@ static uint32_t gmem_chunk_shift(void) {
     return (uint32_t)gc_shift_decided;
 }
 static void gmem_chunk_decide(void) {
+    if (g_vk.staged_heap) return;
     int shift;
     const char *e = getenv(SF2C_EXEC_S_LARECOMP_VK_GMEM_CHUNK_MB_B29B);
     uint64_t lim = g_vk.props.limits.maxStorageBufferRange;
+    uint64_t capacity = backend_guest_heap_capacity();
     gc_lazy = gmem_lazy();
     shift = 0;
     if (e) { uint64_t b = strtoull(e, NULL, SF2C_EXEC_N_10_4A44) << SF2C_EXEC_N_20_F5CA; if (b) shift = SF2C_EXEC_N_63_DA4E - __builtin_clzll(b); }
     else if (gc_lazy) shift = SF2C_EXEC_N_24_C235;
-    else if (HEAP_MAX > lim && lim) shift = SF2C_EXEC_N_63_DA4E - __builtin_clzll(lim);
+    else if (capacity > lim && lim) shift = SF2C_EXEC_N_63_DA4E - __builtin_clzll(lim);
     if (shift > SF2C_EXEC_N_30_624B) shift = SF2C_EXEC_N_30_624B;  // (1 GB at most: NVIDIA computes a block's length in signed 32 bits, a 2 GB range reads as negative)
     // The table holds GC_MAX chunks at most, and a stage's storage buffers (the windows, gfast, binding 17) its limit
     // (Intel: 200): a chunk size that doesn't fit grows until it does (4 MB asked for -> 16 MB). One buffer only where
@@ -3925,16 +4014,16 @@ static void gmem_chunk_decide(void) {
         shift = 0;
     }
     while (shift) {
-        n = (int)((HEAP_MAX + (SF2C_EXEC_N_1ULL_622E << shift) - 1) >> shift);
+        n = (int)((capacity + (SF2C_EXEC_N_1ULL_622E << shift) - 1) >> shift);
         bool fits = n <= GC_MAX && (gc_lazy || ((uint32_t)n + SF2C_EXEC_N_8_2C62 <= per_stage && (uint32_t)n + 1 <= per_set));
         if (fits) break;
-        if ((SF2C_EXEC_N_1ULL_622E << shift) >= HEAP_MAX) { shift = 0; break; }  // (not even one chunk fits: one buffer)
+        if ((SF2C_EXEC_N_1ULL_622E << shift) >= capacity) { shift = 0; break; }  // (not even one chunk fits: one buffer)
         shift++;
     }
     if (shift != asked && asked)
         LOG(SF2C_EXEC_S_VK_GUEST_HEAP_CHUNKS_OF_LLU__C778,
             (unsigned long long)(SF2C_EXEC_N_1ULL_622E << asked) >> SF2C_EXEC_N_20_F5CA, GC_MAX, per_stage, per_set, shift ? SF2C_EXEC_S_LARGER_CHUNKS_99E3 : SF2C_EXEC_S_ONE_BUFFER_67F6);
-    if (!shift && HEAP_MAX > lim && lim) LOG(SF2C_EXEC_S_VK_WARNING_ONE_STORAGE_BUFFE_827A, (unsigned long long)lim >> SF2C_EXEC_N_20_F5CA);
+    if (!shift && capacity > lim && lim) LOG(SF2C_EXEC_S_VK_WARNING_ONE_STORAGE_BUFFE_827A, (unsigned long long)lim >> SF2C_EXEC_N_20_F5CA);
     if (!shift) gc_lazy = false;
     gc_shift = (uint32_t)shift;
     gc_n = shift ? n : 0;
@@ -3951,7 +4040,8 @@ static uint64_t gmem_heap_size(void) {
     uint64_t want = (kernel_heap_size() + SF2C_EXEC_N_0XFFFF_F51F) & ~SF2C_EXEC_N_0XFFFFULL_2BD3;
     uint64_t ring = snap_ring_end();  // (overlap: the storage copies' ring right after the heap is the GPU's too)
     if (ring > want) want = ring;
-    return want > HEAP_MAX ? HEAP_MAX : want;
+    uint64_t capacity = backend_guest_heap_capacity();
+    return want > capacity ? capacity : want;
 }
 
 static bool host_import(uint64_t off, uint64_t size, VkBuffer *buf, VkDeviceMemory *mem, bool bda);
@@ -4595,6 +4685,7 @@ void vc_flush(void) {
 // CPU writes as on the Switch. Falls back to copies outside the heap or without the import; LARECOMP_VK_COPY_VERTICES=1
 // forces copies.
 static bool guest_direct(int kind, uint64_t addr, uint64_t size, VkBuffer *buf, VkDeviceSize *off) {  // kind: 0 vertex, 1 index (bind_note)
+    if (g_vk.staged_heap) return false;
     static int copy = -1;
     if (copy < 0) copy = getenv(SF2C_EXEC_S_LARECOMP_VK_COPY_VERTICES_BDEF) != NULL;
     if (copy || addr < HEAP_BASE) return false;
@@ -4630,12 +4721,18 @@ void vk_exec_reset(void) {
     ds_gen++;   // (set reuse: the heap import below is destroyed at once)
     g_cs_n = 0;
     gcopy_gen++;
+    for (unsigned i = 0; i < GEOMETRY_CACHE_ENTRIES; i++) {
+        GeometryCopy *e = &geometry_cache[i];
+        if (e->buf) vmaDestroyBuffer(g_vk.vma, e->buf, e->mem);
+    }
+    memset(geometry_cache, 0, sizeof geometry_cache);
+    geometry_cache_bytes = 0;
     if (gmem_buf) {
 #ifdef __linux__
         bool driver_heap = gmem_dmabuf;
         heap_unmap_placed();
         // Drop the dma-buf CPU mapping before freeing its Vulkan allocation, too (not just placed maps).
-        if (driver_heap && !plat_reset_guest(HEAP_BASE, HEAP_BASE + HEAP_MAX)) FATAL(SF2C_EXEC_S_CANNOT_RESTORE_THE_GUEST_HEA_BF54);
+        if (driver_heap && !plat_reset_guest(HEAP_BASE, HEAP_BASE + gmem_size)) FATAL(SF2C_EXEC_S_CANNOT_RESTORE_THE_GUEST_HEA_BF54);
 #endif
         vkDestroyBuffer(g_vk.dev, gmem_buf, NULL);
         vkFreeMemory(g_vk.dev, gmem_mem, NULL);
@@ -4932,7 +5029,7 @@ static uint64_t cs_content_key(uint64_t code_hash, const uint32_t local[SF2C_EXE
 
 static bool translate_compute(CsProg *cp, const uint8_t *code, size_t max, uint64_t addr) {
     maxwell_gmem_base = HEAP_BASE;
-    maxwell_gmem_size = HEAP_MAX;
+    maxwell_gmem_size = backend_guest_heap_capacity();
     maxwell_gmem_chunk_shift = gmem_chunk_shift();
     ShaderKey k = {0};
     k.glsl = 1;
@@ -5223,11 +5320,18 @@ static void gpl_probe_note(Pipe *pp) { (void)pp; }
 static void gpl_probe(void) {}
 #endif
 
+static void require_shader_heap(const ShaderInfo *si, int stage, uint64_t code) {
+    if (g_vk.staged_heap && si->uses_gmem)
+        FATAL(SF2C_EXEC_S_STAGED_VULKAN_MEMORY_CANNOT__3851
+              SF2C_EXEC_S_RELAUNCH_WITH_LARECOMP_VK_GU_D353, (unsigned long long)code, stage);
+}
+
 static void dispatch_compute(uint32_t gx, uint32_t gy, uint32_t gz) {
     snap_reason = SF2C_EXEC_S_COMPUTE_9B08; snapshots_invalidate(NULL);
     if (!st.program || !gx || !gy || !gz) return;
     CsProg *cp = compute_program(st.program);
     if (!cp || atomic_load(&cp->p.state) != 1) { SKIP_CS(!cp ? SK_NO_STAGES : atomic_load(&cp->p.state) == SF2C_EXEC_N_2_D473 ? SK_CS_FAILED : SK_CS_BUILDING); return; }
+    require_shader_heap(cp->si, STAGE_COMPUTE, cp->code);
     {   // LARECOMP_SKIP_CS=<code address hex> (debug): skip that compute shader's dispatches, to see what it does
         static uint64_t skip = ~SF2C_EXEC_N_0ULL_DF1B;
         if (skip == ~SF2C_EXEC_N_0ULL_DF1B) { const char *e = getenv(SF2C_EXEC_S_LARECOMP_SKIP_CS_863B); skip = e ? strtoull(e, NULL, SF2C_EXEC_N_16_B17E) : 0; }
@@ -5433,6 +5537,8 @@ static void draw_(CmdRec *r, bool indexed) {
     for (int i = 0; i < st.rt.ncolor; i++) if (st.rt.color[i]) fkey.rt_kind[i] = (uint8_t)rt_kind(st.rt.color[i]->format);
     Prog *pr = get_program(st.program, &vkey, &fkey);
     if (!pr || atomic_load(&pr->state) != 1) { SKIP(!pr ? SK_NO_STAGES : atomic_load(&pr->state) == SF2C_EXEC_N_2_D473 ? SK_PROG_FAILED : SK_PROG_BUILDING); return; }
+    require_shader_heap(pr->vi, STAGE_VERTEX, pr->code[0]);
+    require_shader_heap(pr->fi, STAGE_FRAGMENT, pr->code[1]);
     if (trace_render) LOG(SF2C_EXEC_S_DRAW_STEP_1_PR_P_VS_LLX_FS_L_7174, pr, (unsigned long long)pr->code[0], (unsigned long long)pr->code[1]);
     snap_apply(0, pr->vi->ssbo_read);  // (overlap) the storage slots the shaders read: a copy where the CPU rewrites the range
     snap_apply(1, pr->fi->ssbo_read);
@@ -5694,8 +5800,9 @@ static void draw_(CmdRec *r, bool indexed) {
     if (pr->fi->uses_gmem_store) vc_mark_sbufs(1);
 
     uint64_t prof_t2_ = prof ? SDL_GetTicksNS() : 0;
-    // ---- indices (copied; the largest index bounds the vertex data copied below)
+    // ---- indices (the index range bounds the vertex data copied below)
     uint32_t first = 0, count = (uint32_t)r->x[SF2C_EXEC_N_2_D473], inst, base_inst, max_index = 0;
+    uint32_t min_index = UINT32_MAX, vertex_start = 0;
     int32_t base_vertex = 0;
     VkSpan ib = {0};
     VkIndexType itype_vk = VK_INDEX_TYPE_UINT32;
@@ -5703,9 +5810,16 @@ static void draw_(CmdRec *r, bool indexed) {
     bool use_index = indexed || !native;
     const void *scan_src = NULL;  // deferred index scan (direct index buffer)
     uint32_t scan_isz = 0, scan_restart = 0;
+    bool trim_vertices = g_vk.staged_heap && !pr->vs_uses_vid && native;
     if (!indexed) {
         first = (uint32_t)r->x[1]; base_inst = (uint32_t)r->x[SF2C_EXEC_N_3_4E07]; inst = (uint32_t)r->x[SF2C_EXEC_N_4_4B22] ? (uint32_t)r->x[SF2C_EXEC_N_4_4B22] : 1;
         max_index = first + count;
+        if (trim_vertices) {
+            // The shader does not read the vertex ID, so the copied streams can start at the first vertex.
+            vertex_start = first;
+            max_index = count;
+            first = 0;
+        }
         if (!native) {
             uint32_t *e = expand_indices(mode, count, NULL, 0, first, &icount);
             ib = vk_transient_copy(e, (uint64_t)icount * SF2C_EXEC_N_4_4B22 + SF2C_EXEC_N_4_4B22, SF2C_EXEC_N_4_4B22);
@@ -5726,9 +5840,16 @@ static void draw_(CmdRec *r, bool indexed) {
             if (iaddr % isz == 0 && guest_direct(1, iaddr, (uint64_t)count * isz, &ib.buf, &ib.off)) {
                 scan_src = src; scan_isz = isz; scan_restart = restart;  // max_index only if a stream gets copied
             } else {
-                ib = vk_transient_copy(src, (uint64_t)count * isz + SF2C_EXEC_N_4_4B22, SF2C_EXEC_N_4_4B22);
-                if (isz == SF2C_EXEC_N_2_D473) { const uint16_t *s = src; for (uint32_t i = 0; i < count; i++) if (s[i] > max_index && s[i] != (uint16_t)restart) max_index = s[i]; }
-                else { const uint32_t *s = src; for (uint32_t i = 0; i < count; i++) if (s[i] > max_index && s[i] != restart) max_index = s[i]; }
+                uint64_t bytes = (uint64_t)count * isz + SF2C_EXEC_N_4_4B22;
+                ib = g_vk.staged_heap ? guest_geometry_copy(iaddr, bytes) : vk_transient_copy(src, bytes, SF2C_EXEC_N_4_4B22);
+                for (uint32_t i = 0; i < count; i++) {
+                    uint32_t index = isz == SF2C_EXEC_N_2_D473 ? ((const uint16_t *)src)[i] : ((const uint32_t *)src)[i];
+                    uint32_t cut = isz == SF2C_EXEC_N_2_D473 ? UINT16_MAX : UINT32_MAX;
+                    if (g_vk.staged_heap ? pre && index == cut : index == (isz == SF2C_EXEC_N_2_D473 ? (uint16_t)restart : restart))
+                        continue;
+                    if (index > max_index) max_index = index;
+                    if (index < min_index) min_index = index;
+                }
             }
         } else if (native) {  // 8-bit indices: widen to 16
             ib = vk_transient((uint64_t)count * SF2C_EXEC_N_2_D473 + SF2C_EXEC_N_4_4B22, SF2C_EXEC_N_4_4B22);
@@ -5744,8 +5865,16 @@ static void draw_(CmdRec *r, bool indexed) {
             free(e);
         }
         if (!scan_src) {
-            max_index += 1;
-            if (base_vertex > 0) max_index += (uint32_t)base_vertex;
+            int64_t start = (int64_t)min_index + base_vertex;
+            if (trim_vertices && min_index <= INT32_MAX && start >= 0 && start <= UINT32_MAX) {
+                // Keep index data intact and make the first copied vertex index zero.
+                vertex_start = (uint32_t)start;
+                max_index = max_index - min_index + 1;
+                base_vertex = -(int32_t)min_index;
+            } else {
+                max_index += 1;
+                if (base_vertex > 0) max_index += (uint32_t)base_vertex;
+            }
         }
     }
     if (use_index && ss_need(SS_IB, ss.ib == ib.buf && ss.io == ib.off && ss.it == itype_vk)) {
@@ -5778,12 +5907,13 @@ static void draw_(CmdRec *r, bool indexed) {
                 scan_src = NULL;
             }
             uint64_t stride = vl.stride[s], need;
+            uint64_t skip = vl.divisor[s] ? 0 : (uint64_t)vertex_start * stride;
             if (!stride) need = SF2C_EXEC_N_256_51E8;
             else if (vl.divisor[s]) need = ((uint64_t)base_inst + inst + vl.divisor[s] - 1) / vl.divisor[s] * stride + SF2C_EXEC_N_256_51E8;
             else need = (uint64_t)max_index * stride + SF2C_EXEC_N_256_51E8;
-            if (v.size && need > v.size) need = v.size;
-            if (!v.addr) { static const uint8_t zero[SF2C_EXEC_N_256_51E8]; sp = vk_transient_copy(zero, SF2C_EXEC_N_256_51E8, SF2C_EXEC_N_16_B17E); }
-            else sp = guest_copy(v.addr, need ? need : SF2C_EXEC_N_16_B17E);
+            if (v.size && skip < v.size && need > v.size - skip) need = v.size - skip;
+            if (!v.addr || (v.size && skip >= v.size)) { static const uint8_t zero[SF2C_EXEC_N_256_51E8]; sp = vk_transient_copy(zero, SF2C_EXEC_N_256_51E8, SF2C_EXEC_N_16_B17E); }
+            else sp = guest_geometry_copy(v.addr + skip, need ? need : SF2C_EXEC_N_16_B17E);
         }
         VkDeviceSize off = sp.off;
         if (ss_on && (ss.vb_known >> s & 1) && ss.vb[s] == sp.buf && ss.vo[s] == off) continue;
